@@ -1,0 +1,6 @@
+/* pgb docs — minimal overrides on top of the Mintlify aspen theme.
+   The indigo accent is set in docs.json (ParadeDB brand: primary/light #4f46e5, dark #818cf8);
+   aspen reads those top-level branding keys directly, so no CSS color overrides are needed. */
+:root {
+  --rounded-code: 0.5rem;
+}

@@ -1,0 +1,5 @@
+node_modules/
+.next/
+.mintlify/
+dist/
+.DS_Store

@@ -1,0 +1,53 @@
+---
+title: "pgb — two-stage Postgres codegen"
+description: "Typed builders and static query functions generated from your schema. PostgreSQL 18 & 19, full ParadeDB pg_search support."
+---
+
+**pgb** is a [sqlc](https://sqlc.dev) process plugin that turns your Postgres schema into four layers of Go — so repetitive SQL never gets hand-written again:
+
+1. **Models** — typed structs, generated with sqlc-gen-go-compatible behavior and a single shared type map.
+2. **Stage 1: builders** — per-table column descriptors with typed predicates, including every ParadeDB pg_search operator on bm25-indexed columns.
+3. **Stage 2: static functions** — `Get / List / Count / Insert / InsertBatch / Update / Upsert / Delete / Search / HybridSearch` per table, ready to call.
+4. **Query wrappers** — typed Go functions for the handwritten queries sqlc already resolved.
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/welcome/quickstart">
+    Install the plugin, wire one yaml block, run `sqlc generate`.
+  </Card>
+  <Card title="ParadeDB pg_search" icon="magnifying-glass" href="/paradedb/overview">
+    Full support for the v2 operator API — stable 0.25.9, 0.26-rc tracked — predicates, scoring, snippets, hybrid RRF.
+  </Card>
+  <Card title="Generated code" icon="code" href="/generated-code/builders">
+    What lands in `dbgen/` and what you can call.
+  </Card>
+  <Card title="Why this design" icon="book-open" href="/architecture/overview">
+    One plugin, one type map, a SchemaIR contract, and a churn barrier for pg_search.
+  </Card>
+</CardGroup>
+
+## The problem it solves
+
+Pure sqlc is static: every query is hand-written SQL. Dynamic filtering devolves into planner-hostile workarounds like `(@x IS NULL OR col = @x)` (a known [anti-pattern](https://github.com/sqlc-dev/sqlc/discussions/364)), and anything ParadeDB-flavored needs raw SQL escape hatches.
+
+pgb keeps sqlc where it is strong — parsing your schema, analyzing your handwritten queries — and generates the layer sqlc deliberately doesn't provide: a **runtime query builder**, typed to your actual columns, plus **static functions** for the CRUD shapes every table repeats.
+
+```go
+// static layer — zero hand-written SQL
+users, err := dbgen.ListUsers(ctx, db, dbgen.UserFilter{
+    EmailLike:    pgb.Opt("%@corp.io"),
+    CreatedAfter: pgb.Opt(since),
+}, pgb.Limit(20))
+
+// search — generated from the USING paradedb index definition
+hits, err := dbgen.SearchProducts(ctx, db, "running shoes",
+    dbgen.SearchOpts{Fuzzy: 1, BoostCategory: 2.0, Snippet: "description"})
+```
+
+## Targets
+
+| | |
+|---|---|
+| Postgres | 18 (full), 19 (gated features, beta) |
+| ParadeDB | 0.25.9+ / 0.26-rc — v2 operator API (`\|\|\|`, `&&&`, `###`, `===`, `@@@`, `##`, `pdb.*`) |
+| Go | 1.24+ · pgx/v5 · generics |
+| Generator | sqlc process plugin (protobuf over stdin/stdout) |

@@ -1,0 +1,63 @@
+---
+title: "Architecture overview"
+description: "The pipeline, the SchemaIR contract, and why pgb replaces gen: go: instead of sitting beside it."
+icon: "book-open"
+---
+
+## Pipeline
+
+```
+schema.sql (+ queries.sql)                       sqlc.yaml (options = pgb config)
+     │                                                │
+     ▼                                                ▼
+┌───────────────────────────  sqlc  ───────────────────────────────┐
+│  parse (libpg_query 18 via sqlc-dev/oliphant)                    │
+│  analyze → catalog (tables/columns/types) + resolved queries     │
+└──────────────┬───────────────────────────────────────────────────┘
+               │ GenerateRequest (protobuf, stdin)
+               ▼
+┌───────────────────────────  pgb plugin  ─────────────────────────┐
+│ 1. build SchemaIR:  catalog proto + oliphant re-parse of the     │
+│    schema files (index DDL, generated columns, COMMENT ON        │
+│    directives — none of which survive into the proto)            │
+│ 2. pass A: models + handwritten-query wrappers                   │
+│ 3. pass B: descriptors + builders          (stage 1)             │
+│ 4. pass C: static functions + search layer (stage 2)             │
+└──────────────┬───────────────────────────────────────────────────┘
+               │ GenerateResponse { File{name, contents} }
+               ▼
+        db/ (models + query wrappers)      dbgen/ (builders + statics)
+               │ imports (runtime only)
+               ▼
+        core/ — handwritten runtime: expression tree, SQL emitter,
+                pgx scan helpers, pg_search predicate emitters
+```
+
+## Decisions worth knowing
+
+### One plugin replaces `gen: go:`
+
+The plugin protocol hands pgb the same catalog and resolved queries that sqlc-gen-go receives, so pgb forks sqlc-gen-go (MIT) for models and query emission. The alternative — stock `gen: go:` plus a second builder plugin — means two independent type mappings; the moment their override sets diverge, generated code disagrees with models and you get runtime mis-scans or confusing compile errors.
+
+With a single fork there is exactly **one type map**, and it is still checked twice: pass A generates scan code that *assigns into* the model structs, so any internal inconsistency breaks `go build` rather than misbehaving.
+
+### The plugin gets no SQL AST — so pgb re-parses the schema
+
+sqlc's plugin protocol sends the resolved **catalog** (tables, columns, types, enums) and finished **query** objects, but not the parse tree. `CREATE INDEX ... USING paradedb`, `COMMENT ON` directives, and generated-column details are parsed by sqlc and then dropped. pgb therefore re-parses the schema files itself with `sqlc-dev/oliphant` — the same pure-Go libpg_query-18 binding sqlc uses, so there is no grammar drift. [SchemaIR](/architecture/schema-ir) is the merged result.
+
+### The pg_search emitter is one file
+
+ParadeDB churned its API twice in 2025 (`paradedb.*` → `pdb.*`, `USING bm25` → `USING paradedb`). All pg_search emission in the handwritten runtime lives in `core/search.go` behind a `paradedb.version` config gate — churn cost is one file, not a codebase.
+
+## Input modes
+
+| mode | entrypoint | notes |
+|---|---|---|
+| sqlc plugin (primary) | `sqlc generate` | full pipeline; sqlc keeps doing analysis, vet, handwritten-query typing |
+| standalone (`pgb-gen`) | `pgb-gen --schema schema.sql` | builds SchemaIR purely from oliphant, runs the same three passes. Escape hatch if sqlc's analyzer ever blocks a schema; costs its own domain/enum resolution |
+
+## Non-goals
+
+- No ORM: no relationships, eager loading, hooks, identity map, or unit-of-work.
+- No migrations tool.
+- One dialect only: Postgres (version-gated), not MySQL/SQLite.

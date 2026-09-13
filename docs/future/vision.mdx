@@ -1,0 +1,145 @@
+---
+title: "Future development — the Prisma-style loop"
+description: "pgb 2.0 vision: declarative multi-file schema, an encoded IR artifact, auto-run migrations, and a relation-aware ORM client on pgx."
+icon: "road"
+---
+
+<Note>
+This page is a **plan**, not a spec. Everything here lands after v0.1 (M0–M5). The shipped pgb stays what it is: a sqlc plugin generating builders and static functions from your SQL schema. The sqlc-plugin path remains fully supported for SQL-first users — the Prisma-style loop is a second front door into the same engine, not a replacement.
+</Note>
+
+## The vision
+
+Today pgb generates code *from* your schema but leaves schema management to you (hand-written migrations). The 2.0 direction closes the loop, Prisma-style:
+
+1. **Declare** tables in multiple schema files — a declarative DSL, not SQL.
+2. **Compile** them to SchemaIR; codegen emits models, builders, statics — and a **special encoded artifact** (the serialized IR) into your repo.
+3. **Sync** the database: a companion tool reads the artifact, diffs it against the live catalog, and **auto-generates and runs migrations**.
+
+```
+pgb/*.pgb (multiple schema files)
+     │
+     ▼  pgb compiler (DSL parser)
+SchemaIR  ────────────────────────────────────────┐
+     │                                            │
+     ▼                                            ▼
+db/ + dbgen/ (models, builders,          .pgb/schema.bin (encoded IR:
+statics, ORM client)                      IR + pgb version + content hash)
+                                                      │
+                                              pgb migrate (reads artifact)
+                                                      │
+                                              diff vs live pg_catalog
+                                                      │
+                                              DDL plan → auto-apply (dev)
+                                                        / explicit deploy (prod)
+```
+
+**Why this is cheap for pgb specifically:** SchemaIR was designed as the contract between parsing and codegen. The DSL is a *new source* into the IR; the migrate tool is a *new consumer* of it; the ORM is an *extension* of stage 1 (relations). No re-architecture — the 2.0 work hangs off the decision made on day one.
+
+## P1 — declarative schema DSL
+
+Multiple `*.pgb` files (like Prisma's multi-file schema), concatenated and name-checked:
+
+```prisma
+// pgb/products.pgb
+model Product {
+  id          Uuid   @id @default(uuidv7())
+  title       Text
+  description Text   @search(tokenizer: "simple", args: { stemmer: "english" })
+  category    Text   @search(tokenizer: "literal")
+  rating      Int    @search
+  price       Numeric @pg(type: "json.Number")
+  inStock     Bool   @default(true)
+  metadata    Jsonb  @search(path: "color", alias: "json_color", tokenizer: "literal")
+  embedding   Vector @dimension(768)
+  createdAt   Timestamptz @default(now())
+
+  @@paradedb(keyField: "id")
+  @@unique([category, title])
+}
+```
+
+Design points:
+
+- **ParadeDB annotations are first-class** — `@search(...)` fields become the `USING paradedb` index columns, `@@paradedb(keyField:)` sets the key field, JSON paths and aliases are declared where you read them. No other ORM schema language can express a search index; that stays pgb's wedge. Attributes are **plugin-owned**: they are claimed by the official `pgb-paradedb` extension via the [plugin system](/future/plugins), and an unknown attribute errors naming the plugin that would claim it.
+- Every construct has an exact SQL DDL projection — the DSL is **lossless against Postgres 18/19 features** (generated columns, temporal constraints, ranges), not a lossy abstraction.
+- Base types mirror the [type-mapping table](/reference/type-mapping); `@pg(type:)` overrides map to Go.
+- The SQL-first path stays untouched: `schema.sql` + sqlc continues to work. Both doors produce the same SchemaIR.
+
+## P2 — encoded artifact + `pgb migrate`
+
+Every generation writes `.pgb/schema.bin`: protobuf-encoded SchemaIR + pgb version + content hash. It is the single artifact the migration tool trusts (Prisma's DMMF/migration-lock analogy).
+
+```bash
+pgb migrate dev       # diff artifact vs shadow DB → generate + AUTO-APPLY DDL to the dev database
+pgb migrate deploy    # apply recorded migrations to staging/prod — explicit, no auto-diff
+pgb migrate diff      # print the SQL plan without applying
+pgb migrate status    # drift report: artifact vs live catalog
+```
+
+Design points:
+
+- **Diffing happens in a shadow database** (Prisma Migrate's approach): replay recorded migrations, apply the computed plan, capture the resulting DDL — never diff against prod directly.
+- **Dev auto-runs; prod requires an explicit deploy step** with reviewable SQL files committed to the repo. Destructive changes (drop column/table, type narrow) get an interactive confirm in dev and a hard refusal flag in deploy.
+- Drift detection is continuous: someone hand-altered the database → `migrate status` says so, and `migrate dev` offers to baseline.
+- The diff engine needs full `pg_catalog` coverage — the same oliphant-informed catalog work from the [DDL extraction pass](/architecture/schema-ir), pointed the other way: IR → catalog instead of catalog → IR.
+
+## P3 — the ORM client
+
+Generated, typed, pgx-native — with **relations** promoted from non-goal to feature:
+
+```prisma
+model User {
+  id    Int    @id
+  email Text   @unique
+  posts Post[] @relation(fields: [id], references: [authorId])
+}
+
+model Post {
+  id       Int  @id
+  authorId Int
+  author   User @relation(fields: [authorId], references: [id])
+}
+```
+
+```go
+users, err := client.User.FindMany(
+    User.Where(Email.Contains("@corp.io"), CreatedAt.Gte(since)),
+).Include(User.Include.Posts()).Take(20).Exec(ctx)
+```
+
+Design points:
+
+- **No query engine process.** Prisma ships a Rust engine binary; pgb's client is pure Go compiling down to the same core emitter — every query is parameterized SQL executed by pgx.
+- **Eager loading via pgx pipelining** (`pgx.Batch`), not N+1: one round trip per include level.
+- Transactions keep the existing `DBTX` shape; `client.Tx(ctx)` scopes a fluent session.
+- `Select`/`Include` projections generate row-scans per projection shape.
+- Static functions, builders, search, and hybrid search from v0.1 remain exactly as they are — the ORM adds traversal on top, it does not replace them.
+
+## Parity with Prisma
+
+| Prisma | pgb 2.0 |
+|---|---|
+| `schema.prisma` (multi-file) | `pgb/*.pgb` (multi-file) |
+| DMMF / generated client metadata | `.pgb/schema.bin` (protobuf SchemaIR) |
+| `prisma migrate dev` (auto-apply, shadow DB) | `pgb migrate dev` |
+| `prisma migrate deploy` | `pgb migrate deploy` |
+| `prisma db push` | `pgb migrate dev --force` mode |
+| Prisma Client (Rust engine underneath) | pure-Go client on pgx, same emitter as v0.1 |
+| `$queryRaw` | `core.Raw(...)`, plus the whole sqlc handwritten-query path |
+| — | ParadeDB `@search` annotations, hybrid search functions (Prisma has nothing here) |
+
+## Why Postgres-only makes this tractable
+
+Prisma's hardest problem is the connector matrix (a dozen databases, each with its own DDL dialect and migration semantics). pgb has exactly one dialect it already parses and emits, one catalog to diff against, and one extension ecosystem (ParadeDB, pgvector) that it treats as first-class rather than an escape hatch. The ambitious part is the diff engine's `pg_catalog` coverage — a bounded, testable problem (and the [round-trip property test](/guides/testing) already exercises the hardest grammar cases).
+
+## Sequencing
+
+| phase | gate | exit |
+|---|---|---|
+| P0 plugin split | after v0.1 (M5) | `pgb-paradedb` ships as an official extension; output byte-identical before/after — see [plugin system](/future/plugins) |
+| P1 DSL | after P0 | DSL → SchemaIR → identical codegen output as the SQL path on the same schema |
+| P2 migrate | after P1 | shadow-DB diff correct on the integration schema set; dev auto-run + deploy flow e2e |
+| P3 ORM | after P2 | relation traversal + Include with pipelined loading; zero N+1 in tests |
+
+Open questions are tracked in the repo; the biggest one: **how much of `pgb migrate` reuses existing migration tooling (goose, atlas) versus building the declarative diff engine from scratch.** Leaning: own the diff engine (it is the product), stay compatible with plain `.sql` migration directories for baselining and escape hatches.

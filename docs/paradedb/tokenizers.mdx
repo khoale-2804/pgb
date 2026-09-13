@@ -1,0 +1,106 @@
+---
+title: "Tokenizers & token filters"
+description: "The 13 pg_search tokenizers, the token filter set, and how pgb carries tokenizer casts from the DDL into codegen."
+icon: "font"
+---
+
+Tokenizers decide how a field's text is split into indexed tokens; token filters transform those tokens afterwards. Both are declared per column inside the `USING paradedb` index definition — they affect indexing, never the predicate SQL pgb emits.
+
+## Tokenizers
+
+Thirteen tokenizers ship with pg_search. **Multiple tokenizers per field are allowed** — index the same column several ways (e.g. `icu` for matching plus `edge_ngrams` for autocomplete).
+
+| tokenizer | use case |
+|---|---|
+| `unicode` (default) | NFA-based Unicode segmentation; the multilingual default |
+| `simple` | splits on non-alphanumeric characters; plain prose |
+| `whitespace` | splits on whitespace only, keeps punctuation; tags, code fragments |
+| `literal` | no tokenization — the whole value is one token; keyword matching |
+| `literal_normalized` | like `literal`, with normalization applied |
+| `ngrams` | overlapping character n-grams; substring matching |
+| `edge_ngrams` | prefix-only n-grams; search-as-you-type |
+| `regex` | tokenizes by a user-supplied pattern |
+| `chinese_compatible` | CJK segmentation for space-less Chinese text |
+| `lindera` | dictionary-based morphological analysis; Japanese, Korean, Chinese |
+| `icu` | ICU-based segmentation; robust multilingual text and diacritics |
+| `jieba` | Chinese word segmentation |
+| `source_code` | splits camelCase/snake_case identifiers; code search |
+
+## Token filters
+
+| filter | effect |
+|---|---|
+| `alphanumeric` | drops non-alphanumeric tokens |
+| `ascii_folding` | folds diacritics to ASCII (café → cafe) |
+| `lowercase` | lowercases tokens |
+| `lowercase_ngram` | lowercases, then n-grams |
+| `stopwords` | removes language stop words |
+| `stemming` | language stemmers |
+| `token_length` | drops tokens outside a length range |
+| `trim` | strips surrounding whitespace |
+
+Filters arrive as options on the tokenizer cast where the tokenizer supports them, e.g. `pdb.simple('stemmer=english')`.
+
+<Note>
+A column indexed without a tokenizer cast uses the `unicode` default — only opt into others when segmentation or exactness demands it. ParadeDB allows one search index per table ([index DDL extraction](/paradedb/index-ddl) enforces this at parse time), so tokenizer choices are fixed at index creation; indexing the same column under several tokenizers is the way to get both exact and fuzzier access to it.
+</Note>
+
+## Tokenizer choice vs predicate choice
+
+The tokenizer sets what tokens exist; the [predicate](/paradedb/predicates) decides how the query matches them. Two pairings cover most tables:
+
+- **Exact fields** — `literal` (or `literal_normalized`) turns the whole value into a single token, which is what the `===` family (`.Exact`, `.ExactAny`) matches against: categories, SKUs, statuses.
+- **Prose fields** — `unicode`, `icu`, or `simple` produce many tokens per value, which is what `|||`, `###`, and fuzzy (`.Match`, `.Phrase`, `.Fuzzy`) expect.
+
+Mismatching the two is the classic silent-empty-result bug: an exact predicate against a prose-tokenized field only matches whole-token values. pgb does not re-tokenize client-side — it emits the operator and lets the index decide.
+
+## Cast spellings
+
+In the DDL, the tokenizer is a cast on the indexed column (same pass that records [fast flags](/paradedb/index-ddl) and JSON-path aliases):
+
+```sql
+CREATE INDEX products_search ON products USING paradedb
+  (id,
+   description::pdb.icu,                        -- multilingual segmentation
+   title::pdb.simple('stemmer=english'),        -- tokenizer with a filter option
+   sku::pdb.literal,                            -- keyword-like, one token
+   suggest::pdb.ngram(3, 8)                     -- substring window, min/max
+  )
+  WITH (key_field='id');
+```
+
+The cast is metadata, not a value conversion — it tells pg_search how to tokenize the field at index time. Windowed tokenizers take the range as arguments (`pdb.ngram(min, max)` above); `regex` takes its pattern as an argument.
+
+## How they flow through pgb
+
+pgb has no separate tokenizer config — tokenizers arrive as **casts in the DDL** and ride the [DDL extraction](/paradedb/index-ddl) pass:
+
+```sql
+CREATE INDEX products_search ON products USING paradedb
+  (id, description::pdb.icu, (metadata->'color')::pdb.literal('alias=json_color'), rating)
+  WITH (key_field='id');
+```
+
+The DDL pass records each cast as metadata on the IR `SearchField` — `Tokenizer: "icu"`, JSON path, alias, `PGType` — as shown in the worked example in [index DDL extraction](/paradedb/index-ddl). Codegen then uses it:
+
+- **Index re-emission** — tokenizer metadata lets the index definition be reproduced exactly.
+- **Predicates** — which predicates a column gets is decided by its presence in the index ([predicates](/paradedb/predicates)); the tokenizer choice stays in the DDL.
+- **Aliases** — `alias=` on a cast becomes the name JSON-path predicates use.
+- **SchemaIR round-trip** — tokenizer/path/alias metadata lives in the [SchemaIR](/architecture/schema-ir), so a changed cast shows up as a diff in regenerated code, reviewable like any other schema change.
+
+## Planned: DSL `@search` attributes
+
+<Warning>
+Planned (P1) — not implemented in v0.1. Scope lives in the [vision](/future/vision).
+</Warning>
+
+The proposed search DSL expresses this metadata as declarative `@search` attributes next to the field, instead of casts inside `CREATE INDEX`:
+
+```go
+type Product struct {
+    Description string `search:"tokenizer=icu"`
+    Color       string `search:"path=metadata->'color',alias=json_color,tokenizer=literal"`
+}
+```
+
+The attributes cover `tokenizer:`, `path:`, and `alias:` — exactly the metadata the DDL pass extracts today. pgb would generate the `USING paradedb` index DDL from them, giving the search schema one source of truth: the Go struct, with the DDL as generated output rather than hand-maintained input.

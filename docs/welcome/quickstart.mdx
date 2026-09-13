@@ -1,0 +1,100 @@
+---
+title: "Quickstart"
+description: "Wire pgb into sqlc and generate your first builder + static functions."
+icon: "rocket"
+---
+
+pgb is a sqlc **process plugin**: a Go binary sqlc invokes with a protobuf `GenerateRequest` on stdin. You need [sqlc](https://docs.sqlc.dev) and pgx/v5 in your project.
+
+## 1. Install sqlc (main until the next tagged release)
+
+The PostgreSQL 18 parser (`sqlc-dev/oliphant`) and unknown-function tolerance are merged on sqlc **main** but not yet in a tagged release (latest release: v1.31.1):
+
+```bash
+go install github.com/sqlc-dev/sqlc/cmd/sqlc@main
+```
+
+<Note>
+On v1.31.1 your schema still parses fine (the PG17-era grammar handles all pgb-relevant DDL, including `USING paradedb`), but handwritten queries calling `pdb.*` functions fail type analysis — the graceful degradation to untyped `any` columns is sqlc main-branch behavior, not yet in a tagged release.
+</Note>
+
+## 2. Build the plugin binary
+
+```bash
+git clone https://github.com/your-org/pgb && cd pgb
+go build -o /usr/local/bin/sqlc-gen-pgb ./gen
+```
+
+## 3. Configure sqlc.yaml
+
+```yaml
+version: '2'
+sql:
+  - engine: postgresql
+    schema: schema.sql
+    queries: queries.sql        # optional — handwritten queries only
+    codegen:
+      - out: dbgen
+        plugin: pgb
+        options:
+          package: dbgen
+          models_package: db
+          core: github.com/your-org/pgb/core
+          target: "18"          # or "19" — dialect gate for the SQL emitter
+          paradedb:
+            version: "0.26"
+          emit:
+            batch: true          # InsertXxx batch functions
+            keyset: true         # cursor pagination helpers
+            hybrid: true         # SearchXxxHybrid when a vector column exists
+            merge: false         # MERGE builder (PG17+), off by default
+          overrides:
+            - db_type: vector
+              go_type: github.com/pgvector/pgvector-go.Vector
+plugins:
+  - name: pgb
+    process: { cmd: sqlc-gen-pgb }
+```
+
+<Tip>
+pgb **replaces** `gen: go:` — do not configure both. Models are emitted by pgb itself (forked sqlc-gen-go behavior), so the whole project shares one type map.
+</Tip>
+
+## 4. Generate
+
+```bash
+sqlc generate
+```
+
+Output layout:
+
+```
+db/                      # models + wrappers for handwritten queries.sql
+  models.gen.go
+  users.gen.go
+dbgen/                   # stage 1 + stage 2 — do not edit
+  users.gen.go           #   descriptors, predicates, builders, static funcs
+  users_search.gen.go    #   only for tables with a USING paradedb index
+```
+
+## 5. Call it
+
+```go
+pool, _ := pgxpool.New(ctx, os.Getenv("DATABASE_URL"))
+
+u, err := dbgen.GetUser(ctx, pool, 42)                  // pgb.ErrNotFound if missing
+users, err := dbgen.ListUsers(ctx, pool, dbgen.UserFilter{
+    EmailLike: pgb.Opt("%@corp.io"),
+}, pgb.Limit(20))
+
+// fluent escape hatch when a static shape doesn't fit
+rows, err := dbgen.Users.Select().
+    Where(dbgen.Or(
+        dbgen.Users.Email().Like("%@corp.io"),
+        dbgen.Users.CreatedAt().Gte(since))).
+    OrderBy(dbgen.Users.CreatedAt().Desc()).
+    Limit(20).
+    All(ctx, pool)
+```
+
+Every function accepts any `pgx` executor (pool, conn, or tx) through the `pgb.DBTX` interface.

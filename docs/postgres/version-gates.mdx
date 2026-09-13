@@ -1,0 +1,40 @@
+---
+title: "Postgres version gates"
+description: "What pgb emits per Postgres version — 18 features today, 19 features behind a gate until GA."
+icon: "layer-group"
+---
+
+`target: "18" | "19"` in the pgb options controls the SQL emitter's feature gates. The generated code stays version-agnostic — the gate only controls which syntax the emitter is allowed to produce.
+
+| feature | introduced | pgb behavior |
+|---|---|---|
+| explicit column lists in RETURNING | all versions | always used — `SELECT *` is never emitted |
+| default-bearing columns omitted from INSERT | all versions | unless `IncludeDefaults` |
+| `MERGE ... RETURNING` | 17 | `MERGE` builder behind `emit.merge` (M4/M5, off by default) |
+| virtual generated columns (new default kind) | 18 | excluded from INSERT/UPDATE/UPSERT column lists; fine in filters and RETURNING |
+| `uuidv7()` | 18 | nothing emitted (defaults live in your schema); DDL lint suggests uuidv7 for new uuid PKs |
+| `RETURNING OLD/NEW` | 18 | emitter supports it; note sqlc's analyzer still cannot parse it in handwritten queries (#4355) — another reason such statements belong in the generated layer |
+| temporal constraints (`WITHOUT OVERLAPS`) | 18 | detected in the IR; temporal upserts get an explicit "use Raw" error in v1, emitter support in M5 |
+| `INSERT ... ON CONFLICT DO SELECT RETURNING` | 19 | `UpsertOpts.OnSelect` gated behind `target: "19"`; syntax re-verified at PG19 GA (currently beta) |
+| `FOR PORTION OF` (update/delete) | 19 | planned M5 |
+| SQL/PGQ property graphs | 19 | non-goal — `Raw()` escape hatch |
+| `WAIT FOR` | 19 | out of scope |
+
+## Parser reality
+
+The generator parses your schema with libpg_query 18 (`sqlc-dev/oliphant`; libpg_query 18.0.0 landed 2026-05-21). **No parser embeds PG19 grammar yet** — libpg_query has no 19 branch, and PG19 is beta (beta 3: 2026-08-13, GA expected ~Sept/Oct 2026).
+
+Practical consequence: keep PG19-only DDL (e.g. `CREATE PROPERTY GRAPH`) out of `schema.sql` for now. Emitted DML is validated by the live server, not by the codegen parser, so targeting `19` in the emitter is unaffected.
+
+## ParadeDB on PG19
+
+pg_search ships binaries for Postgres 15, 16, 17, and 18 — **no 19 builds yet**. The test matrix therefore runs:
+
+- **PG18 + ParadeDB image** — full matrix including search and hybrid.
+- **postgres:19-beta** — non-search matrix only; `pgb` emits version-agnostic SQL for those paths, so nothing else changes.
+
+When ParadeDB ships PG19 builds, the search lanes join the 19 matrix with zero code changes.
+
+## Support window
+
+The PG19 beta status above tracks the upstream calendar: beta 3 landed 2026-08-13 with GA expected late Sept/Oct 2026, and the supported majors 15–18 are EOL'd 2027-11-11, 2028-11-09, 2029-11-08, and 2030-11-14 respectively (5 years per major). How pgb turns those dates into gate errors and warnings — and how it announces future drops — is described in the [support matrix](/reference/support-matrix).

@@ -1,0 +1,85 @@
+---
+title: "SchemaIR"
+description: "The intermediate representation between parsing and codegen — tables, columns, paradedb indexes, directives."
+icon: "shapes"
+---
+
+Everything pgb generates is derived from one in-memory structure. Parsing (sqlc catalog, oliphant DDL pass) and codegen (three passes) only meet through it — which is what makes the standalone input mode possible.
+
+## The IR
+
+```go
+package ir
+
+type Schema struct {
+    DefaultSchema string        // "public"
+    Tables        []Table
+    Enums         []Enum        // named, per schema
+    Composites    []Composite
+    Domains       map[string]string // domain -> base type
+}
+
+type Table struct {
+    Schema, Name string
+    Comment      string
+    Columns      []Column
+    PrimaryKey   []string
+    Uniques      [][]string     // incl. WITHOUT OVERLAPS (flagged temporal)
+    ForeignKeys  []ForeignKey   // detected, kept inert in v1
+    Search       *SearchIndex   // non-nil iff a USING paradedb/bm25 index exists
+}
+
+type Column struct {
+    Name        string
+    PGType      string       // resolved base type (domain unwrapped)
+    NotNull     bool
+    IsArray     bool
+    HasDefault  bool
+    DefaultExpr string
+    Generated   string       // "stored" | "virtual" (PG18 virtual = default kind)
+    IsTemporal  bool         // participates in a WITHOUT OVERLAPS constraint
+    Comment     string
+}
+
+type SearchIndex struct {
+    Name     string           // index name
+    Using    string           // "paradedb" | "bm25" (accepted alias)
+    KeyField string           // from WITH (key_field='id')
+    Fields   []SearchField    // ordered per DDL
+    Options  map[string]string // rest of WITH(...) raw
+}
+
+type SearchField struct {
+    Column    string
+    Path      string          // "metadata->'color'" when a JSON path is indexed
+    Alias     string          // alias=json_color
+    Tokenizer string          // icu | simple(stemmer=english) | literal | ngram(3,3) | fast=...
+    PGType    string          // text | numeric | timestamp | boolean | jsonb | range | array
+}
+```
+
+## Where each fact comes from
+
+| fact | source | why |
+|---|---|---|
+| tables, columns, types, enums | sqlc catalog proto | already resolved (domains unwrapped, overrides applied) |
+| `USING paradedb` index DDL | oliphant re-parse | the proto catalog drops `CREATE INDEX` entirely |
+| generated columns (`STORED` / PG18 `VIRTUAL`) | oliphant re-parse | kind flag not in the proto |
+| temporal constraints (`WITHOUT OVERLAPS`) | oliphant re-parse | |
+| `COMMENT ON` directives | oliphant re-parse | inline `--` comments do not survive any PG parse — `COMMENT ON` is real DDL |
+
+Failure policy: if oliphant cannot parse a statement the sqlc catalog already resolved, that is a **warning**, not an error — the IR degrades to catalog-only and the search layer is simply not generated for the affected table.
+
+## Directives
+
+Ride in `COMMENT ON` statements so they are valid DDL:
+
+```sql
+COMMENT ON TABLE  users            IS 'pgb:skip';              -- no codegen for this table
+COMMENT ON COLUMN users.password   IS 'pgb:no_filter';         -- not exposed as a predicate
+COMMENT ON COLUMN users.bio        IS 'pgb:no_patch';          -- excluded from Update sets
+COMMENT ON COLUMN users.embedding  IS 'pgb:type=github.com/pgvector/pgvector-go.Vector';
+COMMENT ON COLUMN users.metadata   IS 'pgb:type=map[string]any';
+```
+
+v1 directive set: `pgb:skip`, `pgb:no_filter`, `pgb:no_patch`, `pgb:type=<go type>`. Everything global lives in the [sqlc.yaml options](/reference/config) instead.

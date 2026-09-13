@@ -1,0 +1,93 @@
+---
+title: "Stage 2 — static functions"
+description: "Get, List, Count, Insert, InsertBatch, Update, Upsert, Delete — the CRUD layer you never write again."
+icon: "bolt"
+---
+
+Stage 2 generates the static layer — the reason repetitive SQL never gets hand-written. Every function: explicit column lists, bound parameters, `pgb.ErrNotFound` sentinel wrapping `pgx.ErrNoRows`, tx-compatible via `pgb.DBTX`.
+
+```go
+func GetUser(ctx context.Context, db pgb.DBTX, id int64) (db.User, error)             // pgb.ErrNotFound
+func ListUsers(ctx context.Context, db pgb.DBTX, f UserFilter, o ...pgb.ListOpt) ([]db.User, error)
+func CountUsers(ctx context.Context, db pgb.DBTX, f UserFilter) (int64, error)
+
+func InsertUser(ctx context.Context, db pgb.DBTX, p InsertUserParams) (db.User, error)
+func InsertUsers(ctx context.Context, db pgb.DBTX, ps []InsertUserParams) ([]db.User, error)
+func UpdateUser(ctx context.Context, db pgb.DBTX, id int64, s UserSet) (db.User, error)
+func UpdateUsers(ctx context.Context, db pgb.DBTX, where []core.Expr, s UserSet) (int64, error)
+func UpsertUser(ctx context.Context, db pgb.DBTX, p InsertUserParams, o UpsertOpts) (db.User, error)
+func DeleteUser(ctx context.Context, db pgb.DBTX, id int64) error
+func DeleteUsers(ctx context.Context, db pgb.DBTX, where []core.Expr) (int64, error)
+```
+
+## Filters
+
+`UserFilter` fields are typed and optional — `nil` / zero means "don't filter":
+
+```go
+type UserFilter struct {
+    ID           *int64
+    Emails       []string
+    EmailLike    *string
+    CreatedAfter *time.Time
+    MetadataEq   map[string]any     // jsonb KeyEq shorthand
+    Extra        []core.Expr        // escape hatch — composes with generated filters
+}
+```
+
+<Warning>
+This is exactly the layer where hand-written sqlc deteriorates into `(@x IS NULL OR col = @x)` — a [planner anti-pattern](https://github.com/sqlc-dev/sqlc/discussions/364). Generated filters compose the WHERE clause structurally instead, so Postgres always sees a clean, sargable predicate.
+</Warning>
+
+## Inserts
+
+- `InsertUser` emits `INSERT ... RETURNING <explicit columns>` and returns the row.
+- Columns with defaults are omitted from the column list; PG18 virtual generated columns are always omitted (both INSERT and UPDATE).
+- `InsertUsers` handles arbitrary batch sizes while still returning rows:
+
+```sql
+INSERT INTO users (email, name)
+SELECT * FROM unnest($1::text[], $2::text[])
+RETURNING id, email, name, created_at
+```
+
+A `pgx.CopyFrom` variant is available opt-in for pure bulk loads (no `RETURNING` — Postgres has no `COPY ... RETURNING`).
+
+## Updates — three-state sets
+
+```go
+type UserSet struct {
+    Email core.Set[string]     // pgb.Set("x") · pgb.Null[string]() · zero = skip
+    Bio   core.Set[string]
+}
+
+dbgen.UpdateUser(ctx, db, id, dbgen.UserSet{
+    Email: pgb.Set("new@corp.io"),
+    Bio:   pgb.Null[string](),
+})
+```
+
+## Upserts
+
+```go
+dbgen.UpsertUser(ctx, db, p, dbgen.UpsertOpts{
+    Target:  []string{"email"},          // ON CONFLICT (email)
+    Action:  dbgen.DoUpdate(dbgen.UserSet{Bio: pgb.Set("...")}),
+    // OnSelect: true                      // target 19 → ON CONFLICT DO SELECT RETURNING
+})
+```
+
+`OnSelect` is gated behind `target: "19"` in config; the `DO SELECT` syntax must be re-verified at PG19 GA (currently beta).
+
+## Transactions
+
+Every function takes `pgb.DBTX`, which `*pgxpool.Pool`, `*pgx.Conn`, and `pgx.Tx` all satisfy:
+
+```go
+_ = pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
+    _, err := dbgen.InsertUser(ctx, tx, p)   // joins the tx
+    return err
+})
+```
+
+or the helper: `pgb.WithTx(ctx, pool, func(tx pgb.DBTX) ([]db.User, error) { ... })`.

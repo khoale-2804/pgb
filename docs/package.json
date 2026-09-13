@@ -1,0 +1,13 @@
+{
+  "name": "pgb-docs",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "mint dev --port 3736",
+    "validate": "mint validate",
+    "check": "mint broken-links"
+  },
+  "devDependencies": {
+    "mintlify": "^4.0.0"
+  }
+}

@@ -1,0 +1,68 @@
+---
+title: "Models & type mapping"
+description: "How pgb maps Postgres types to Go — one shared map for models, params, filters, and scans."
+icon: "braille"
+---
+
+Models are emitted by pgb itself (pass A), forked from sqlc-gen-go's behavior — same struct shapes, same familiar defaults — so that models, builder predicates, function params, and row scans all share **one type map**.
+
+## Defaults
+
+| Postgres | Go (default) | notes |
+|---|---|---|
+| `text` `varchar` `bpchar` `citext` `name` | `string` | |
+| `boolean` | `bool` | |
+| `int2` / `int4` / `int8` | `int16` / `int32` / `int64` | |
+| `oid` | `uint32` | |
+| `float4` / `float8` | `float32` / `float64` | |
+| `numeric` | `pgtype.Numeric` | override to `json.Number` / `string` for money |
+| `uuid` | `uuid.UUID` (google) | |
+| `bytea` | `[]byte` | |
+| `json` `jsonb` | `[]byte` | override to a typed struct or map |
+| `timestamptz` `timestamp` | `pgtype.Timestamptz` | |
+| `date` | `pgtype.Date` | |
+| `interval` | `pgtype.Interval` | |
+| `inet` `cidr` `macaddr` | `pgtype.*` | |
+| range types | `pgtype.Range[T]` | |
+| user-defined enum | generated string type | |
+| `vector` (pgvector) | override → `pgvector.Vector` | required for hybrid search |
+| unknown / `any` | `any` | untyped columns (e.g. `pdb.score()` under sqlc v1.31.1) |
+
+## Nullability
+
+Two modes via the `nullability` option:
+
+- `pgtype` (default) — nullable columns use `pgtype.Timestamptz`, `pgtype.Date`, … matching sqlc-gen-go conventions.
+- `pointers` — nullable columns use `*T`.
+
+## Three-state writes
+
+For `UPDATE`/`INSERT` you need three states: *write value*, *write NULL*, *skip column*. pgb uses one generic instead of pointer tricks:
+
+```go
+package core
+
+type Set[T any] struct {
+    V       T
+    IsNull  bool
+    Defined bool
+}
+
+func Set[T any](v T) Set[T]  // write value
+func Null[T any]() Set[T]    // write NULL
+// zero value              // skip this column
+```
+
+```go
+dbgen.UpdateUser(ctx, db, id, dbgen.UserSet{
+    Email: pgb.Set("new@corp.io"),   // SET email = $2
+    Bio:   pgb.Null[string](),       // SET bio = NULL
+    // CreatedAt: zero               // left untouched
+})
+```
+
+## Overrides
+
+Per-column Go types come from either the [config `overrides` list](/reference/config) or the [`pgb:type=` directive](/architecture/schema-ir). Because there is exactly one type map, an override changes the model field, the filter field, and the scan target simultaneously.
+
+Columns typed `any` (unresolved extension functions in handwritten queries on sqlc v1.31.1) surface as explicit `any` fields — the nudge is to cast in SQL (`pdb.score(id)::float8`) for a clean type.

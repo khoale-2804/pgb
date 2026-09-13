@@ -1,0 +1,66 @@
+---
+title: "Index DDL extraction"
+description: "How pgb parses USING paradedb index definitions and turns them into search-aware codegen."
+icon: "file-magnifying-glass"
+---
+
+sqlc's plugin protocol drops `CREATE INDEX` entirely — the plugin receives no trace of it. Since the index definition *is* the search schema, pgb re-parses your schema files with `sqlc-dev/oliphant` (the same libpg_query-18 binding sqlc uses) and lifts every `USING paradedb`/`USING bm25` index into the [SchemaIR](/architecture/schema-ir).
+
+## What it parses
+
+```sql
+CREATE INDEX products_search ON products USING paradedb
+  (id, description::pdb.icu, (metadata->'color')::pdb.literal('alias=json_color'), rating)
+  WITH (key_field='id');
+```
+
+becomes:
+
+```go
+SearchIndex{
+    Name:     "products_search",
+    Using:    "paradedb",
+    KeyField: "id",
+    Fields: []SearchField{
+        {Column: "id"},
+        {Column: "description", Tokenizer: "icu", PGType: "text"},
+        {Path: "metadata->'color'", Alias: "json_color", Tokenizer: "literal", PGType: "jsonb"},
+        {Column: "rating", PGType: "numeric"},
+    },
+}
+```
+
+## What codegen does with it
+
+- **Predicate surface** — search methods are generated *only* on indexed columns; everything else stays a plain column.
+- **JSON paths** — the path expression is re-emitted exactly as indexed (`metadata->'color'`), so the predicate matches what the index actually covers.
+- **Scoring** — `key_field` from `WITH` feeds `pdb.score(...)`. pgb prefers the primary key if `key_field` is absent; ParadeDB's one-index-per-table rule is enforced at parse time.
+- **`key_field` uniqueness caveat** — ParadeDB currently requires the key field to be UNIQUE and the first indexed column (a removal is in progress upstream). pgb parses tolerantly and warns, but emits `pdb.score` against the declared key field either way.
+
+## Covering-index semantics
+
+A `USING paradedb` index is covering: every indexed column is stored inside the index, so predicates and scoring resolve without heap fetches. The flip side: adding a column to an existing index requires a `REINDEX` — the search schema lives in the index, not the table.
+
+## Supported index shapes
+
+| shape | example |
+|---|---|
+| partial | `... USING paradedb (...) WHERE in_stock` |
+| composite | several columns in one index (one index per table) |
+| expression | `(metadata->'color')::pdb.literal('alias=json_color')` |
+| JSON-path | nested document paths as indexed fields |
+| array | array columns indexed element-wise |
+
+## Build monitoring
+
+Index builds report through Postgres's standard `pg_stat_progress_create_index` view — large builds are visible with the same tooling as any other index.
+
+## Tokenizer casts
+
+Per-column tokenizers are recorded as metadata on the `SearchField` (they affect how the field is indexed, not the predicate SQL): `pdb.icu`, `pdb.simple('stemmer=english')`, `pdb.literal`, `pdb.literal_normalized`, `pdb.ngram(3,3)`, `fast` flags, and JSON path aliasing.
+
+Indexable field types: text, JSON, numeric, timestamp, range, boolean, arrays.
+
+## Failure policy
+
+A schema statement oliphant cannot parse is a warning, not an error — the table simply gets no search layer, and the sqlc catalog still drives everything else.

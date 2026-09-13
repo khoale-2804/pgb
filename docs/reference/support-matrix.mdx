@@ -1,0 +1,119 @@
+---
+title: "Support matrix & deprecations"
+description: "Supported Postgres, ParadeDB pg_search, and sqlc versions — and how pgb announces deprecations."
+icon: "table"
+---
+
+pgb's compatibility surface has three moving parts: PostgreSQL majors, ParadeDB pg_search releases, and sqlc itself. This page records what is supported today, what is gated, and how pgb announces deprecations. The per-version SQL emitter gates live in [version gates](/postgres/version-gates); the option keys themselves live in [configuration](/reference/config).
+
+## At a glance
+
+| component | supported today | gate in pgb |
+|---|---|---|
+| PostgreSQL | 15, 16, 17, 18 | `target: "18" \| "19"` — 19 is a beta gate |
+| ParadeDB pg_search | 0.25.9+ stable, 0.26-rc tracked | `paradedb.version: "0.26"` |
+| sqlc | v1.31.1 release; `@main` for new parser behavior | install instruction, not a config gate |
+
+## Postgres majors
+
+PostgreSQL follows a 5-years-per-major EOL policy. pgb targets every major still inside its window:
+
+| major | upstream EOL | pgb support |
+|---|---|---|
+| 15 | 2027-11-11 | supported — also the pg_search binary floor |
+| 16 | 2028-11-09 | supported |
+| 17 | 2029-11-08 | supported (MERGE builder target) |
+| 18 | 2030-11-14 | supported — default `target` |
+| 19 | not GA yet (beta 3: 2026-08-13; GA expected late Sept/Oct 2026) | beta gate — emitter accepts `target: "19"`, search lanes wait on ParadeDB binaries |
+
+<Note>
+PG14 leaves upstream support 2026-11-12 and PG13 was EOL'd 2025-11-13. Both are outside pgb's targets, so no gate applies — but hosts or schema dumps pinned to them are on their own.
+</Note>
+
+Current point releases (2026-08-13): 18.6, 17.11, 16.15, 15.19. pgb emits no point-release-specific SQL, so point releases need no gate.
+
+The emitter half of the 19 gate works today because emitted DML is validated by the live server, not by the codegen parser. The search half waits on ParadeDB: pg_search ships no PG19 binaries yet, so the test matrix runs search lanes on 15–18 and a non-search lane on postgres 19 beta — details in [version gates](/postgres/version-gates).
+
+## ParadeDB pg_search
+
+| fact | value |
+|---|---|
+| stable release | **v0.25.9 (2026-09-11)** |
+| tracked prerelease | v0.26.0-rc.1 — not final; changed no operator or `pdb.*` signatures |
+| Postgres binaries | 15, 16, 17, 18 (PG18 default since v0.22.0) — no PG19 builds |
+| Postgres floor | PG15 |
+| required dependency | pgvector, since pg_search 0.25.0 |
+| index access method | `USING paradedb` primary — `USING bm25` is a deprecated alias |
+| pgb gate | `paradedb.version: "0.26"` |
+
+pgb targets **0.25.9+ / 0.26-rc**: stable 0.25.9 is the floor, and the `"0.26"` gate value tracks the release candidates so emitted search SQL is ready when 0.26 goes final. The value is a gate name, not a stability claim — pgb's yaml examples keep `"0.26"` even though 0.26.0-rc.1 is a prerelease.
+
+<Warning>
+Never read `paradedb.version: "0.26"` as "0.26 is stable". It is the rc-tracking gate on a 0.25.9+ floor; the stable release is v0.25.9.
+</Warning>
+
+Recent pg_search milestones pgb leans on:
+
+| release | change |
+|---|---|
+| 0.22.0 | PG18 becomes the default prebuilt binary |
+| 0.24.0 | index writes are WAL-logged and MVCC-safe |
+| 0.25.0 | pgvector becomes a required dependency |
+| 0.25.5 | external-index filters (ltree `<@`, PostGIS-style) |
+| 0.25.9 | JSON-path fields usable in aggregates |
+| 0.26.0-rc.1 | vector tiebreak ordering, vector pushdown for RRF queries |
+
+For the full version story — single extension, embedded DataFusion, license split — see [pg_search overview](/paradedb/overview).
+
+## sqlc
+
+| fact | value |
+|---|---|
+| pinned release | v1.31.1 (2026-04-22) — latest tagged release |
+| PG18 parser (`oliphant`, libpg_query 18) | main branch only — unreleased |
+| unknown function degrades to untyped `any` | main branch only — unreleased |
+| pgb install instruction | `go install github.com/sqlc-dev/sqlc/cmd/sqlc@main` |
+
+v1.31.1 parses your schema fine, but handwritten queries calling `pdb.*` fail sqlc's analysis, and the parser behaviors pgb relies on (the PG18 `oliphant` parser, tolerance for unknown functions) exist only on the main branch. `oliphant` pins libpg_query 18.0.0 (landed 2026-05-21); no parser embeds PG19 grammar yet. Until the next tagged release ships these, pgb documents `sqlc@main` — see the [quickstart](/welcome/quickstart). sqlc publishes no release calendar, so pgb says "next tagged release" rather than promising a version number.
+
+## pgb versioning & deprecation policy
+
+pgb itself follows MAJOR.MINOR.PATCH semver. Drops are announced through four channels:
+
+1. **`target` gate** — the SQL emitter gate errors on unsupported feature combos (e.g. search emission with `target: "19"` until ParadeDB ships PG19 binaries) and warns when the target major is within ~6 months of its upstream EOL.
+2. **`paradedb.version` gate** — the gate value is validated against known pg_search releases: unsupported combos error; near-EOL or legacy values warn.
+3. **codegen warnings** — planned drops are surfaced as comments in generated files one MINOR before they happen.
+4. **N-2 support window (PROPOSED)** — a Postgres major or a pg_search floor is dropped only in a pgb MAJOR release, announced one MINOR ahead.
+
+<Note>
+Channels 1–2 are enforced by the gates as configured today. Channel 3 is the codegen convention; channel 4 is a proposal, not yet a promise.
+</Note>
+
+Both gates are configured in the [options table](/reference/config); what each gate emits per version is in [version gates](/postgres/version-gates).
+
+### Gate behavior examples
+
+| situation | gate | behavior |
+|---|---|---|
+| search emission with `target: "19"` | `target` | error — no ParadeDB PG19 binaries to test against |
+| target major within ~6 months of its upstream EOL | `target` | warning |
+| `paradedb.version` value not matching a known pg_search release | `paradedb.version` | error |
+| legacy or near-EOL pg_search gate value | `paradedb.version` | warning |
+
+## Common questions
+
+**Can pgb target PG19 today?**
+For non-search emission, yes — `target: "19"` opens the emitter gate (`INSERT ... ON CONFLICT DO SELECT RETURNING` and friends). Search lanes stay on 15–18 until ParadeDB ships PG19 binaries; the test matrix runs the two in parallel.
+
+**Which pg_search release should I run?**
+v0.25.9 (stable) or v0.26.0-rc.1. Both sit under the same `"0.26"` gate — the rc changed no operator or `pdb.*` signatures, so emitted SQL is identical.
+
+**Why does pgb install `sqlc@main`?**
+The PG18 parser and the unknown-function tolerance pgb's generated calls rely on are main-branch behavior, unreleased as of v1.31.1. The moment the next tagged release includes them, the pinned instruction moves back to a version.
+
+**What happens when a supported major nears EOL?**
+The `target` gate starts warning ~6 months ahead of the upstream date. Under the N-2 proposal, the actual floor drop lands only in a pgb MAJOR release, announced one MINOR ahead — never silently in a PATCH.
+
+## Why pgb keeps its own gates
+
+Upstream policies differ: PostgreSQL guarantees 5 years per major; sqlc publishes no release calendar; ParadeDB's drop policy is unpublished — its supported floors move silently in READMEs. pgb's gates exist so those silent upstream moves become loud, actionable errors and warnings in your build instead of surprises at deploy time.

@@ -1,0 +1,119 @@
+---
+title: "Aggregations"
+description: "pdb.agg — ParadeDB's Elasticsearch-compatible aggregation document, pgb's raw passthrough, and the planned typed helpers."
+icon: "chart-pie"
+---
+
+Aggregations run through `pdb.agg`, which takes an Elasticsearch-compatible aggregation document as `jsonb`. pgb treats the document as data, not SQL: it is always **bound as a parameter** (`pdb.agg($1)`), never inlined — the same binding rule as every [predicate](/paradedb/predicates).
+
+## The raw surface (shipped)
+
+Generated search functions expose a raw passthrough today, listed as `.Agg(json)` in the [predicates](/paradedb/predicates) table:
+
+```go
+dbgen.Products.Search().Agg(`{"terms": {"field": "category"}}`)
+// ... pdb.agg($1)
+```
+
+The JSON is emitted verbatim and validated server-side, where pg_search parses it — anything the aggregation DSL accepts works without a pgb release.
+
+`.Agg` chains with the other search methods like any predicate, so the aggregation runs over the filtered set:
+
+```go
+dbgen.Products.Search().Match("shoes").Agg(`{"terms": {"field": "category"}}`)
+// WHERE description ||| $1 ... pdb.agg($2)
+```
+
+## Bucket aggregations
+
+| bucket | use |
+|---|---|
+| `terms` | group by discrete field values (categories, tags) |
+| `date_histogram` | bucket a timestamp field by fixed calendar intervals |
+| `histogram` | bucket a numeric field by fixed-width intervals |
+| `range` | bucket a numeric/date field by explicit from/to ranges |
+| `filters` | bucket rows into named predicate groups |
+
+## Metric aggregations
+
+| metric | use |
+|---|---|
+| `avg` | mean of a numeric field per bucket |
+| `cardinality` | approximate distinct count |
+| `value_count` | count of indexed values |
+| `min` | minimum per bucket |
+| `max` | maximum per bucket |
+| `percentiles` | percentile sketch of a numeric field |
+| `stats` | min/max/sum/avg/count in one |
+| `sum` | total per bucket |
+| `top_hits` | top N rows per bucket, with selected source fields |
+
+Buckets nest metrics — and other buckets — under `aggs`.
+
+## Visibility
+
+`pdb.agg` accepts a named `visibility` argument controlling which segments an aggregate reads:
+
+| value | reads |
+|---|---|
+| `raw` | every segment, including the mutable one |
+| `threshold` | only segments above a row-count threshold |
+| `auto` | pg_search decides per segment |
+
+The mutable-segment lifecycle this sits on is described in [architecture](/paradedb/architecture).
+
+## JSON-path fields (0.25.9)
+
+Since 0.25.9, aggregation fields can be indexed JSON paths. As with [predicates](/paradedb/predicates), the path is re-emitted exactly as indexed:
+
+```go
+dbgen.Products.Search().Agg(`{"terms": {"field": "metadata->'color'"}}`)
+```
+
+## Example: terms bucket + avg metric
+
+The same aggregate handwritten in SQL — bucket on `category`, average `rating` inside each bucket:
+
+```sql
+SELECT pdb.agg('{
+  "terms": {
+    "field": "category",
+    "aggs": {
+      "avg_rating": { "avg": { "field": "rating" } }
+    }
+  }
+}'::jsonb)
+FROM products
+WHERE id @@@ pdb.all();
+```
+
+Aggregates and GROUP BY push down through pg_search's custom scan into its embedded DataFusion engine — see [architecture](/paradedb/architecture).
+
+<Note>
+The custom scan only activates when a ParadeDB operator appears in the query. For an aggregation over a whole table, `id @@@ pdb.all()` (the `.ForceIndex()` predicate) routes it through pg_search instead of a plain Postgres plan.
+</Note>
+
+## Typed helpers (planned, not in v0.1)
+
+<Warning>
+The typed aggregation surface below is a **proposal**. pgb v0.1 ships only the raw `.Agg(json)` passthrough — nothing in this section exists in generated code yet.
+</Warning>
+
+The planned shape: typed `AggregateXxx` statics on generated search functions, taking bucket/metric descriptors instead of raw JSON. A builder composes the document and emits the same `pdb.agg($1::jsonb)` call with the predicate `WHERE` clause attached:
+
+```go
+// proposed — does not exist in v0.1
+dbgen.Products.Search().Aggregate(
+    pgb.Terms("category",
+        pgb.Avg("rating").As("avg_rating"),
+    ),
+)
+// emitted: SELECT pdb.agg($1::jsonb) FROM products WHERE id @@@ pdb.all()
+//          $1 = {"terms":{"field":"category","aggs":{"avg_rating":{"avg":{"field":"rating"}}}}}
+```
+
+Typed descriptors turn misspelled field names into compile errors instead of server-side JSON errors, and the parameter binding keeps the document out of the SQL text.
+
+## Scoring interplay
+
+Aggregates themselves are score-less, but the query they filter on is not: `pdb.score(key_field)` and the snippet family behave as documented in [scoring](/paradedb/scoring), and `top_hits` is the aggregate-side way to get rows back.

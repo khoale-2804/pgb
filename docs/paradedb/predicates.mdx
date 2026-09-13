@@ -1,0 +1,85 @@
+---
+title: "Search predicates"
+description: "The complete v2 operator vocabulary as typed Go methods — match, phrase, fuzzy, regex, term sets, proximity, boost."
+icon: "filter"
+---
+
+Search predicate methods are generated only on columns that appear in a `USING paradedb` index. Each method emits the v2 operator SQL with the query **bound as a parameter** — values are never inlined. The table below is the core surface; the sections that follow complete the v2 vocabulary — phrase and regex variants, both proximity operators, aliases, and external-index filters.
+
+| method | emits | notes |
+|---|---|---|
+| `.Match(q)` | `description \|\|\| $1` | match-any (token OR) |
+| `.MatchAll(q)` | `description &&& $1` | match-all (token AND) |
+| `.Phrase(q, pgb.Slop(2))` | `description ### $1::pdb.slop(2)` | order + position aware |
+| `.Exact(v)` | `category === $1` | exact token, case-sensitive |
+| `.ExactAny(vs)` | `category === $1::text[]` | term set — any of, via array RHS |
+| `.Fuzzy(q, 1, pgb.Prefix())` | `description === $1::pdb.fuzzy(1, true)` | max distance 2; attach points beyond `===` to be verified against 0.26-rc docs |
+| `.Regex(p)` | `description @@@ pdb.regex($1)` | |
+| `.RangeTerm(r, "Intersects")` | `rating @@@ pdb.range_term($1::int4range, 'Intersects')` | also `Contains`, `Within` |
+| `.Proximity(a, b, n)` | `$1 ## n ## $2` | and `##>` |
+| `.ForceIndex()` | `id @@@ pdb.all()` | forces ParadeDB execution / Top-K routing (used on the vector lane) |
+| `.Parse(q, pgb.Lenient)` | `description @@@ pdb.parse($1, lenient => true)` | full query-string syntax |
+| `.MoreLikeThis(3)` | `... pdb.more_like_this(3)` | |
+| `.Agg(json)` | `... pdb.agg($1)` | raw aggregation JSON |
+
+## Boost
+
+Boost is a **cast on the right-hand side**, chainable on any predicate:
+
+```go
+dbgen.Products.Description().Match("shoes").Boost(2.0)
+// description ||| $1::pdb.boost(2)
+
+dbgen.Products.Description().Regex("key.*").Boost(2.0)
+// description @@@ pdb.regex($1)::pdb.boost(2)
+```
+
+The same right-hand-side position takes the vocabulary's other casts — `::pdb.fuzzy(n)`, `::pdb.slop(n)`, and `::pdb.whitespace`, the last re-tokenizing a literal on whitespace boundaries before it is matched.
+
+## Boolean logic
+
+Compound queries are plain SQL — `AND` / `OR` / `NOT` between predicates, combined with the core expression tree:
+
+```go
+dbgen.Or(
+    dbgen.Products.Description().Match("running shoes"),
+    dbgen.And(
+        dbgen.Products.Category().Exact("shoes"),
+        dbgen.Products.Description().Fuzzy("shose", 1, pgb.Prefix()).Boost(2.0),
+    ),
+    dbgen.Not(dbgen.Products.InStock().Exact(false)),
+)
+```
+
+## Phrase & regex variants
+
+| method | emits | notes |
+|---|---|---|
+| `.RegexPhrase(ps)` | `description @@@ pdb.regex_phrase($1)` | ordered sequence of regexes |
+| `.PhrasePrefix(q)` | `description @@@ pdb.phrase_prefix($1)` | phrase whose final term prefix-matches |
+| `.ProxRegex(a, b, n)` | `$1 ## n ## $2` with regex operands (to be verified) | regex terms under proximity |
+
+## Proximity operators
+
+`.Proximity` (above) emits `##` — both operands within n tokens of each other. Its companion `##>` is the ordered form: the left operand must precede the right within n tokens (to be verified).
+
+## JSON-path fields
+
+For an indexed path like `(metadata->'color')::pdb.literal('alias=json_color')`, the generated predicate re-emits the same path expression:
+
+```go
+dbgen.Products.Metadata().SearchExact("json_color", "red")
+// metadata->'color' === $1
+```
+
+## Aliased fields
+
+The `.Alias(name, q)` builder targets an index-declared alias by name instead of re-emitting the path — `pdb.alias('json_color', $1)` (to be verified). Prefer it when several predicates share one long path expression; aliases are extracted from the same DDL casts (see [index DDL](/paradedb/index-ddl)).
+
+## External-index filters
+
+Since pg_search 0.25.5, filters on columns indexed by *other* index types push down into the ParadeDB scan — ltree ancestry (`path <@ $1`) and PostGIS-style geometric operators. pgb emits these as ordinary SQL in the same generated query; no special predicate surface is required.
+
+<Note>
+Shapes marked "to be verified" are pinned by golden tests in the repo; they are confirmed against the 0.26-rc documentation during milestone M3 and any drift lands in `core/search.go` only.
+</Note>

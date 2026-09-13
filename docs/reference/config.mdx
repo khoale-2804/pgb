@@ -1,0 +1,89 @@
+---
+title: "Configuration reference"
+description: "Every pgb option in the sqlc.yaml codegen block."
+icon: "sliders"
+---
+
+pgb is configured entirely through the `options:` block of its `codegen:` entry in sqlc.yaml (they arrive in the plugin as JSON bytes in `PluginOptions`):
+
+```yaml
+sql:
+  - engine: postgresql
+    schema: schema.sql
+    queries: queries.sql
+    codegen:
+      - out: dbgen
+        plugin: pgb
+        options:
+          package: dbgen
+          models_package: db
+          core: github.com/your-org/pgb/core
+          target: "18"
+          nullability: pgtype
+          paradedb:
+            version: "0.26"
+          emit:
+            batch: true
+            keyset: true
+            hybrid: true
+            merge: false
+          include_defaults: false
+          vector_dim:
+            products: 768
+          overrides:
+            - db_type: vector
+              go_type: github.com/pgvector/pgvector-go.Vector
+            - column: products.metadata
+              go_type: map[string]any
+plugins:
+  - name: pgb
+    process: { cmd: sqlc-gen-pgb }
+```
+
+## Options
+
+| key | type | default | meaning |
+|---|---|---|---|
+| `package` | string | `dbgen` | package name of the generated builder/static layer |
+| `models_package` | string | `db` | package (and import path fallback) for the models layer |
+| `core` | string | — | import path of the handwritten `core` runtime |
+| `target` | `"18"` \| `"19"` | `"18"` | SQL emitter dialect gate — errors on unsupported feature combos (e.g. search emission with `target: "19"` until ParadeDB ships PG19 binaries); warns when the target major is within ~6 months of EOL — see [version gates](/postgres/version-gates) and the [support matrix](/reference/support-matrix) |
+| `nullability` | `pgtype` \| `pointers` | `pgtype` | representation of nullable columns |
+| `paradedb.version` | string | `"0.26"` | gate for the pg_search emitter; validated against known pg_search releases — `"0.26"` tracks 0.26-rc on a 0.25.9+ floor; unsupported combos error, near-EOL/legacy values warn |
+| `emit.batch` | bool | `true` | generate `InsertXxx` batch functions (unnest-based) |
+| `emit.keyset` | bool | `true` | generate cursor pagination helpers |
+| `emit.hybrid` | bool | `true` | generate `SearchXxxHybrid` when a vector column exists |
+| `emit.merge` | bool | `false` | generate the MERGE builder (PG17+) |
+| `include_defaults` | bool | `false` | include default-bearing columns in INSERT column lists |
+| `vector_dim` | map table→int | — | dimension for `$n::vector` param casts in hybrid search |
+| `overrides` | list | — | per-`db_type` or per-`column` Go type overrides, sqlc-gen-go compatible |
+
+## Overrides
+
+Two shapes, matching sqlc-gen-go conventions:
+
+```yaml
+overrides:
+  - db_type: vector                          # whole Postgres type
+    go_type: github.com/pgvector/pgvector-go.Vector
+  - column: products.metadata                # single table.column
+    go_type:
+      import: map[string]any                 # or a full spec: import + package + type
+```
+
+Overrides apply to the model field, the filter field, and the scan target at once — one type map, remember.
+
+## Plugin declaration
+
+```yaml
+plugins:
+  - name: pgb
+    process: { cmd: sqlc-gen-pgb }
+    # or: wasm: { url: ..., sha256: ... } for distributed installs
+```
+
+Process plugins run as executables with the method name as `argv[1]`; sqlc pipes the protobuf request to stdin. Env is opt-in via `env:` on the plugin entry; `SQLC_VERSION` is always set.
+
+## Do not configure `gen: go:`
+
+pgb emits the models layer itself. Configuring both would produce two model sets from two type maps — the drift pgb exists to prevent.

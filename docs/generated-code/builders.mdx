@@ -1,0 +1,86 @@
+---
+title: "Stage 1 — builders"
+description: "Per-table column descriptors, typed predicates, and fluent statement builders."
+icon: "wrench"
+---
+
+Stage 1 generates the typed glue over the handwritten runtime core: one **descriptor** per table, predicate methods per column (by type family), and chainable statement builders whose terminators execute.
+
+## Descriptors
+
+For a table `users`, `dbgen/users.gen.go` contains:
+
+```go
+// Descriptors — package-level, immutable
+var Users = newUserTable("public", "users")
+
+func (t UserTable) ID() UserIDCol             // typed wrapper around core.Col
+func (t UserTable) Email() UserEmailCol
+func (t UserTable) CreatedAt() UserCreatedAtCol
+func (t UserTable) Score() core.Expr          // pdb.score(id) — only for bm25 tables
+```
+
+## Predicates, by column type family
+
+```go
+// every column
+func (c UserIDCol) Eq(v int64) core.Expr
+func (c UserIDCol) Ne(v int64) core.Expr
+func (c UserIDCol) In(vs ...int64) core.Expr
+func (c UserIDCol) IsNull() core.Expr          // / NotNull()
+
+// ordered types (ints, floats, numerics, timestamps, dates)
+func (c UserCreatedAtCol) Gt(v time.Time) core.Expr        // Lt Lte Gte Between
+
+// text types
+func (c UserEmailCol) Like(p string) core.Expr             // ILike NotLike
+
+// jsonb types
+func (c UserMetadataCol) KeyEq(path string, v any) core.Expr   // metadata->>$2 = $3
+
+// array types
+func (c UserTagsCol) Contains(v []string) core.Expr            // tags @> $1::text[]
+
+// bm25 columns only — see the ParadeDB section
+func (c UserBioCol) Match(q string) core.Expr
+```
+
+Columns marked `pgb:no_filter` generate no predicate methods.
+
+## Statement builders
+
+Fluent, composable, terminators execute against any `pgb.DBTX`:
+
+```go
+u, err := dbgen.Users.Select().
+    Where(dbgen.Or(
+        dbgen.Users.Email().Like("%@corp.io"),
+        dbgen.Users.CreatedAt().Gte(since))).
+    OrderBy(dbgen.Users.CreatedAt().Desc()).
+    Limit(20).
+    All(ctx, db)                       // ([]db.User, error)
+
+dbgen.Users.Select().Where(...).Count(ctx, db)         // (int64, error)
+dbgen.Users.Select().Where(...).Exists(ctx, db)        // (bool, error)
+dbgen.Users.Select().Where(...).One(ctx, db)           // (db.User, error) — errors if >1
+dbgen.Users.Delete().Where(...).Exec(ctx, db)          // (int64, error)
+dbgen.Users.Update().Set(...).Where(...).Returning().All(ctx, db)
+```
+
+Supports `DistinctOn`, `Group`/`Having`, `ForUpdate`-style locking, and CTEs via the core statement types.
+
+## Safety guard
+
+`Update` and `Delete` with an **empty WHERE** return `pgb.ErrNoWhere`. Full-table mutations are explicit:
+
+```go
+dbgen.Users.Delete().AllowAll().Exec(ctx, db)          // deliberate
+```
+
+<Note>
+This is a runtime guard, not a type machine. It keeps the builder API readable; the failure mode of forgetting a WHERE is a clean error at the call site, not a truncated table.
+</Note>
+
+## What stage 1 never does
+
+It does not execute anything and holds no state — descriptors are immutable package-level values, and every expression is a pure value tree consumed by the [core emitter](/reference/core-api). That property is what makes generated code deterministic and testable against golden files.

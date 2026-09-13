@@ -1,0 +1,152 @@
+---
+title: "ParadeDB architecture"
+description: "How pg_search works inside Postgres — LSM-tree index, custom-scan pushdown, joins, and the license split."
+icon: "sitemap"
+---
+
+pgb's emitted SQL targets one thing: the `pg_search` extension running inside your Postgres server. This page is the mental model behind every search query pgb generates — what the index physically is, when Postgres hands execution to ParadeDB, and what the license covers. Version specifics and deprecation windows live in the [support matrix](/reference/support-matrix).
+
+## One extension
+
+pg_search is a single Postgres extension, not a fleet of them. One `CREATE EXTENSION` provides:
+
+- **BM25 full-text search** — the `|||`, `&&&`, `###`, `===`, `@@@`, `##` operators and the `pdb.*` function vocabulary ([predicates reference](/paradedb/predicates)).
+- **Vectors and hybrid search** — vector columns indexed in the same index as text, with RRF fusion for combined queries; pgvector is a required dependency (since 0.25.0).
+- **Aggregations** — an Elasticsearch-compatible JSON aggregation DSL executed via `pdb.agg` ([aggregations reference](/paradedb/aggregations)).
+- **Joins** — cross-table search planned and executed as a distributed query plan.
+- **OLAP** — Apache DataFusion is embedded *inside* pg_search and executes the analytical plans.
+
+Where each piece lives:
+
+| concern | runs | notes |
+|---|---|---|
+| query execution | Postgres backend processes | custom scan nodes, user-defined functions — ordinary extension code |
+| index storage | Postgres block storage | stored alongside the table, uses the standard buffer cache, WAL-logged |
+| analytical execution | embedded Apache DataFusion | in-process, invoked from pg_search's scan nodes |
+| external components | none | no sidecar daemon, no external search server, no extra backup or security surface |
+
+Storage lives inside Postgres — that is the whole point of the design. There is nothing extra to run, back up, or secure, and index consistency follows from Postgres' own crash recovery. One connection string, one auth surface, one backup story.
+
+<Note>
+Two pieces of ParadeDB history are easy to mistake for current features:
+
+- **pg_analytics** (repo archived 2025-03-19) and **pg_lakehouse** (discontinued, repo gone) are history. DuckDB is out of the stack; the DataFusion embedded in pg_search does the analytical work.
+- **"columnar"** refers to the columnar/fast-field half of each index segment — a storage layout *within* the index, not a table storage format. There is no table access method: `USING columnar` (or any equivalent `USING stripe` spelling) does not exist.
+
+</Note>
+
+<Tip>
+Both index spellings are accepted at DDL parse time: `USING paradedb` (0.25.0+) and the legacy `USING bm25` alias. Everything on this page applies to either spelling; pgb emits `USING paradedb`.
+</Tip>
+
+## The LSM-tree index
+
+An index built with `USING paradedb` is an LSM tree. Each segment holds two halves for its rows:
+
+| half | contents |
+|---|---|
+| inverted | the BM25 term dictionary and postings lists that text predicates search |
+| columnar | fast fields — a columnar layout used for filtering, sorting, aggregations, and pushdown |
+
+The write path is append-only:
+
+1. Rows from `INSERT`/`UPDATE`/`DELETE` statements append to a single **mutable segment**, buffered across statements — small transactions do not each pay a full segment-creation cost.
+2. When the mutable segment reaches `mutable_segment_rows` rows (default **1,000**), it freezes into an immutable segment.
+3. In the background, frozen segments merge layer by layer at 100KB, 1MB, 10MB, 100MB, 1GB, and 10GB; the layer boundaries are configurable through `background_layer_sizes` / `layer_sizes`.
+4. Merges run outside the query path — reads never wait on compaction.
+
+Three properties matter for generated SQL:
+
+- **WAL-logged and MVCC-safe** (since 0.24.0) — index maintenance participates in normal Postgres transactions, crash recovery included.
+- **No refresh interval.** Unlike Elasticsearch, there is no near-real-time gap to reason about: committed rows are visible to search under ordinary transactional semantics, immediately.
+- **A `work_mem` floor.** ParadeDB enforces a minimum of 15MB for index maintenance; connections tuned below that are raised at runtime.
+
+The knobs pgb users most often touch:
+
+| knob | default | effect |
+|---|---|---|
+| `mutable_segment_rows` | 1,000 | rows buffered in the mutable segment before it freezes into an immutable one |
+| `background_layer_sizes` / `layer_sizes` | 100KB–10GB layers | the boundaries background merges stop at |
+| `work_mem` | 15MB minimum enforced | floor for index maintenance, raised at runtime if set lower |
+
+## Custom-scan pushdown
+
+ParadeDB registers a custom scan node with the Postgres planner. It activates **only when a ParadeDB operator or `pdb.*` function appears in the query** — a plain `SELECT` against an indexed table is left to the standard planner and standard access paths.
+
+```sql
+-- the shape of a generated pgb search function
+SELECT id, description, pdb.score(id) AS score
+FROM products
+WHERE description @@@ 'running shoes'
+ORDER BY score DESC
+LIMIT 10;
+```
+
+Here the `@@@` predicate triggers the custom scan, and `ORDER BY score DESC LIMIT 10` is served by `SegmentedTopKExec`, which reads only the per-segment tops instead of scoring every row. The full pushdown surface:
+
+| query shape | what executes |
+|---|---|
+| filters (text, term, range) | evaluated inside the index against the inverted/columnar halves |
+| `ORDER BY ... LIMIT n` | SegmentedTopKExec — per-segment top-k heap, no full scoring pass |
+| `ORDER BY pdb.score(...)` + limit | the same Top-K path, ordered by BM25 score |
+| aggregates + `GROUP BY` | evaluated against the columnar fast fields ([aggregations reference](/paradedb/aggregations)) |
+| `JOIN`s | a DataFusion-based multi-paradigm plan, gated by the `paradedb.enable_join_custom_scan` GUC |
+
+This is why pgb's generated functions can be both typed and fast: the predicates are ordinary SQL, and the planner recognizes them as its own.
+
+## Join pushdown requirements
+
+The join planner is conservative. Every requirement below must hold, or the query falls back to a normal Postgres join — correct results, slower plan:
+
+| requirement | detail |
+|---|---|
+| indexed tables | every table in the join has a `USING paradedb` index |
+| operator present | the query contains at least one ParadeDB operator or `pdb.*` function |
+| indexed join columns | join keys, filter columns, and `ORDER BY` columns are indexed; text/JSON columns need fast/columnar fields |
+| LIMIT present | the query carries a `LIMIT` |
+
+When all four hold, the join executes as a single distributed plan pushed to DataFusion rather than a Postgres nested loop with per-row index probes. When any one fails — an unindexed filter column, a missing `LIMIT` — the planner silently takes the fallback path, so the query still returns correct results.
+
+```sql
+-- every requirement met: one distributed plan
+SELECT p.id, r.body, pdb.score(p.id) AS score
+FROM products p
+JOIN reviews r ON r.product_id = p.id
+WHERE p.description @@@ 'running shoes'
+  AND r.body @@@ 'durable'
+ORDER BY score DESC
+LIMIT 10;
+```
+
+Both tables are indexed, a ParadeDB operator appears in each branch of the filter, the join and ordering columns are indexed, and a `LIMIT` is present — the whole query pushes down.
+
+## Covering index
+
+Every indexed column lives inside the index — the columnar half stores the values, so pushed-down filters, sorts, and aggregates never need to visit the heap. The flip side is that **adding a column to an existing index is a rebuild**: drop the index and re-run `CREATE INDEX ... USING paradedb` with the extended column list (a `REINDEX` in effect), because the column's inverted/columnar data has to be written into the segments.
+
+pgb's [DDL extraction](/paradedb/index-ddl) records the full column list — including tokenizer casts and JSON paths — from your schema, so codegen never emits a predicate against a column the index does not actually cover. If you widen an index in a migration, pgb picks up the new column set on the next generation run.
+
+<Note>
+ParadeDB allows one `USING paradedb` index per table, and currently requires the key field to be UNIQUE and the first indexed column (a removal is in progress upstream). pgb enforces the one-index-per-table rule at parse time, parses the key-field requirement tolerantly, and warns — see [DDL extraction](/paradedb/index-ddl).
+</Note>
+
+## License split
+
+| edition | license | what you get |
+|---|---|---|
+| Community | AGPL-3.0 | every functional feature — search, vectors, hybrid, aggregations, joins, OLAP; the paradedb index runs on the primary only ("cluster size 1") |
+| Enterprise | paid | high availability and read replicas of the paradedb index |
+
+Nothing pgb emits is Enterprise-gated: the split governs deployment topology, not the SQL surface. The managed ParadeDB Cloud offering is a waitlist, not a generally available option.
+
+## How pgb maps onto this
+
+Each pgb surface sits directly on a piece of the architecture above:
+
+| pgb surface | architecture it relies on |
+|---|---|
+| [DDL extraction](/paradedb/index-ddl) | the index definition is the search schema — parsed into SchemaIR before codegen |
+| [typed predicates](/paradedb/predicates) | operators trigger the custom scan; filters evaluate inside the index |
+| [scoring](/paradedb/scoring) | `pdb.score` with ORDER BY/LIMIT rides the Top-K path |
+| [hybrid search](/paradedb/hybrid-search) | vector and BM25 in one index, fused with RRF |
+| [aggregations](/paradedb/aggregations) | `pdb.agg` JSON evaluated against the fast fields |

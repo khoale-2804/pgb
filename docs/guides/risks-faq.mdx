@@ -1,0 +1,45 @@
+---
+title: "Risks & FAQ"
+description: "Known risks, sharp edges, and honest answers — from sqlc release lag to ParadeDB churn."
+icon: "triangle-exclamation"
+---
+
+## Risks
+
+<AccordionGroup>
+  <Accordion title="sqlc releases lag main">
+    The PG18 parser (`oliphant`) and unknown-function tolerance are merged on sqlc main but not in a tagged release (v1.31.1 as of 2026-09-13). pgb pins `sqlc@main` until the next tagged release ships these. On v1.31.1 the schema still parses; only handwritten `pdb.*` queries lose type inference.
+  </Accordion>
+  <Accordion title="ParadeDB API churn">
+    The pg_search API broke twice in 2025 (`paradedb.*` → `pdb.*`, `USING bm25` → `USING paradedb`). All emission lives in one file (`core/search.go`) behind the `paradedb.version` gate. Predicate shapes marked "verify" are pinned by golden tests during M3.
+  </Accordion>
+  <Accordion title="Fork drift from sqlc-gen-go">
+    Pass A is a fork of upstream. A CI parity test diffs its output against upstream on the same schema — drift is a reviewable diff, not a silent behavior change.
+  </Accordion>
+  <Accordion title="`any` leaking from unknown functions">
+    Columns typed `any` (unresolved extension functions — the fallback is sqlc main-branch behavior, unreleased; v1.31.1 fails analysis instead) surface explicitly in generated code. Fix at the source: cast in SQL (`pdb.score(id)::float8`) or use database-backed analysis against a live ParadeDB.
+  </Accordion>
+  <Accordion title="PG19 is beta">
+    Emitter gates for PG19 syntax (`ON CONFLICT DO SELECT RETURNING`) are marked for re-verification at GA. No parser embeds PG19 grammar yet; keep PG19-only DDL out of schema.sql.
+  </Accordion>
+</AccordionGroup>
+
+## FAQ
+
+<AccordionGroup>
+  <Accordion title="Why not just use go-jet/jet or bob?">
+    They are the closest prior art and prove the design shape. jet generates builders from a **live database** via information_schema and escapes extension syntax through `Raw()`; bob is ORM-first (hooks, relationships, factories). Neither is ParadeDB-aware — no generated search predicates, score handling, or hybrid RRF — and neither runs off your sqlc schema files with a shared type map. pgb is sqlc-native and pg_search-native.
+  </Accordion>
+  <Accordion title="Why a fork of sqlc-gen-go instead of a second plugin?">
+    Two codegen paths mean two type maps; override sets drift silently and generated code disagrees with models. One fork = one map, and the fork-parity test keeps it reviewable.
+  </Accordion>
+  <Accordion title="Why generate static functions at all — isn't the builder enough?">
+    The builder is for dynamic composition. The static layer is for the 90% case: `GetUser`, `InsertUsers`, `SearchProducts` are one call, fully typed, zero ceremony. They compose the builder internally, so they stay composable when a query outgrows them.
+  </Accordion>
+  <Accordion title="Does `sqlc vet` still work?">
+    Yes — pgb runs inside sqlc as a plugin; vet, verify, and the whole config surface keep working. Only `gen: go:` is replaced.
+  </Accordion>
+  <Accordion title="License implications of ParadeDB?">
+    pg_search is AGPL-3.0 for the community edition. Using it in your stack (self-hosted) does not infect your application; redistribution of the extension itself is what AGPL governs.
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,31 @@
+---
+title: "Directives"
+description: "Per-table and per-column annotations via COMMENT ON — skip tables, hide columns, override types."
+icon: "tags"
+---
+
+Directives are the per-object annotation channel. They ride in `COMMENT ON` statements because inline `--` comments do not survive a PostgreSQL parse — `COMMENT ON` is real DDL that the oliphant pass reads from your schema files.
+
+```sql
+COMMENT ON TABLE  users            IS 'pgb:skip';
+COMMENT ON COLUMN users.password   IS 'pgb:no_filter';
+COMMENT ON COLUMN users.bio        IS 'pgb:no_patch';
+COMMENT ON COLUMN users.embedding  IS 'pgb:type=github.com/pgvector/pgvector-go.Vector';
+COMMENT ON COLUMN users.metadata   IS 'pgb:type=map[string]any';
+```
+
+## Directive set (v1)
+
+| directive | level | effect |
+|---|---|---|
+| `pgb:skip` | table | no codegen at all for this table |
+| `pgb:no_filter` | column | no predicate methods generated |
+| `pgb:no_patch` | column | excluded from generated Update sets |
+| `pgb:type=<go type>` | column | Go type override (import path or bare type) |
+
+## Notes
+
+- A comment that does not start with `pgb:` is treated as documentation, not a directive — real table/column comments are safe to mix in.
+- Multiple directives on one column: separate with `;`.
+- Type overrides here and in the [config `overrides` list](/reference/config) resolve the same way; the directive wins on conflict (it is closer to the schema).
+- Everything coarse-grained (dialect target, emit toggles, ParadeDB version) belongs in sqlc.yaml options, not directives — directives are for schema-local facts only.

@@ -1,0 +1,62 @@
+---
+title: "Type mapping reference"
+description: "The complete Postgres → Go mapping, nullability modes, three-state writes, and override resolution."
+icon: "table"
+---
+
+The canonical table. One map serves models, filter fields, function params, and row scans — override it in [config](/reference/config) or per-column via [directives](/reference/directives).
+
+## Base types
+
+| Postgres | Go (default) | notes |
+|---|---|---|
+| `text` `varchar` `bpchar` `citext` `name` | `string` | |
+| `boolean` | `bool` | |
+| `smallint` / `int2` | `int16` | |
+| `integer` / `int4` | `int32` | |
+| `bigint` / `int8` | `int64` | |
+| `oid` | `uint32` | |
+| `real` / `float4` | `float32` | |
+| `double precision` / `float8` | `float64` | |
+| `numeric` / `decimal` | `pgtype.Numeric` | override to `json.Number` or `string` for money |
+| `uuid` | `uuid.UUID` | github.com/google/uuid |
+| `bytea` | `[]byte` | |
+| `json` / `jsonb` | `[]byte` | override to a typed struct or `map[string]any` |
+| `timestamptz` / `timestamp` | `pgtype.Timestamptz` | |
+| `date` | `pgtype.Date` | |
+| `time` / `timetz` | `pgtype.Time` / `pgtype.Timetz` | |
+| `interval` | `pgtype.Interval` | |
+| `inet` / `cidr` / `macaddr` | `pgtype.*` | |
+| ranges (`int4range`, `tsrange`, …) | `pgtype.Range[T]` | |
+| user-defined enum | generated string type | one type per enum |
+| composite | generated struct | |
+| domain | unwrapped to base type | |
+| `vector` (pgvector) | override required | `github.com/pgvector/pgvector-go.Vector` |
+| unknown / `any` | `any` | unresolved extension function columns |
+
+Arrays map to `[]T` of the element type (`text[]` → `[]string`).
+
+## Nullability modes
+
+| mode | nullable column representation |
+|---|---|
+| `pgtype` (default) | `pgtype.Timestamptz`, `pgtype.Numeric`, … |
+| `pointers` | `*string`, `*time.Time`, … |
+
+## Three-state writes
+
+`UPDATE` sets need *value*, *NULL*, and *skip*. One generic covers it:
+
+```go
+type Set[T any] struct { V T; IsNull bool; Defined bool }
+
+pgb.Set("x")       // SET col = $n
+pgb.Null[string]() // SET col = NULL
+UserSet{}          // column omitted
+```
+
+## Override resolution order
+
+1. `pgb:type=` directive (COMMENT ON) — wins on conflict
+2. config `overrides` list (exact `column: table.column` first, then `db_type`)
+3. built-in default from the table above

@@ -1,0 +1,40 @@
+---
+title: "Testing strategy"
+description: "Golden files, round-trip property tests through oliphant, and the docker CI matrix for PG18 + ParadeDB and PG19 beta."
+icon: "vial"
+---
+
+Codegen correctness is the product. Four layers:
+
+## 1. Emitter unit tests
+
+Table-driven: expression tree in, SQL + args out, byte-exact. Coverage includes every operator in the [predicate reference](/paradedb/predicates), every [version gate](/postgres/version-gates), and the error paths (`ErrNoWhere`, empty slices, cursor mismatch).
+
+## 2. Golden generated-code tests
+
+A canonical `testdata/schema.sql` (including `USING paradedb` DDL, enums, domains, generated columns) is run through the full pipeline; output is snapshotted.
+
+```bash
+go test ./... -update       # regenerate snapshots, review diffs like a PR
+```
+
+Golden diffs are the code review surface for generator changes — every generated-line change is visible.
+
+## 3. Round-trip property tests
+
+The emitter's SQL is fed back through oliphant and must re-parse to the same statement shape. The generator ships with the PG18 parser in-process, so it can check its own grammar on every fuzz case — malformed emission is caught generically, not per-bug.
+
+## 4. Integration matrix (docker compose)
+
+Every generated function executed against real servers:
+
+| lane | image | covers |
+|---|---|---|
+| full | `paradedb/paradedb` (0.25.9+/0.26) on **PG18** | CRUD, builders, search, scoring, hybrid RRF |
+| plain | `postgres:19-beta` | CRUD, builders, upsert gates — search lanes skipped until ParadeDB ships PG19 builds |
+
+ParadeDB emits version-agnostic SQL on the non-search paths, so the PG19 lane needs no code changes when its search lane activates.
+
+## 5. Fork parity
+
+Pass A (models + query wrappers) is diffed against upstream sqlc-gen-go output on the same schema in CI, so the fork stays honest about what it changed — drift shows up as a diff, not a surprise.

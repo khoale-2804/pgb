@@ -1,0 +1,72 @@
+---
+title: "Hybrid search"
+description: "Generated RRF fusion of BM25 text relevance and pgvector similarity — the documented ParadeDB pattern, as one function call."
+icon: "shuffle"
+---
+
+ParadeDB has no single "hybrid" function; the documented pattern is **Reciprocal Rank Fusion** over two lanes. pgb generates it for every table that has both a `USING paradedb` index and a vector column (detected via the `pgvector.Vector` type override):
+
+```go
+hits, err := dbgen.SearchProductsHybrid(ctx, db, "running shoes", queryVec, dbgen.HybridOpts{
+    TextWeight:  0.7,
+    VecWeight:   0.3,
+    K:           60,    // RRF constant
+    PerLane:     20,    // per-lane LIMIT
+    Limit:       10,
+})
+```
+
+## Emitted SQL
+
+```sql
+WITH text AS (
+    SELECT id, RANK() OVER (ORDER BY pdb.score(id) DESC, id) AS rank
+    FROM products
+    WHERE description ||| $1
+    LIMIT 20
+  ), vec AS (
+    SELECT id, RANK() OVER (ORDER BY embedding <=> $2::vector) AS rank
+    FROM products
+    WHERE id @@@ pdb.all()
+    LIMIT 20
+  )
+SELECT p.*,
+       0.7/(60+text.rank) + 0.3/(60+vec.rank) AS rrf_score
+FROM products p
+JOIN text      ON text.id = p.id
+FULL JOIN vec  ON vec.id  = p.id
+ORDER BY rrf_score DESC, p.id
+LIMIT $3
+```
+
+Details that matter:
+
+- The vector lane carries `WHERE id @@@ pdb.all()` — that forces ParadeDB execution and enables its Top-K routing for the lane.
+- `<=>` is cosine distance via pgvector, which has been a **required dependency** of pg_search since 0.25.0.
+- 0.26-rc's vector pushdown for RRF queries and vector tiebreak ordering apply to this shape automatically — no pgb change needed.
+
+<Note>
+The vector index itself is SPANN-style (not HNSW) and Beta — its format may change between pg_search releases and require a `REINDEX`. The `embedding vector_cosine_ops` opclass is declared *inside* the `USING paradedb (...)` index, not in a separate pgvector index; pgvector is a required dependency of pg_search since 0.25.0.
+</Note>
+
+## Requirements
+
+1. The `vector` type override in sqlc.yaml:
+
+```yaml
+overrides:
+  - db_type: vector
+    go_type: github.com/pgvector/pgvector-go.Vector
+```
+
+2. `vector_dim` config when generating the `$2::vector` cast parameter typing:
+
+```yaml
+options:
+  vector_dim:
+    products: 768
+```
+
+## Non-goals
+
+No pgvector-only `SearchXxxVec` functions are generated in v1 — a plain `Users.Select().Where(...).OrderBy(vecL2)` chain covers it, and a dedicated vector-search layer is deferred until ParadeDB's vector story stabilizes further.

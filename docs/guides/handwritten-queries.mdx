@@ -1,0 +1,65 @@
+---
+title: "Handwritten queries"
+description: "Coexisting with sqlc .sql files — when to keep them, how pg_search calls type-check, database-backed analysis."
+icon: "file-code"
+---
+
+pgb does not abolish handwritten SQL — it shrinks it to the queries that genuinely deserve it: CTE chains, window tricks, PGQ, reporting. Everything repetitive moves to the generated layer.
+
+## How handwritten queries work under pgb
+
+`queries.sql` entries are resolved by sqlc (parsed, analyzed, params and result columns computed) and arrive in the plugin request. pgb emits typed wrappers into `db/` in the sqlc-gen-go style, honoring the standard annotations: `:one`, `:many`, `:exec`, `:execrows`, `:batchexec`, `:copyfrom`, ...
+
+```sql
+-- name: RevenueByMonth :many
+SELECT date_trunc('month', created_at) AS month, sum(amount) AS revenue
+FROM orders
+WHERE shop_id = $1
+GROUP BY 1 ORDER BY 1;
+```
+
+becomes a typed `db.RevenueByMonth(ctx, db, shopID)` — same ergonomics you have today.
+
+## pg_search in handwritten queries
+
+The analyzer does not know ParadeDB's functions:
+
+- **sqlc v1.31.1** — `pdb.score(id)` fails analysis ("function does not exist").
+- **sqlc main** — unknown functions/operators degrade gracefully: the expression goes untyped and the generated column becomes `any` (main-branch behavior, unreleased as of v1.31.1).
+
+Two clean fixes:
+
+**1. Cast in SQL** — cheapest, always available:
+
+```sql
+-- name: SearchProducts :many
+SELECT id, name, pdb.score(id)::float8 AS score
+FROM products
+WHERE description ||| $1
+ORDER BY pdb.score(id) DESC, id
+LIMIT $2;
+```
+
+**2. Database-backed analysis** — point sqlc at a live ParadeDB so extension types resolve from the real catalog:
+
+```yaml
+sql:
+  - engine: postgresql
+    database:
+      uri: ${PARADEDB_URI}
+      analyzer: { database: true }
+```
+
+## Choosing the lane
+
+| need | use |
+|---|---|
+| CRUD, filters, pagination, search | generated static functions |
+| dynamic filter composition | generated builders |
+| complex one-off reporting CTE | handwritten `queries.sql` |
+| statement sqlc cannot parse (e.g. `RETURNING OLD/NEW`) | generated layer — pgb's emitter knows PG18/19 syntax sqlc's analyzer does not |
+| something the builder can't express | `core.Raw(sql, args...)` composes into any expression position |
+
+## vet keeps working
+
+`sqlc vet` runs over the whole project — including rules against your handwritten queries. The generated layer is linted by Go's own toolchain plus pgb's golden tests.

@@ -1,0 +1,63 @@
+---
+title: "pg_search overview"
+description: "What full ParadeDB pg_search support (0.25.9+ / 0.26-rc) means in pgb — target API, version gate, and the churn barrier."
+icon: "magnifying-glass"
+---
+
+pgb targets **ParadeDB 0.25.9+ / 0.26-rc** — the v2 operator API (stable since 0.20.0). The current stable release is v0.25.9 (2026-09-11); v0.26.0-rc.1 is tracked but prerelease. The 0.26.0-rc changelog introduced no operator or `pdb.*` signature changes; its improvements (vector pushdown for RRF, tiebreak ordering with vector) benefit pgb's emitted hybrid-search SQL automatically.
+
+<Note>
+Both index spellings are accepted at DDL parse time: `USING paradedb` (0.25.0+) and the legacy `USING bm25` alias.
+</Note>
+
+## What "full support" covers
+
+1. **DDL extraction** — the `USING paradedb` index definition is parsed from your schema ([details](/paradedb/index-ddl)) and drives codegen: which columns get search predicates, the `key_field` for scoring, tokenizer metadata.
+2. **Predicates** — typed methods emitting the complete v2 operator vocabulary ([reference](/paradedb/predicates)).
+3. **Scoring & snippets** — `pdb.score(key_field)`, `pdb.snippet*` families with named arguments ([reference](/paradedb/scoring)).
+4. **Hybrid search** — the documented RRF fusion pattern as a generated function ([reference](/paradedb/hybrid-search)).
+5. **Aggregations** — the `pdb.agg` JSON aggregation DSL ([reference](/paradedb/aggregations)).
+6. **Tokenizers** — the full tokenizer/token-filter list, extracted from DDL casts ([reference](/paradedb/tokenizers)).
+7. **Architecture** — the LSM-tree index, custom-scan pushdown, and joins ([reference](/paradedb/architecture)).
+
+## Single extension
+
+pg_search is one Postgres extension, not a family: BM25 full-text, vectors, hybrid search, aggregates, joins, and OLAP all ship in it — Apache DataFusion is embedded inside and does the analytical work. The index lives inside Postgres (block storage API, buffer cache, WAL), stored alongside the table.
+
+<Note>
+Two corrections to older material: pg_analytics (archived 2025-03-19) and pg_lakehouse (discontinued) are history only, never current features. And there is no `USING columnar` table AM — "columnar" refers to the columnar/fast-field half of each LSM segment.
+</Note>
+
+## License split
+
+| edition | license | scope |
+|---|---|---|
+| Community | AGPL-3.0 | all functional features; the paradedb index runs on the primary only |
+| Enterprise | paid | high availability + read replicas of the paradedb index |
+
+## The version gate
+
+```yaml
+options:
+  paradedb:
+    version: "0.26"
+```
+
+All pg_search emission lives in one handwritten file, `core/search.go`, behind this gate. ParadeDB broke its API twice in 2025 (`paradedb.*` JSON DSL → `pdb.*` casts, `USING bm25` → `USING paradedb`); when it churns again, the fix is contained to that file.
+
+## Where pg_search does *not* flow through sqlc
+
+sqlc parses `@@@` fine (the real PG grammar accepts any operator), but `pdb.*` functions are unknown to its analyzer:
+
+- **Generated layer** — unaffected. pgb emits SQL at runtime; the server validates it, not the codegen analyzer.
+- **Handwritten `.sql` queries** — on sqlc v1.31.1 they fail analysis ("function does not exist"); on main they degrade to untyped `any` columns. Fixes: cast in SQL (`pdb.score(id)::float8`) or point sqlc's database-backed analyzer at a live ParadeDB (`database: {uri: ...}, analyzer: {database: true}`) so extension types resolve exactly. See [handwritten queries](/guides/handwritten-queries).
+
+## Version facts (verified 2026-09-13)
+
+| | |
+|---|---|
+| current stable | v0.25.9 (2026-09-11) · v0.26.0-rc.1 (prerelease) |
+| API surface | v2 operators, `pdb.*` functions/casts |
+| Postgres binaries | 15, 16, 17, 18 — **no 19 yet** |
+| pgvector | required dependency since 0.25.0 |
+| license | AGPL-3.0 community · Enterprise: HA + read replicas |

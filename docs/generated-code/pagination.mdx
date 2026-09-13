@@ -1,0 +1,32 @@
+---
+title: "Pagination"
+description: "Keyset (cursor) pagination generated from your unique keys — including score-ordered search results."
+icon: "arrow-right-long"
+---
+
+Offset pagination degrades linearly and drifts under concurrent writes. pgb generates **keyset** pagination from your table's unique sortable key (`emit.keyset: true`), returning an opaque cursor:
+
+```go
+rows, next, more, err := dbgen.Users.Select().
+    OrderBy(dbgen.Users.ID().Asc()).
+    Page(ctx, db, pgb.CursorOf(prev), 50)
+```
+
+- The emitted WHERE is `(k > $last)` — index-driven, stable under inserts.
+- `next` is a base64-encoded, versioned cursor over the sort key; `more` is computed by fetching `limit + 1` rows.
+- Cursors are tied to the column set that produced them; mixing sort keys returns `pgb.ErrCursorMismatch`.
+
+## Composite keys
+
+Tables whose unique key is `(tenant_id, id)` produce two-column cursors: `WHERE (tenant_id, id) > ($1, $2)`.
+
+## Search results
+
+Score-ordered search has unstable keys (ties), so the search functions paginate on the **(score, id) composite** — which ParadeDB requires anyway: the tiebreak column must be indexed for Top-K execution.
+
+```go
+hits, next, more, err := dbgen.SearchProductsPage(ctx, db, "running shoes",
+    pgb.CursorOf(prev), 20)
+```
+
+The SQL orders by `pdb.score(id) DESC, id ASC` and continues from the previous page's `(score, id)` pair.

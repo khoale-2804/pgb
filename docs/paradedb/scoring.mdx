@@ -1,0 +1,58 @@
+---
+title: "Scoring & snippets"
+description: "pdb.score(key_field), ORDER BY score, and the snippet/highlight family with named arguments."
+icon: "star"
+---
+
+## Score
+
+`pdb.score(...)` is emitted against the index's `key_field` (from `WITH (key_field='id')` or the table's primary key):
+
+```go
+dbgen.Users.Score()        // Call{Fn: "pdb.score", Args: [Users.ID]}  →  pdb.score(id)
+```
+
+Generated search functions always select and order by it:
+
+```sql
+SELECT id, name,
+       pdb.score(id) AS score,
+       pdb.snippet(description, start_tag => '<em>') AS snip
+FROM products
+WHERE description ||| $1
+ORDER BY pdb.score(id) DESC, id ASC
+LIMIT $2
+```
+
+<Warning>
+The tiebreaker column (`id`) must be indexed for ParadeDB's Top-K execution. pgb emits `pdb.score(id) DESC, id ASC` by default, and pagination uses the `(score, id)` composite — see [Pagination](/generated-code/pagination).
+</Warning>
+
+<Note>
+`ORDER BY` on the score — or on any indexed field — combined with `LIMIT n` is pushed down to ParadeDB's `SegmentedTopKExec` top-K executor: the candidate set is pruned during the scan instead of fully sorted (see [architecture](/paradedb/architecture)). Vector tiebreak ordering for this shape arrives with pg_search 0.26-rc.
+</Note>
+
+## Snippets & highlights
+
+Named arguments are bound parameters where pgb can, literals where ParadeDB requires them:
+
+| method | emits |
+|---|---|
+| `.Snippet(StartTag("<em>"), MaxChars(150))` | `pdb.snippet(description, start_tag => ..., end_tag => ..., max_num_chars => ...)` |
+| `.Snippets(pgb.LimitN(5), SortBy("score"))` | `pdb.snippets(description, "limit" => 5, sort_by => 'score')` |
+| `.SnippetPositions()` | `pdb.snippet_positions(description)` |
+| `.Highlight(StartTag("<em>"))` | `pdb.highlight(description, start_tag => ..., end_tag => ...)` |
+
+Snippets are not supported for fuzzy predicates (ParadeDB limitation). The generated `*Hit` result struct carries them per field:
+
+```go
+type ProductHit struct {
+    Product  db.Product
+    Score    float64
+    Snippet  map[string]string   // populated per snippet'd field
+}
+```
+
+## Boosting at the scorer level
+
+Term-level boosts live on predicates (`::pdb.boost(2)`); constant-score fallback is available as the `::pdb.const(1)` cast and as the `pdb.const_score` builder — `dbgen.Users.ConstScore(1.0)` emits `pdb.const_score(id, 1.0)` (to be verified). Both are literal-side forms, handled by the same emitter path as [predicates](/paradedb/predicates).

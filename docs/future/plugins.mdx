@@ -1,0 +1,104 @@
+---
+title: "Extension & plugin system"
+description: "pgb as a platform: a plugin architecture for extensions, with pgb-paradedb as the first official plugin."
+icon: "puzzle-piece"
+---
+
+<Note>
+Part of the [pgb 2.0 plan](/future/vision) — phased after v0.1. Through v0.1 the ParadeDB layer ships built-in exactly as designed; the plugin split below is the first phase of 2.0.
+</Note>
+
+## The idea
+
+pgb core stays **generic Postgres**: expression tree, emitter, models, builders, statics — nothing in the core knows ParadeDB exists. Everything opinionated lives in **extensions**, and the thing you're reading about ParadeDB becomes **the first official plugin**, shipping in-repo and semver'd: `pgb-paradedb`.
+
+That turns pgb from a tool into a platform people can play with:
+
+| plugin | what it would add |
+|---|---|
+| `pgb-paradedb` (**official**) | search predicates, scoring/snippets, hybrid RRF, index-DDL extraction, `@search` DSL annotations |
+| `pgb-pgvector` (community, plausible) | vector-only search functions, distance operators, ANN index awareness |
+| `pgb-timescale` (community, plausible) | hypertable declarations, chunk predicates, time-bucket helpers |
+| `pgb-postgis` (community, plausible) | geometry types, spatial predicates, KNN ordering |
+
+## Every extension has two halves
+
+1. **Codegen side** — a hook into pgb's passes that enriches the IR and emits additional code (extra descriptor methods, extra files, extra static functions).
+2. **Runtime side** — a Go module the generated code imports (`.../extensions/paradedb/runtime`), pinned by semver. The core defines small interfaces the runtime implements (expression participation, emitter hooks for extra operators/functions), so the generated code stays ordinary Go.
+
+## Architecture
+
+### Registration
+
+```yaml
+codegen:
+  - out: dbgen
+    plugin: pgb
+    options:
+      core: github.com/you/pgb/core
+      extensions:
+        - name: paradedb          # official — bundled, runs in-process
+          version: "0.26"
+        - name: timescale         # third-party — process plugin, any language
+          process: { cmd: pgb-ext-timescale }
+          options: { chunk_interval: "7 days" }
+```
+
+Official plugins are compiled into the `pgb` binary (no IPC, versioned with core). Third-party plugins are **process plugins over the same protobuf pattern sqlc uses** (request on stdin, files out on stdout) — a contract Go developers already know, writable from any language.
+
+### Hook 1 — IR enrichment
+
+A plugin receives the compiled [SchemaIR](/architecture/schema-ir) plus the raw schema files and may attach namespaced, opaque data:
+
+```go
+ir.Table.Extensions["paradedb"] = SearchIndex{ KeyField: "id", Fields: [...] }
+```
+
+The SDK exposes the same oliphant helpers pgb core uses, so a plugin can parse the DDL core doesn't care about (for paradedb: `CREATE INDEX ... USING paradedb` — the exact pass described in [index-DDL extraction](/paradedb/index-ddl), simply re-homed).
+
+### Hook 2 — DSL attributes (2.0)
+
+When the [declarative DSL](/future/vision) lands, attributes are **plugin-owned**: `@search(...)` and `@@paradedb(...)` are claimed by the paradedb extension. An unknown attribute is a compile error naming the plugin that would claim it — so the DSL stays small and the ecosystem grows without core churn.
+
+### Hook 3 — codegen weaving
+
+After passes B/C, each enabled plugin gets (IR, manifest of emitted files, its options) and returns:
+
+- **new files** to emit (e.g. `users_search.gen.go` with search statics),
+- **method weaves** — additions to the generated table structs, e.g. `func (t UserTable) Search() paradedb.UserSearch`. Weaving is possible because *pgb generates the structs*; the plugin's contributions are merged during pass B, before code is written.
+- **static function registrations** for the search layer.
+
+This is exactly where today's built-in ParadeDB generation plugs in — the plugin API is the extracted interface of what already works.
+
+### Runtime contract
+
+The core emitter only emits operators/functions it knows. A plugin runtime registers extras through a small `DialectExtension` interface (operator tokens, function names, cast shapes) — the emitter validates against the union, so a typo'd operator fails at *generate* time, not at runtime.
+
+## What moves into `pgb-paradedb`
+
+| today (built-in, v0.1) | becomes (2.0) |
+|---|---|
+| `core/search.go` (the churn barrier) | `extensions/paradedb/runtime` — still one file, still the churn barrier |
+| `USING paradedb` DDL extraction in the oliphant pass | plugin Hook 1 |
+| predicate/score/snippet/hybrid generation in pass C | plugin Hook 3 |
+| `paradedb:` config block | plugin options, namespaced |
+| `@search` DSL attributes (planned) | plugin Hook 2 |
+| pgvector type mapping | stays in **core** (generic Postgres type); hybrid *functions* go to the plugin |
+
+## For plugin authors
+
+- **Template repo** (`pgb-plugin-template`): a working process plugin emitting one extra descriptor method + one static function, golden-tested.
+- **Stable contract**: the protobuf schema and the runtime interfaces are semver'd; core changes don't break plugins across patch/minor releases.
+- **Trust model** identical to sqlc: official plugins are in-repo and auditable; third-party process plugins are arbitrary executables — install what you trust.
+- **Docs**: a "writing your first plugin" guide walks the IR-enrichment → weave → runtime loop with a minimal (non-search) example.
+
+## Sequencing
+
+| phase | gate | exit |
+|---|---|---|
+| **P0 — plugin split** | after v0.1 (can start in parallel with M3+ as APIs stabilize) | `pgb-paradedb` ships as an official extension; v0.1 codegen output byte-identical before/after the split; template repo + author docs live |
+| P1 DSL | after P0 | attributes claimable by plugins (see [vision](/future/vision)) |
+| P2 migrate | after P1 | |
+| P3 ORM | after P2 | |
+
+The byte-identical exit criterion is deliberate: the plugin split must be a pure refactor, provable by the existing [golden tests](/guides/testing).

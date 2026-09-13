@@ -1,0 +1,137 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "aspen",
+  "name": "pgb",
+  "description": "Two-stage Postgres codegen with full ParadeDB support — typed builders and static query functions generated from your schema.",
+  "colors": {
+    "primary": "#4f46e5",
+    "light": "#4f46e5",
+    "dark": "#818cf8"
+  },
+  "appearance": {
+    "default": "system",
+    "strict": false
+  },
+  "banner": {
+    "content": "Docs expansion: ParadeDB architecture, aggregations, tokenizers, and the [support matrix](/reference/support-matrix) — pgb now documents pg_search 0.25.9+ / 0.26-rc.",
+    "dismissible": true
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Docs",
+        "icon": "book-open",
+        "groups": [
+          {
+            "group": "Getting started",
+            "pages": ["welcome/quickstart"]
+          },
+          {
+            "group": "Architecture",
+            "pages": ["architecture/overview", "architecture/schema-ir"]
+          },
+          {
+            "group": "Explanation",
+            "pages": ["guides/risks-faq"]
+          }
+        ]
+      },
+      {
+        "tab": "Generated code",
+        "icon": "code",
+        "groups": [
+          {
+            "group": "Stage 1 — builders",
+            "pages": ["generated-code/models", "generated-code/builders"]
+          },
+          {
+            "group": "Stage 2 — static functions",
+            "pages": ["generated-code/statics", "generated-code/pagination"]
+          }
+        ]
+      },
+      {
+        "tab": "ParadeDB",
+        "icon": "magnifying-glass",
+        "groups": [
+          {
+            "group": "pg_search",
+            "pages": [
+              "paradedb/overview",
+              "paradedb/architecture",
+              "paradedb/index-ddl",
+              "paradedb/tokenizers",
+              "paradedb/predicates",
+              "paradedb/scoring",
+              "paradedb/aggregations",
+              "paradedb/hybrid-search"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Postgres",
+        "icon": "database",
+        "groups": [
+          {
+            "group": "Versions",
+            "pages": ["postgres/version-gates"]
+          }
+        ]
+      },
+      {
+        "tab": "Reference",
+        "icon": "gears",
+        "groups": [
+          {
+            "group": "Configuration",
+            "pages": ["reference/config", "reference/directives", "reference/type-mapping"]
+          },
+          {
+            "group": "Platform",
+            "pages": ["reference/support-matrix"]
+          },
+          {
+            "group": "Runtime core",
+            "pages": ["reference/core-api"]
+          }
+        ]
+      },
+      {
+        "tab": "Resources",
+        "icon": "toolbox",
+        "groups": [
+          {
+            "group": "Guides",
+            "pages": ["guides/handwritten-queries", "guides/testing"]
+          },
+          {
+            "group": "Project",
+            "pages": ["roadmap"]
+          },
+          {
+            "group": "Future development",
+            "pages": ["future/plugins", "future/vision"]
+          }
+        ]
+      }
+    ]
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/your-org/pgb"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/your-org/pgb"
+    }
+  },
+  "seo": {
+    "metatags": {
+      "og:title": "pgb — two-stage Postgres codegen",
+      "og:description": "Typed builders and static query functions generated from your schema. PostgreSQL 18 & 19 today, full ParadeDB pg_search support."
+    }
+  }
+}

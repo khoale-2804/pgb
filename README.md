@@ -6,7 +6,7 @@
 
 **Two-stage Postgres codegen with full ParadeDB support** — a [sqlc](https://sqlc.dev) process plugin that turns a Postgres schema into typed Go: models, per-table query builders, and static query functions, with first-class [pg_search](https://docs.paradedb.com) (BM25) coverage.
 
-> **Status: in progress.** The design and documentation are complete; implementation starts at milestone M0 ([roadmap](DESIGN.md)). The docs describe the committed design — read them as the spec, not as shipped software.
+> **Status: in progress — M0–M3 implemented and tested.** The sqlc plugin works end-to-end against the golden fixture (models, builders, statics, pg_search codegen, snapshot tests). Remaining: docker integration lane, `pgb fmt`, the DSL (P1) and migrations (P2). See the [roadmap](DESIGN.md).
 
 ```go
 // static layer — zero hand-written SQL

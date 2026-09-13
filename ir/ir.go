@@ -47,9 +47,9 @@ type Enum struct {
 
 // Composite is a PostgreSQL composite type.
 type Composite struct {
-	Schema  string
-	Name    string
-	Fields  []Column
+	Schema string
+	Name   string
+	Fields []Column
 }
 
 // SearchIndex models one `CREATE INDEX ... USING paradedb|bm25` definition.

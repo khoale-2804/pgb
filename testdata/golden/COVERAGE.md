@@ -1,5 +1,7 @@
 # Golden fixture — coverage matrix
 
+**Status: all 56 rows implemented and pinned by the golden suite (pass D = pg_search codegen).**
+
 `schema.sql` + `queries.sql` are the canonical inputs for every verification
 layer (golden generated-code tests, fork-parity, both editions). Each row maps
 a schema feature to the generated artifact that proves codegen handled it and

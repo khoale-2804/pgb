@@ -118,6 +118,18 @@ there) — `export PATH=$PATH:$HOME/go/bin`.
 - If a milestone is fully green: commit, push, update this file's
   ALREADY-DONE, then continue to the next backlog item.
 
+## ALREADY-DONE (2026-09-13 second shift)
+
+- M3a (5c267ad): gen/load_ddl.go — oliphant DDL pass (paradedb indexes,
+  directives, generated columns VIRTUAL/STORED, PK/uniques, views).
+- M3b (966fb00): core/search.go — pg_search constructors, byte-exact pins.
+- M3c + M1 (12f0e33): pass D search codegen (<table>_search.gen.go,
+  Search<Table> statics, Score/Snippet), golden snapshots (44 files,
+  deterministic .pb request fixture), skippable_partner unskipped,
+  COVERAGE all-56-rows implemented.
+- Full gate green: build/vet/test/validate/validate-plugin; emitted
+  package compiles.
+
 ## END CONDITION
 
 When backlog items 1–5 are all green and pushed: run one final full verify,

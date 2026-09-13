@@ -87,11 +87,17 @@ The generator parses your schema with libpg_query 18 (`sqlc-dev/oliphant`; libpg
 
 Practical consequence: keep PG19-only DDL (e.g. `CREATE PROPERTY GRAPH`) out of `schema.sql` for now. Emitted DML is validated by the live server, not by the codegen parser, so targeting `19` in the emitter is unaffected.
 
+## ParadeDB access method
+
+The pg_search access method was renamed in 0.25: releases through 0.24 create search indexes with `USING bm25`, 0.25 and later with `USING paradedb`. pgb emits the 0.25+ spelling in every search index it lifts from your schema (see [index DDL extraction](/paradedb/index-ddl)), so search features require pg_search ≥ 0.25 — **0.25.9 is the tested floor**, the version the integration lane runs against. On a 0.24 server, applying the generated `CREATE INDEX ... USING paradedb` fails because that access method does not exist there; the fix is upgrading the ParadeDB image or extension, not editing the DDL.
+
+pgb still parses both spellings in your schema — `USING bm25` is accepted as the legacy alias at DDL-extraction time and re-emitted as `USING paradedb`.
+
 ## ParadeDB on PG19
 
 pg_search ships binaries for Postgres 15, 16, 17, and 18 — **no 19 builds yet**. The test matrix therefore runs:
 
-- **PG18 + ParadeDB image** — full matrix including search and hybrid.
+- **PG18 + ParadeDB image (`paradedb/paradedb:0.25.9`)** — full matrix including search and hybrid.
 - **postgres:19-beta** — non-search matrix only; `pgb` emits version-agnostic SQL for those paths, so nothing else changes.
 
 When ParadeDB ships PG19 builds, the search lanes join the 19 matrix with zero code changes.

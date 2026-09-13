@@ -110,7 +110,6 @@ type InventorySet struct {
 // and serial columns are out, default-bearing columns join only with
 // the include_defaults option.
 type InsertInventoryParams struct {
-	ItemID    int64
 	Qty       int32
 	UpdatedAt pgtype.Timestamptz
 }
@@ -164,8 +163,8 @@ func CountInventorys(ctx context.Context, exec pgb.DBTX, f InventoryFilter) (int
 // column, defaults included).
 func InsertInventory(ctx context.Context, exec pgb.DBTX, p InsertInventoryParams) (Inventory, error) {
 	rows, err := pgb.NewInsert("public.inventory",
-		[]string{"item_id", "qty", "updated_at"},
-		[]pgb.Expr{pgb.Lit{V: p.ItemID}, pgb.Lit{V: p.Qty}, pgb.Lit{V: p.UpdatedAt}},
+		[]string{"qty", "updated_at"},
+		[]pgb.Expr{pgb.Lit{V: p.Qty}, pgb.Lit{V: p.UpdatedAt}},
 	).Returning(pgb.Col{Table: "inventory", Name: "item_id"}, pgb.Col{Table: "inventory", Name: "qty"}, pgb.Col{Table: "inventory", Name: "updated_at"}).Run(ctx, exec)
 	if err != nil {
 		return Inventory{}, err
@@ -180,7 +179,7 @@ func InsertInventory(ctx context.Context, exec pgb.DBTX, p InsertInventoryParams
 	return us[0], nil
 }
 
-const insertInventorysSQL = "INSERT INTO public.inventory (item_id, qty, updated_at) SELECT * FROM unnest($1::int8[], $2::int4[], $3::timestamptz[]) RETURNING item_id, qty, updated_at"
+const insertInventorysSQL = "INSERT INTO public.inventory (qty, updated_at) SELECT * FROM unnest($1::int4[], $2::timestamptz[]) RETURNING item_id, qty, updated_at"
 
 // InsertInventorys inserts a whole batch in one round trip via
 // unnest and returns every inserted row.
@@ -188,16 +187,14 @@ func InsertInventorys(ctx context.Context, exec pgb.DBTX, ps []InsertInventoryPa
 	if len(ps) == 0 {
 		return nil, nil
 	}
-	colItemID := make([]int64, len(ps))
 	colQty := make([]int32, len(ps))
 	colUpdatedAt := make([]pgtype.Timestamptz, len(ps))
 	for i, p := range ps {
-		colItemID[i] = p.ItemID
 		colQty[i] = p.Qty
 		colUpdatedAt[i] = p.UpdatedAt
 	}
-	args := make([]any, 0, 3*len(ps))
-	args = append(args, colItemID, colQty, colUpdatedAt)
+	args := make([]any, 0, 2*len(ps))
+	args = append(args, colQty, colUpdatedAt)
 	rows, err := exec.Query(ctx, insertInventorysSQL, args...)
 	if err != nil {
 		return nil, err

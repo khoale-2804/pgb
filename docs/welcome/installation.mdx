@@ -40,16 +40,19 @@ difference.
 ## 3. A database with pg_search
 
 For search features you need the ParadeDB extension — the fastest way is
-their Docker image, which also bundles pgvector:
+their Docker image, which also bundles pgvector. Pin the tag: pgb emits
+`USING paradedb` index DDL, and that access method only exists on
+pg_search 0.25+ (0.24 and earlier create indexes with `USING bm25`):
 
 ```bash
 docker run -d --name pgb-demo -e POSTGRES_PASSWORD=postgres \
-  -p 5432:5432 paradedb/paradedb:latest
+  -p 5432:5432 paradedb/paradedb:0.25.9
 ```
 
-`CREATE EXTENSION pg_search;` and `CREATE EXTENSION vector;` in that
-database, then point your connection string at it. Plain `postgres:18`
-works for everything non-search.
+`0.25.9` is the version pgb's own integration lane tests against — the
+tested floor. `CREATE EXTENSION pg_search;` and `CREATE EXTENSION
+vector;` in that database, then point your connection string at it.
+Plain `postgres:18` works for everything non-search.
 
 ## 4. Verify
 

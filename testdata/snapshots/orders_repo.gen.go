@@ -192,7 +192,6 @@ type OrderSet struct {
 // and serial columns are out, default-bearing columns join only with
 // the include_defaults option.
 type InsertOrderParams struct {
-	ID         int64
 	ShopID     int32
 	UserID     int64
 	Channel    OrderChannel
@@ -237,8 +236,8 @@ func CountOrders(ctx context.Context, exec pgb.DBTX, f OrderFilter) (int64, erro
 // column, defaults included).
 func InsertOrder(ctx context.Context, exec pgb.DBTX, p InsertOrderParams) (Order, error) {
 	rows, err := pgb.NewInsert("public.orders",
-		[]string{"id", "shop_id", "user_id", "channel", "total", "placed_at", "ship_window", "schedule", "notes"},
-		[]pgb.Expr{pgb.Lit{V: p.ID}, pgb.Lit{V: p.ShopID}, pgb.Lit{V: p.UserID}, pgb.Lit{V: p.Channel, Cast: "order_channel"}, pgb.Lit{V: p.Total}, pgb.Lit{V: p.PlacedAt}, pgb.Lit{V: p.ShipWindow}, pgb.Lit{V: p.Schedule}, pgb.Lit{V: p.Notes}},
+		[]string{"shop_id", "user_id", "channel", "total", "placed_at", "ship_window", "schedule", "notes"},
+		[]pgb.Expr{pgb.Lit{V: p.ShopID}, pgb.Lit{V: p.UserID}, pgb.Lit{V: p.Channel, Cast: "order_channel"}, pgb.Lit{V: p.Total}, pgb.Lit{V: p.PlacedAt}, pgb.Lit{V: p.ShipWindow}, pgb.Lit{V: p.Schedule}, pgb.Lit{V: p.Notes}},
 	).Returning(pgb.Col{Table: "orders", Name: "id"}, pgb.Col{Table: "orders", Name: "shop_id"}, pgb.Col{Table: "orders", Name: "user_id"}, pgb.Col{Table: "orders", Name: "channel"}, pgb.Col{Table: "orders", Name: "total"}, pgb.Col{Table: "orders", Name: "placed_at"}, pgb.Col{Table: "orders", Name: "ship_window"}, pgb.Col{Table: "orders", Name: "schedule"}, pgb.Col{Table: "orders", Name: "notes"}).Run(ctx, exec)
 	if err != nil {
 		return Order{}, err

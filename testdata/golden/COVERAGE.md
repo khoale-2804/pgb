@@ -80,6 +80,8 @@ to the pass that owns it ([pipeline](/internals/codegen-pipeline)).
 ## Empirical findings (sqlc@main, 2026-09-13 fixture run)
 
 - Bare casts in index column lists (`title::pdb.icu`) are REJECTED by the PG18 parser — parenthesize: `(title::pdb.icu)` (matches ParadeDB docs).
+- pg_search 0.25.9 requires typmod args on `pdb.edge_ngram`: the bare cast `(title::pdb.edge_ngram)` fails at apply time with `Missing required option: 'min'`. Fixture §M uses positional min/max: `(title::pdb.edge_ngram(2, 10))` (2026-09-13, integration lane on paradedb/paradedb:0.25.9). Our parser still accepts the bare form; the generated shape is unchanged.
+- pg_search 0.25.9 depends on the `vector` extension — when rebuilding the public schema (it cascade-drops installed extensions), `CREATE EXTENSION vector` must run before `CREATE EXTENSION pg_search`.
 - String-form pgvector override emits INVALID Go (`pgvector-go.Vector` — hyphen in derived package name). Use the structured override (`import`/`package`/`type`). The error surfaces as `expected ';', found '-'`.
 - Empirical stock mappings: tstzmultirange → pgtype.Multirange[pgtype.Range[pgtype.Timestamptz]]; xid8 → pgtype.Uint64; tid → pgtype.TID; money → pgtype.Numeric; **tsvector / xml / pg_lsn → any** (the leak the standalone edition catalog fixes); citext → unknown ext, resolves via override.
 - Keyword/quoted/unicode identifiers sanitize cleanly (Type/Range/Select/Email/Café), labels with spaces preserved in enum constants (Passwordreset).

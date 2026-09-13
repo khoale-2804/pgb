@@ -76,7 +76,6 @@ type SkippablePartnerSet struct {
 // and serial columns are out, default-bearing columns join only with
 // the include_defaults option.
 type InsertSkippablePartnerParams struct {
-	ID    int64
 	Label string
 }
 
@@ -129,8 +128,8 @@ func CountSkippablePartners(ctx context.Context, exec pgb.DBTX, f SkippablePartn
 // column, defaults included).
 func InsertSkippablePartner(ctx context.Context, exec pgb.DBTX, p InsertSkippablePartnerParams) (SkippablePartner, error) {
 	rows, err := pgb.NewInsert("public.skippable_partner",
-		[]string{"id", "label"},
-		[]pgb.Expr{pgb.Lit{V: p.ID}, pgb.Lit{V: p.Label}},
+		[]string{"label"},
+		[]pgb.Expr{pgb.Lit{V: p.Label}},
 	).Returning(pgb.Col{Table: "skippable_partner", Name: "id"}, pgb.Col{Table: "skippable_partner", Name: "label"}).Run(ctx, exec)
 	if err != nil {
 		return SkippablePartner{}, err
@@ -145,7 +144,7 @@ func InsertSkippablePartner(ctx context.Context, exec pgb.DBTX, p InsertSkippabl
 	return us[0], nil
 }
 
-const insertSkippablePartnersSQL = "INSERT INTO public.skippable_partner (id, label) SELECT * FROM unnest($1::int8[], $2::text[]) RETURNING id, label"
+const insertSkippablePartnersSQL = "INSERT INTO public.skippable_partner (label) SELECT * FROM unnest($1::text[]) RETURNING id, label"
 
 // InsertSkippablePartners inserts a whole batch in one round trip via
 // unnest and returns every inserted row.
@@ -153,14 +152,12 @@ func InsertSkippablePartners(ctx context.Context, exec pgb.DBTX, ps []InsertSkip
 	if len(ps) == 0 {
 		return nil, nil
 	}
-	colID := make([]int64, len(ps))
 	colLabel := make([]string, len(ps))
 	for i, p := range ps {
-		colID[i] = p.ID
 		colLabel[i] = p.Label
 	}
-	args := make([]any, 0, 2*len(ps))
-	args = append(args, colID, colLabel)
+	args := make([]any, 0, 1*len(ps))
+	args = append(args, colLabel)
 	rows, err := exec.Query(ctx, insertSkippablePartnersSQL, args...)
 	if err != nil {
 		return nil, err

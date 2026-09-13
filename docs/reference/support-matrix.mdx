@@ -43,10 +43,10 @@ The emitter half of the 19 gate works today because emitted DML is validated by 
 | Postgres binaries | 15, 16, 17, 18 (PG18 default since v0.22.0) — no PG19 builds |
 | Postgres floor | PG15 |
 | required dependency | pgvector, since pg_search 0.25.0 |
-| index access method | `USING paradedb` primary — `USING bm25` is a deprecated alias |
+| index access method | `USING paradedb` since 0.25.0 — pg_search ≤ 0.24 used `USING bm25` (parsed as a legacy alias, never emitted) |
 | pgb gate | `paradedb.version: "0.26"` |
 
-pgb targets **0.25.9+ / 0.26-rc**: stable 0.25.9 is the floor, and the `"0.26"` gate value tracks the release candidates so emitted search SQL is ready when 0.26 goes final. The value is a gate name, not a stability claim — pgb's yaml examples keep `"0.26"` even though 0.26.0-rc.1 is a prerelease.
+pgb targets **0.25.9+ / 0.26-rc**: stable 0.25.9 is the tested floor — the integration lane runs against the pinned `paradedb/paradedb:0.25.9` image — and the `"0.26"` gate value tracks the release candidates so emitted search SQL is ready when 0.26 goes final. The value is a gate name, not a stability claim — pgb's yaml examples keep `"0.26"` even though 0.26.0-rc.1 is a prerelease. Because pgb emits `USING paradedb`, any pg_search older than 0.25 (which only knows `USING bm25`) is out regardless of the gate value.
 
 <Warning>
 Never read `paradedb.version: "0.26"` as "0.26 is stable". It is the rc-tracking gate on a 0.25.9+ floor; the stable release is v0.25.9.
@@ -58,7 +58,7 @@ Recent pg_search milestones pgb leans on:
 |---|---|
 | 0.22.0 | PG18 becomes the default prebuilt binary |
 | 0.24.0 | index writes are WAL-logged and MVCC-safe |
-| 0.25.0 | pgvector becomes a required dependency |
+| 0.25.0 | pgvector becomes a required dependency; access method renamed `USING bm25` → `USING paradedb` |
 | 0.25.5 | external-index filters (ltree `<@`, PostGIS-style) |
 | 0.25.9 | JSON-path fields usable in aggregates |
 | 0.26.0-rc.1 | vector tiebreak ordering, vector pushdown for RRF queries |

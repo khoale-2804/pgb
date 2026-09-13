@@ -1,6 +1,6 @@
 VENV := tools/.venv/bin
 
-.PHONY: fmt-schema fmt-docs check-docs validate validate-plugin plugin test install-plugin
+.PHONY: fmt-schema fmt-docs check-docs validate validate-plugin plugin test integration install-plugin
 
 fmt-schema: ## format schema SQL files (sqlfluff; pgb fmt replaces this in v0.2)
 	$(VENV)/sqlfluff format testdata/
@@ -20,6 +20,9 @@ plugin: ## build the sqlc process plugin binary
 
 test: ## run all Go tests (integration test skips itself without sqlc)
 	go test ./...
+
+integration: ## run the integration suite against docker compose up paradedb
+	go test -tags integration ./testdata/integration/
 
 install-plugin: ## install the plugin binary onto PATH (sqlc resolves cmd via PATH)
 	go install ./cmd/sqlc-gen-pgb

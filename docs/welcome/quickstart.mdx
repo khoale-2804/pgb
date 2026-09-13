@@ -312,11 +312,13 @@ Every generated function names its executor parameter `exec` (`func GetUser(ctx 
 
 ## 7. Run it
 
-Against the official ParadeDB image (pg_search preinstalled):
+Against the official ParadeDB image (pg_search preinstalled, pinned to
+`0.25.9` — the tested floor; the `USING paradedb` index pgb emits needs
+pg_search 0.25+):
 
 ```bash
 docker run --name pgb-demo -e POSTGRES_PASSWORD=postgres \
-  -p 5432:5432 paradedb/paradedb
+  -p 5432:5432 paradedb/paradedb:0.25.9
 export DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres
 psql "$DATABASE_URL" -f schema.sql
 sqlc generate

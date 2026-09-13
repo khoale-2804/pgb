@@ -86,8 +86,12 @@ Every generated function executed against real servers:
 
 | lane | image | covers |
 |---|---|---|
-| full | `paradedb/paradedb` (0.25.9+/0.26) on **PG18** | CRUD, builders, search, scoring, hybrid RRF |
+| full | `paradedb/paradedb:0.25.9` on **PG18** | CRUD, builders, search, scoring, hybrid RRF |
 | plain | `postgres:19-beta` | CRUD, builders, upsert gates — search lanes skipped until ParadeDB ships PG19 builds |
+
+The ParadeDB lane is pinned to `0.25.9`, the tested floor: pg_search 0.25
+renamed the access method to `USING paradedb` (the only spelling pgb
+emits), and 0.25.9 is the current stable release.
 
 Both lanes run side by side in one compose file — separate ports, one `docker compose up`:
 

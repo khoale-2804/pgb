@@ -368,6 +368,17 @@ func enrichCreate(sch *ir.Schema, st *ast.CreateStmt) {
 					setGenerated(t, cd.GetColname(), con.GetGeneratedKind())
 					continue
 				}
+				if con.GetContype() == ast.ConstrType_CONSTR_IDENTITY {
+					// GENERATED ALWAYS/BY DEFAULT AS IDENTITY: the value
+					// comes from the implicit sequence default, so the
+					// column must not join INSERT column lists (the server
+					// rejects non-DEFAULT inserts into ALWAYS, SQLSTATE
+					// 428C9). HasDefault routes it through insertableIdx.
+					if c := findColumn(t, cd.GetColname()); c != nil {
+						c.HasDefault = true
+					}
+					continue
+				}
 				applyConstraint(t, con, cd.GetColname())
 			}
 		case *ast.Node_Constraint:

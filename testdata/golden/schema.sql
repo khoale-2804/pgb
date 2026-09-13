@@ -343,6 +343,6 @@ CREATE TABLE docs (
 );
 
 CREATE INDEX docs_search ON docs USING paradedb
-  (id, (title::pdb.edge_ngram), (title::pdb.literal('alias=title_exact')),
+  (id, (title::pdb.edge_ngram(2, 10)), (title::pdb.literal('alias=title_exact')),
    (body::pdb.simple('stemmer=english')))
   WITH (key_field='id');

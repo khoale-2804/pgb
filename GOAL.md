@@ -130,6 +130,26 @@ there) — `export PATH=$PATH:$HOME/go/bin`.
 - Full gate green: build/vet/test/validate/validate-plugin; emitted
   package compiles.
 
+## ALREADY-DONE (2026-09-14 real-world validation shift)
+
+- Real-world validation round (cbdba03): 3-builder fan-out (realworld e2e +
+  edge codegen + quality audit). Fixes: P0 `In` → `col = ANY(?::cast[])`
+  with serial→int mapping (was unparenthesized `= ANY $1`, 42601); P0
+  `KeyEq` → `->> ? = ?` (was `->> ?` with 2 args, 08P01); P1 unnest batch
+  suppressed for slice-typed columns (42804); P1 aliased JSON-path predicates
+  emit `::pdb.literal('alias=…')` (pg_search resolves aliased fields ONLY
+  through the cast). New fixtures: testdata/realworld (11 tables, 25 queries,
+  28-file gen, smoke 4/4 on pgb_realworld DB) + testdata/edge (hostile
+  identifiers; only E11 ALTER-TABLE-PK unsupported). AUDIT.md = open-issues
+  ledger (6 P1 + 9 P2 deferred, heuristicPK fail-soft is #1).
+- New runtime gate: TestEmittedPredicateShapes executes 11 predicate shapes
+  against the server — snapshot tests pin Go shapes, this pins SQL validity.
+- Full gate green: build/vet/gofmt/unit/validate/validate-plugin/integration
+  8/8/realworld smoke 4/4/edge build. sqlc gotcha: plugin cmd is LookPath'd
+  whole + child env stripped → `go run` impossible as cmd; use a wrapper
+  script (testdata/realworld/pgb-plugin) or installed binary (make
+  install-plugin) with ~/go/bin on PATH.
+
 ## ALREADY-DONE (2026-09-13 third shift)
 
 - Integration lane on pg_search 0.25.9 (f3ddd2e): docker-compose pinned to

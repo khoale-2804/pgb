@@ -138,7 +138,7 @@ In the plugin repo the passes live in `gen/`: `load_sqlc.go` (proto + options �
 
 ## Where golden tests pin each pass
 
-Determinism ([same IR → byte-identical output](/internals/emitter#determinism)) is what makes snapshot tests meaningful. Each pass has its own pin:
+Determinism ([same IR → byte-identical output](/internals/emitter#determinism)) is what makes snapshot tests meaningful. Each pass has its own pin. One more stage before any file is written: **generated `.go` output passes through `go/format` (gofmt)**, so golden files are gofmt-canonical and output style is enforced by the toolchain — never hand-tidied. (The docs snippets follow the same discipline via `tools/fmt-docs.py`.)
 
 | pass | pinned by | a regression looks like |
 |---|---|---|

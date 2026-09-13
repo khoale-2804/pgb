@@ -64,16 +64,16 @@ COMMENT ON COLUMN documents.embedding IS
 
 ```go
 type Document struct {
-    ID        uuid.UUID          // uuid — github.com/google/uuid
-    Price     pgtype.Numeric     // numeric — exact decimal,
-                                 // never a float
-    Note      pgtype.Text        // nullable text
-    Meta      []byte             // jsonb — raw bytes
-                                 // unless overridden
-    Tags      []string           // text[]
-    UpdatedAt pgtype.Timestamptz // nullable timestamp
-    Embedding pgvector.Vector   // via the directive
-                                // (vector has no default Go type)
+	ID    uuid.UUID      // uuid — github.com/google/uuid
+	Price pgtype.Numeric // numeric — exact decimal,
+	// never a float
+	Note pgtype.Text // nullable text
+	Meta []byte      // jsonb — raw bytes
+	// unless overridden
+	Tags      []string           // text[]
+	UpdatedAt pgtype.Timestamptz // nullable timestamp
+	Embedding pgvector.Vector    // via the directive
+	// (vector has no default Go type)
 }
 ```
 
@@ -83,15 +83,15 @@ Write with the exact-decimal constructor; floats cannot represent money:
 
 ```go
 db.UpdateDocument(ctx, pool, doc.ID, db.DocumentSet{
-    Price: pgb.Set(pgtype.Numeric{
-        Int: big.NewInt(19999), Exp: -2, Valid: true}), // 199.99
+	Price: pgb.Set(pgtype.Numeric{
+		Int: big.NewInt(19999), Exp: -2, Valid: true}), // 199.99
 })
 ```
 
 ```go
 if v, err := doc.Price.Value(); err == nil {
-    fmt.Println(v.(string)) // "199.99" — string form
-                            // of the exact decimal
+	fmt.Println(v.(string)) // "199.99" — string form
+	// of the exact decimal
 }
 ```
 
@@ -104,19 +104,19 @@ Raw bytes by default: marshal in, unmarshal out:
 ```go
 raw, err := json.Marshal(map[string]any{"plan": "pro", "seats": 12})
 if err != nil {
-    return err
+	return err
 }
 _, err = db.UpdateDocument(ctx, pool, doc.ID,
-    db.DocumentSet{Meta: pgb.Set(raw)})
+	db.DocumentSet{Meta: pgb.Set(raw)})
 ```
 
 ```go
 if len(doc.Meta) > 0 {
-    var m map[string]any
-    if err := json.Unmarshal(doc.Meta, &m); err != nil {
-        return err
-    }
-    fmt.Println(m["plan"])
+	var m map[string]any
+	if err := json.Unmarshal(doc.Meta, &m); err != nil {
+		return err
+	}
+	fmt.Println(m["plan"])
 }
 ```
 
@@ -128,13 +128,13 @@ Go slices bind natively; pgx encodes them as arrays (empty slices get explicit c
 
 ```go
 _, err := db.UpdateDocument(ctx, pool, doc.ID, db.DocumentSet{
-    Tags: pgb.Set([]string{"staff", "beta"}),
+	Tags: pgb.Set([]string{"staff", "beta"}),
 })
 ```
 
 ```go
 for _, t := range doc.Tags { // SQL NULL arrives as a nil slice
-    fmt.Println(t)
+	fmt.Println(t)
 }
 ```
 
@@ -144,20 +144,20 @@ for _, t := range doc.Tags { // SQL NULL arrives as a nil slice
 
 ```go
 db.UpdateDocument(ctx, pool, doc.ID, db.DocumentSet{
-    UpdatedAt: pgb.Set(pgtype.Timestamptz{
-        Time: time.Now().UTC(), Valid: true}),
+	UpdatedAt: pgb.Set(pgtype.Timestamptz{
+		Time: time.Now().UTC(), Valid: true}),
 })
 ```
 
 ```go
 db.UpdateDocument(ctx, pool, doc.ID, db.DocumentSet{
-    UpdatedAt: pgb.Null[pgtype.Timestamptz](), // SET updated_at = NULL
+	UpdatedAt: pgb.Null[pgtype.Timestamptz](), // SET updated_at = NULL
 })
 ```
 
 ```go
 if doc.UpdatedAt.Valid {
-    fmt.Println(doc.UpdatedAt.Time.UTC().Format(time.RFC3339))
+	fmt.Println(doc.UpdatedAt.Time.UTC().Format(time.RFC3339))
 }
 ```
 
@@ -167,10 +167,10 @@ A plain `uuid.UUID` value — construct, scan, and print without glue:
 
 ```go
 _, err := db.InsertDocument(ctx, pool, db.InsertDocumentParams{
-    Price: pgtype.Numeric{
-        Int: big.NewInt(4999), Exp: -2, Valid: true}, // 49.99
-    // ID is omitted: gen_random_uuid() is a default, and
-    // include_defaults is false
+	Price: pgtype.Numeric{
+		Int: big.NewInt(4999), Exp: -2, Valid: true}, // 49.99
+	// ID is omitted: gen_random_uuid() is a default, and
+	// include_defaults is false
 })
 ```
 
@@ -185,17 +185,17 @@ Mapped through the `pgb:type=` directive (or the config `db_type: vector` overri
 
 ```go
 db.UpdateDocument(ctx, pool, doc.ID, db.DocumentSet{
-    Embedding: pgb.Set(pgvector.New([]float32{0.11, 0.25, 0.04})),
+	Embedding: pgb.Set(pgvector.New([]float32{0.11, 0.25, 0.04})),
 })
 ```
 
 ```go
 // optional check against the column dim
 if err := doc.Embedding.Validate(384); err != nil {
-    return err
+	return err
 }
 floats := doc.Embedding.Slice() // []float32 — feed hybrid
-                                // search or your own math
+// search or your own math
 ```
 
 ### The same schema under `pointers`
@@ -216,7 +216,7 @@ Read-side checks become nil checks — and nullable text loses its `pgtype.Text`
 
 ```go
 if doc.Note != nil {
-    fmt.Println(*doc.Note)
+	fmt.Println(*doc.Note)
 }
 ```
 
@@ -227,7 +227,11 @@ Three-state writes are unaffected by the mode — `pgb.Set(v)` / `pgb.Null[T]()`
 `UPDATE` sets need *value*, *NULL*, and *skip*. One generic covers it:
 
 ```go
-type Set[T any] struct { V T; IsNull bool; Defined bool }
+type Set[T any] struct {
+	V       T
+	IsNull  bool
+	Defined bool
+}
 
 pgb.Set("x")       // SET col = $n
 pgb.Null[string]() // SET col = NULL

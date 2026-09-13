@@ -20,32 +20,33 @@ Use goose or golang-migrate for the live database. Both are plain versioned SQL 
 package main
 
 import (
-    "context"
-    "embed"
-    "os"
+	"context"
+	"embed"
+	"os"
 
-    "github.com/jackc/pgx/v5/pgxpool"
-    "github.com/jackc/pgx/v5/stdlib"
-    "github.com/pressly/goose/v3"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/pressly/goose/v3"
 )
 
 //go:embed migrations/*.sql
 var migrationsFS embed.FS
 
 func migrate(ctx context.Context) error {
-    pool, err := pgxpool.New(ctx, os.Getenv("DATABASE_URL"))
-    if err != nil {
-        return err
-    }
-    defer pool.Close()
+	pool, err := pgxpool.New(ctx, os.Getenv("DATABASE_URL"))
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
 
-    // goose speaks database/sql; pgx stdlib bridges
-    db := stdlib.OpenDBFromPool(pool)
-    defer db.Close()
+	// goose speaks database/sql; pgx stdlib bridges
+	db := stdlib.OpenDBFromPool(pool)
+	defer db.Close()
 
-    goose.SetBaseFS(migrationsFS)
-    return goose.Up(ctx, db, "migrations")
+	goose.SetBaseFS(migrationsFS)
+	return goose.Up(ctx, db, "migrations")
 }
+
 ```
 
 The per-change loop — apply, mirror, regenerate, review:
@@ -135,7 +136,7 @@ The new field is immediately usable at every layer — model scan, filter, three
 
 ```go
 stale, err := db.ListUsers(ctx, pool, db.UserFilter{
-    LastSeenAfter: pgb.Opt(time.Now().Add(-30 * 24 * time.Hour)),
+	LastSeenAfter: pgb.Opt(time.Now().Add(-30 * 24 * time.Hour)),
 }, pgb.Limit(100))
 ```
 

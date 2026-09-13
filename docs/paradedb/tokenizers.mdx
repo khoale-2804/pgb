@@ -129,12 +129,13 @@ pgb exposes the aliased variant as its own descriptor on the generated table str
 ```go
 // emits: WHERE title @@@ 'machine learning' LIMIT 10
 rows, err := db.SearchDocs(ctx, pool,
-    db.Docs.Title().Match("machine learning"), 10)
+	db.Docs.Title().Match("machine learning"), 10)
 
 // emits: WHERE title::pdb.alias('title_autocomplete') @@@ 'mach'
-//   LIMIT 10
+//
+//	LIMIT 10
 rows, err := db.SearchDocs(ctx, pool,
-    db.Docs.TitleAutocomplete().Match("mach"), 10)
+	db.Docs.TitleAutocomplete().Match("mach"), 10)
 ```
 
 Both descriptors carry the full predicate surface; only the field they target differs. Tokenizer metadata for each variant is recorded on its own `SearchField` in the [SchemaIR](/architecture/schema-ir).
@@ -167,8 +168,8 @@ The proposed search DSL expresses this metadata as declarative `@search` attribu
 
 ```go
 type Product struct {
-  Description string `search:"tokenizer=icu"`
-  Color string `search:"path=metadata->'color',
+	Description string `search:"tokenizer=icu"`
+	Color       string `search:"path=metadata->'color',
     alias=json_color,tokenizer=literal"`
 }
 ```

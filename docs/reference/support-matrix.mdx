@@ -123,6 +123,7 @@ to 16-18 now.
 // a supported major (16-18) before then. Details:
 // reference/support-matrix.
 package db
+
 ```
 
 **(b) Legacy `paradedb.version`.** A gate value below the emitter floor warns instead of erroring, because pgb can still emit plain Postgres — it is the search SQL that risks drifting from what your pg_search accepts. With `paradedb: { version: "0.23" }`:
@@ -146,6 +147,7 @@ required dependency since 0.25.0). Recommended: version: "0.26"
 // paradedb.version: "0.26" in your sqlc.yaml. Details:
 // reference/support-matrix.
 package db
+
 ```
 
 Both comments are regenerated on every `sqlc generate` run, so a warning that has been addressed disappears from the generated files by itself — stale warning blocks cannot accumulate. A value that matches no known pg_search release at all is an error, not a warning, and produces no generated files.

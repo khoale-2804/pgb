@@ -8,8 +8,8 @@ Offset pagination degrades linearly and drifts under concurrent writes. pgb gene
 
 ```go
 rows, next, more, err := db.Users.Select().
-    OrderBy(db.Users.ID().Asc()).
-    Page(ctx, pool, pgb.CursorOf(prev), 50)
+	OrderBy(db.Users.ID().Asc()).
+	Page(ctx, pool, pgb.CursorOf(prev), 50)
 ```
 
 - The emitted WHERE is `(k > $last)` — index-driven, stable under inserts.
@@ -67,25 +67,25 @@ A drain loop over every page is just the same call with `prev = next`:
 
 ```go
 func allBetaUsers(
-    ctx context.Context,
-    pool *pgxpool.Pool,
+	ctx context.Context,
+	pool *pgxpool.Pool,
 ) ([]db.User, error) {
-    var out []db.User
-    prev := ""
-    for {
-        users, next, more, err := db.Users.Select().
-            Where(db.Users.Tags().Contains([]string{"beta"})).
-            OrderBy(db.Users.ID().Asc()).
-            Page(ctx, pool, pgb.CursorOf(prev), 500)
-        if err != nil {
-            return nil, err
-        }
-        out = append(out, users...)
-        if !more {
-            return out, nil
-        }
-        prev = next
-    }
+	var out []db.User
+	prev := ""
+	for {
+		users, next, more, err := db.Users.Select().
+			Where(db.Users.Tags().Contains([]string{"beta"})).
+			OrderBy(db.Users.ID().Asc()).
+			Page(ctx, pool, pgb.CursorOf(prev), 500)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, users...)
+		if !more {
+			return out, nil
+		}
+		prev = next
+	}
 }
 ```
 
@@ -99,9 +99,9 @@ Tables whose unique key is `(tenant_id, id)` — the orders table on the [builde
 
 ```go
 orders, next, more, err := db.Orders.Select().
-    Where(db.Orders.TenantID().Eq(tenantID)).
-    OrderBy(db.Orders.TenantID().Asc(), db.Orders.ID().Asc()).
-    Page(ctx, pool, pgb.CursorOf(prev), 100)
+	Where(db.Orders.TenantID().Eq(tenantID)).
+	OrderBy(db.Orders.TenantID().Asc(), db.Orders.ID().Asc()).
+	Page(ctx, pool, pgb.CursorOf(prev), 100)
 ```
 
 ```sql
@@ -154,13 +154,13 @@ LIMIT $4
 
 ```go
 users, next, more, err := db.Users.Select().
-    OrderBy(db.Users.Email().Asc()).   // token was built for id ASC
-    Page(ctx, pool, pgb.CursorOf(prev), 50)
+	OrderBy(db.Users.Email().Asc()). // token was built for id ASC
+	Page(ctx, pool, pgb.CursorOf(prev), 50)
 if errors.Is(err, pgb.ErrCursorMismatch) {
-    // the client mixed sort keys — restart from the first page
-    users, next, more, err = db.Users.Select().
-        OrderBy(db.Users.Email().Asc()).
-        Page(ctx, pool, pgb.CursorOf(""), 50)
+	// the client mixed sort keys — restart from the first page
+	users, next, more, err = db.Users.Select().
+		OrderBy(db.Users.Email().Asc()).
+		Page(ctx, pool, pgb.CursorOf(""), 50)
 }
 ```
 

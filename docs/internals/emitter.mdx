@@ -12,20 +12,20 @@ Each `Expr` implements `emit(*emitter)`. The emitter is a tiny struct: the build
 
 ```go
 type emitter struct {
-    sb     strings.Builder
-    args   []any
-    n      int      // parameters emitted so far
-    // operator/function whitelist, core + registered extensions
-    dialect Dialect
+	sb   strings.Builder
+	args []any
+	n    int // parameters emitted so far
+	// operator/function whitelist, core + registered extensions
+	dialect Dialect
 }
 
 func (e *emitter) param(v any, cast string) string {
-    e.n++
-    e.args = append(e.args, v)
-    if cast != "" {
-        return fmt.Sprintf("$%d::%s", e.n, cast)
-    }
-    return fmt.Sprintf("$%d", e.n)
+	e.n++
+	e.args = append(e.args, v)
+	if cast != "" {
+		return fmt.Sprintf("$%d::%s", e.n, cast)
+	}
+	return fmt.Sprintf("$%d", e.n)
 }
 ```
 
@@ -37,36 +37,36 @@ The composed `Where` from the [builders page](/generated-code/builders):
 
 ```go
 active, err := db.Users.Select().
-    Where(
-        db.Or(
-            db.Users.Email().Like("%@corp.io"),
-            db.Users.Email().Like("%@example.com"),
-        ),
-        db.Users.LastLoginAt().Gte(since),
-        db.Users.Tags().Contains([]string{"beta"}),
-    ).
-    OrderBy(db.Users.ID().Asc()).
-    All(ctx, pool)
+	Where(
+		db.Or(
+			db.Users.Email().Like("%@corp.io"),
+			db.Users.Email().Like("%@example.com"),
+		),
+		db.Users.LastLoginAt().Gte(since),
+		db.Users.Tags().Contains([]string{"beta"}),
+	).
+	OrderBy(db.Users.ID().Asc()).
+	All(ctx, pool)
 ```
 
 The descriptors never see SQL — they build a tree:
 
 ```go
 core.And{Parts: []core.Expr{
-    core.Or{Parts: []core.Expr{
-        core.Bin{Op: "LIKE",
-            L: core.Col{Table: "public", Name: "users.email"},
-            R: core.Lit{V: "%@corp.io"}},
-        core.Bin{Op: "LIKE",
-            L: core.Col{Table: "public", Name: "users.email"},
-            R: core.Lit{V: "%@example.com"}},
-    }},
-    core.Bin{Op: ">=",
-        L: core.Col{Table: "public", Name: "users.last_login_at"},
-        R: core.Lit{V: since}},
-    core.Bin{Op: "@>",
-        L: core.Col{Table: "public", Name: "users.tags"},
-        R: core.Lit{V: []string{"beta"}, Cast: "text[]"}},
+	core.Or{Parts: []core.Expr{
+		core.Bin{Op: "LIKE",
+			L: core.Col{Table: "public", Name: "users.email"},
+			R: core.Lit{V: "%@corp.io"}},
+		core.Bin{Op: "LIKE",
+			L: core.Col{Table: "public", Name: "users.email"},
+			R: core.Lit{V: "%@example.com"}},
+	}},
+	core.Bin{Op: ">=",
+		L: core.Col{Table: "public", Name: "users.last_login_at"},
+		R: core.Lit{V: since}},
+	core.Bin{Op: "@>",
+		L: core.Col{Table: "public", Name: "users.tags"},
+		R: core.Lit{V: []string{"beta"}, Cast: "text[]"}},
 }}
 ```
 
@@ -161,9 +161,9 @@ The contract for Raw authors: write the SQL self-contained, with `$1..$m` referr
 
 ```go
 Where(
-    db.Products.Description().Match("shoes"),   // emits $1
-    core.Raw("rating > $1 AND created_at > now() - $2::interval",
-        minRating, window),                     // $1 → $2, $2 → $3
+	db.Products.Description().Match("shoes"), // emits $1
+	core.Raw("rating > $1 AND created_at > now() - $2::interval",
+		minRating, window), // $1 → $2, $2 → $3
 )
 ```
 
@@ -205,13 +205,13 @@ The core emitter only emits operators and functions it knows. Plugin runtimes wi
 // the shape of the registration
 // (see /future/plugins for the full system)
 pgb.RegisterDialect(pgb.DialectExtension{
-    Operators: []string{"|||", "&&&", "###", "===", "@@@", "##", "##>"},
-    Functions: []string{
-        "pdb.score", "pdb.match", "pdb.snippet", "pdb.agg",
-    },
-    Casts: []string{
-        "pdb.fuzzy", "pdb.boost", "pdb.slop", "pdb.whitespace",
-    },
+	Operators: []string{"|||", "&&&", "###", "===", "@@@", "##", "##>"},
+	Functions: []string{
+		"pdb.score", "pdb.match", "pdb.snippet", "pdb.agg",
+	},
+	Casts: []string{
+		"pdb.fuzzy", "pdb.boost", "pdb.slop", "pdb.whitespace",
+	},
 })
 ```
 

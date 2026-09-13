@@ -247,6 +247,7 @@ type Raw   struct{ SQL string; Args []any }          // escape hatch, args still
 - Identifiers quoted as `"schema"."table"` / `"col"` when needed.
 - `emitter.param(v, cast)` registers the arg and returns `$n` (+ optional cast). Empty slices get `$n::text[]`-style casts so pgx encodes them as arrays, not `''`.
 - Deterministic: same IR → byte-identical SQL (golden tests rely on it).
+- **Formatter stage**: generated `.go` output passes through `go/format` (gofmt) before write, and golden files are gofmt-canonical — output style is enforced by the toolchain, never hand-tidied. The docs snippets follow the same discipline via `tools/fmt-docs.py` (go/json reindent + `--check` for CI).
 
 ### 6.3 Execution
 

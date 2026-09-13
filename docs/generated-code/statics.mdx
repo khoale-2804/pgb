@@ -8,55 +8,55 @@ Stage 2 generates the static layer — the reason repetitive SQL never gets hand
 
 ```go
 func GetUser(
-    ctx context.Context,
-    exec pgb.DBTX,
-    id int64,
+	ctx context.Context,
+	exec pgb.DBTX,
+	id int64,
 ) (db.User, error) // pgb.ErrNotFound
 func ListUsers(
-    ctx context.Context,
-    exec pgb.DBTX,
-    f UserFilter,
-    o ...pgb.ListOpt,
+	ctx context.Context,
+	exec pgb.DBTX,
+	f UserFilter,
+	o ...pgb.ListOpt,
 ) ([]db.User, error)
 func CountUsers(
-    ctx context.Context,
-    exec pgb.DBTX,
-    f UserFilter,
+	ctx context.Context,
+	exec pgb.DBTX,
+	f UserFilter,
 ) (int64, error)
 
 func InsertUser(
-    ctx context.Context,
-    exec pgb.DBTX,
-    p InsertUserParams,
+	ctx context.Context,
+	exec pgb.DBTX,
+	p InsertUserParams,
 ) (db.User, error)
 func InsertUsers(
-    ctx context.Context,
-    exec pgb.DBTX,
-    ps []InsertUserParams,
+	ctx context.Context,
+	exec pgb.DBTX,
+	ps []InsertUserParams,
 ) ([]db.User, error)
 func UpdateUser(
-    ctx context.Context,
-    exec pgb.DBTX,
-    id int64,
-    s UserSet,
+	ctx context.Context,
+	exec pgb.DBTX,
+	id int64,
+	s UserSet,
 ) (db.User, error)
 func UpdateUsers(
-    ctx context.Context,
-    exec pgb.DBTX,
-    where []core.Expr,
-    s UserSet,
+	ctx context.Context,
+	exec pgb.DBTX,
+	where []core.Expr,
+	s UserSet,
 ) (int64, error)
 func UpsertUser(
-    ctx context.Context,
-    exec pgb.DBTX,
-    p InsertUserParams,
-    o UpsertOpts,
+	ctx context.Context,
+	exec pgb.DBTX,
+	p InsertUserParams,
+	o UpsertOpts,
 ) (db.User, error)
 func DeleteUser(ctx context.Context, exec pgb.DBTX, id int64) error
 func DeleteUsers(
-    ctx context.Context,
-    exec pgb.DBTX,
-    where []core.Expr,
+	ctx context.Context,
+	exec pgb.DBTX,
+	where []core.Expr,
 ) (int64, error)
 ```
 
@@ -66,13 +66,13 @@ func DeleteUsers(
 
 ```go
 type UserFilter struct {
-    ID           *int64
-    Emails       []string
-    EmailLike    *string
-    CreatedAfter *time.Time
-    MetadataEq   map[string]any     // jsonb KeyEq shorthand
-    // escape hatch — composes with generated filters
-    Extra        []core.Expr
+	ID           *int64
+	Emails       []string
+	EmailLike    *string
+	CreatedAfter *time.Time
+	MetadataEq   map[string]any // jsonb KeyEq shorthand
+	// escape hatch — composes with generated filters
+	Extra []core.Expr
 }
 ```
 
@@ -86,15 +86,15 @@ This is exactly the layer where hand-written sqlc deteriorates into `(@x IS NULL
 
 ```go
 u, err := db.InsertUser(ctx, pool, db.InsertUserParams{
-    Email: "ada@corp.io",
-    Name:  "Ada Lovelace",
-    Bio:   pgtype.Text{String: "First programmer", Valid: true},
-    Tags:  []string{"staff", "beta"},
+	Email: "ada@corp.io",
+	Name:  "Ada Lovelace",
+	Bio:   pgtype.Text{String: "First programmer", Valid: true},
+	Tags:  []string{"staff", "beta"},
 })
 if err != nil {
-    return err
+	return err
 }
-fmt.Println(u.ID, u.CreatedAt.Time)   // RETURNING filled both in
+fmt.Println(u.ID, u.CreatedAt.Time) // RETURNING filled both in
 ```
 
 ```sql
@@ -111,8 +111,8 @@ Columns with defaults (`id`, `created_at`) are omitted from the column list; PG1
 ```go
 u, err := db.GetUser(ctx, pool, u.ID)
 if errors.Is(err, pgb.ErrNotFound) {
-    // no such user — render a 404
-    return err
+	// no such user — render a 404
+	return err
 }
 ```
 
@@ -126,11 +126,11 @@ WHERE id = $1
 
 ```go
 u, err = db.UpdateUser(ctx, pool, u.ID, db.UserSet{
-    Email: pgb.Set("ada@newcorp.io"),
-    Bio:   pgb.Null[string](), // cleared — see three-state sets below
+	Email: pgb.Set("ada@newcorp.io"),
+	Bio:   pgb.Null[string](), // cleared — see three-state sets below
 })
 if err != nil {
-    return err
+	return err
 }
 ```
 
@@ -146,11 +146,11 @@ RETURNING id, email, name, bio, metadata, tags,
 
 ```go
 users, err := db.ListUsers(ctx, pool, db.UserFilter{
-    EmailLike:    pgb.Opt("%@corp.io"),
-    CreatedAfter: pgb.Opt(since),
+	EmailLike:    pgb.Opt("%@corp.io"),
+	CreatedAfter: pgb.Opt(since),
 }, pgb.Limit(20), pgb.Offset(40))
 if err != nil {
-    return err
+	return err
 }
 ```
 
@@ -178,17 +178,17 @@ WHERE id = $1
 
 ```go
 inserted, err := db.InsertUsers(ctx, pool, []db.InsertUserParams{
-    {Email: "grace@corp.io", Name: "Grace Hopper",
-        Tags: []string{"staff"}},
-    {Email: "alan@corp.io", Name: "Alan Turing",
-        Tags: []string{"beta"}},
-    {Email: "edsger@corp.io", Name: "Edsger Dijkstra",
-        Tags: []string{"beta", "speaker"}},
+	{Email: "grace@corp.io", Name: "Grace Hopper",
+		Tags: []string{"staff"}},
+	{Email: "alan@corp.io", Name: "Alan Turing",
+		Tags: []string{"beta"}},
+	{Email: "edsger@corp.io", Name: "Edsger Dijkstra",
+		Tags: []string{"beta", "speaker"}},
 })
 if err != nil {
-    return err
+	return err
 }
-fmt.Println(len(inserted), inserted[0].ID)   // all rows, ids included
+fmt.Println(len(inserted), inserted[0].ID) // all rows, ids included
 ```
 
 ```sql
@@ -207,12 +207,12 @@ For pure bulk loads (imports, fixtures, ETL), an opt-in `pgx.CopyFrom` variant u
 
 ```go
 n, err := db.CopyFromUsers(ctx, pool, pgx.CopyFromRows([][]any{
-    {"ada@corp.io", "Ada Lovelace", []string{"staff"}},
-    {"grace@corp.io", "Grace Hopper", []string{"staff"}},
-    {"alan@corp.io", "Alan Turing", []string{"beta"}},
+	{"ada@corp.io", "Ada Lovelace", []string{"staff"}},
+	{"grace@corp.io", "Grace Hopper", []string{"staff"}},
+	{"alan@corp.io", "Alan Turing", []string{"beta"}},
 }))
 if err != nil {
-    return err
+	return err
 }
 fmt.Println("copied", n)
 ```
@@ -227,12 +227,12 @@ There is no `RETURNING` variant because Postgres has no `COPY ... RETURNING` —
 
 ```go
 type UserSet struct {
-    Email       core.Set[string]
-    Name        core.Set[string]
-    Bio         core.Set[string]
-    Metadata    core.Set[[]byte]
-    Tags        core.Set[[]string]
-    LastLoginAt core.Set[pgtype.Timestamptz]
+	Email       core.Set[string]
+	Name        core.Set[string]
+	Bio         core.Set[string]
+	Metadata    core.Set[[]byte]
+	Tags        core.Set[[]string]
+	LastLoginAt core.Set[pgtype.Timestamptz]
 }
 ```
 
@@ -240,9 +240,9 @@ Each field has exactly three states:
 
 ```go
 db.UpdateUser(ctx, pool, id, db.UserSet{
-    Email: pgb.Set("new@corp.io"),     // write a value
-    Bio:   pgb.Null[string](),         // write NULL
-    // LastLoginAt: zero core.Set     // skip this column entirely
+	Email: pgb.Set("new@corp.io"), // write a value
+	Bio:   pgb.Null[string](),     // write NULL
+	// LastLoginAt: zero core.Set     // skip this column entirely
 })
 ```
 
@@ -258,9 +258,9 @@ RETURNING id, email, name, bio, metadata, tags,
 
 ```go
 n, err := db.UpdateUsers(ctx, pool, []core.Expr{
-    db.Users.Tags().Contains([]string{"legacy"}),
+	db.Users.Tags().Contains([]string{"legacy"}),
 }, db.UserSet{
-    Tags: pgb.Null[[]string](),
+	Tags: pgb.Null[[]string](),
 })
 ```
 
@@ -274,14 +274,14 @@ WHERE tags @> $1::text[]
 
 ```go
 u, err := db.UpsertUser(ctx, pool, db.InsertUserParams{
-    Email: "ada@corp.io",
-    Name:  "Ada Lovelace",
-    Tags:  []string{"staff"},
+	Email: "ada@corp.io",
+	Name:  "Ada Lovelace",
+	Tags:  []string{"staff"},
 }, db.UpsertOpts{
-    Target: []string{"email"}, // ON CONFLICT (email)
-    Action: db.DoUpdate(db.UserSet{
-        Name: pgb.Set("Ada King, Countess of Lovelace"),
-    }),
+	Target: []string{"email"}, // ON CONFLICT (email)
+	Action: db.DoUpdate(db.UserSet{
+		Name: pgb.Set("Ada King, Countess of Lovelace"),
+	}),
 })
 ```
 
@@ -323,26 +323,26 @@ With `pgx.BeginFunc`, returning an error rolls back automatically; a clean retur
 
 ```go
 err := pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
-    u, err := db.InsertUser(ctx, tx, db.InsertUserParams{
-        Email: "grace@corp.io",
-        Name:  "Grace Hopper",
-        Tags:  []string{"staff"},
-    })
-    if err != nil {
-        return err   // rollback — the user insert is undone
-    }
-    _, err = db.InsertOrder(ctx, tx, db.InsertOrderParams{
-        TenantID: 7,
-        UserID:   u.ID,
-        Status:   "paid",
-        Total:    pgtype.Numeric{
-            Int: big.NewInt(12999), Exp: -2, Valid: true,
-        }, // 129.99
-    })
-    if err != nil {
-        return err   // rollback — nothing was written
-    }
-    return nil       // commit both writes
+	u, err := db.InsertUser(ctx, tx, db.InsertUserParams{
+		Email: "grace@corp.io",
+		Name:  "Grace Hopper",
+		Tags:  []string{"staff"},
+	})
+	if err != nil {
+		return err // rollback — the user insert is undone
+	}
+	_, err = db.InsertOrder(ctx, tx, db.InsertOrderParams{
+		TenantID: 7,
+		UserID:   u.ID,
+		Status:   "paid",
+		Total: pgtype.Numeric{
+			Int: big.NewInt(12999), Exp: -2, Valid: true,
+		}, // 129.99
+	})
+	if err != nil {
+		return err // rollback — nothing was written
+	}
+	return nil // commit both writes
 })
 ```
 
@@ -363,28 +363,28 @@ Or the generic helper `pgb.WithTx`, which hands the closure any `pgb.DBTX` (buil
 
 ```go
 o, err := pgb.WithTx(ctx, pool, func(tx pgb.DBTX) (db.Order, error) {
-    updated, err := db.Orders.Update().
-        Set(db.OrderSet{Status: pgb.Set("shipped")}).
-        Where(db.Orders.ID().Eq(orderID)).
-        Returning().
-        All(ctx, tx)
-    if err != nil {
-        return db.Order{}, err
-    }
-    if len(updated) == 0 {
-        return db.Order{}, pgb.ErrNotFound
-    }
-    _, err = db.UpdateUser(ctx, tx, updated[0].UserID, db.UserSet{
-        LastLoginAt: pgb.Set(pgtype.Timestamptz{
-            Time:  time.Now(),
-            Valid: true,
-        }),
-    })
-    if err != nil {
-        return db.Order{}, err
-    }
-    return updated[0], nil   // err == nil → committed;
-                             // err != nil → rolled back
+	updated, err := db.Orders.Update().
+		Set(db.OrderSet{Status: pgb.Set("shipped")}).
+		Where(db.Orders.ID().Eq(orderID)).
+		Returning().
+		All(ctx, tx)
+	if err != nil {
+		return db.Order{}, err
+	}
+	if len(updated) == 0 {
+		return db.Order{}, pgb.ErrNotFound
+	}
+	_, err = db.UpdateUser(ctx, tx, updated[0].UserID, db.UserSet{
+		LastLoginAt: pgb.Set(pgtype.Timestamptz{
+			Time:  time.Now(),
+			Valid: true,
+		}),
+	})
+	if err != nil {
+		return db.Order{}, err
+	}
+	return updated[0], nil // err == nil → committed;
+	// err != nil → rolled back
 })
 ```
 
@@ -403,7 +403,7 @@ The emitted SQL is byte-identical whether the executor is a pool, a conn, or a t
 ```go
 u, err := db.GetUser(ctx, pool, 4242)
 if errors.Is(err, pgb.ErrNotFound) {
-    // render a 404
+	// render a 404
 }
 ```
 
@@ -412,8 +412,8 @@ if errors.Is(err, pgb.ErrNotFound) {
 ```go
 _, err := db.DeleteUsers(ctx, pool, nil)
 if errors.Is(err, pgb.ErrNoWhere) {
-    // refused: pass at least one predicate, or use a deliberate
-    // full-table path if truncation is really intended
+	// refused: pass at least one predicate, or use a deliberate
+	// full-table path if truncation is really intended
 }
 ```
 
@@ -421,13 +421,13 @@ Constraint violations surface as pgx errors wrapping a `*pgconn.PgError` — che
 
 ```go
 _, err := db.InsertUser(ctx, pool, db.InsertUserParams{
-    Email: "ada@corp.io",
-    Name:  "Ada Lovelace",
+	Email: "ada@corp.io",
+	Name:  "Ada Lovelace",
 })
 var pgErr *pgconn.PgError
 if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-    // unique_violation — email taken
-    fmt.Println(pgErr.ConstraintName)   // e.g. users_email_key
+	// unique_violation — email taken
+	fmt.Println(pgErr.ConstraintName) // e.g. users_email_key
 }
 ```
 

@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "mint dev --port 3736",
     "validate": "mint validate",
-    "check": "mint broken-links"
+    "check": "mint broken-links",
+    "fmt:docs": "python3 ../tools/fmt-docs.py",
+    "fmt:docs:check": "python3 ../tools/fmt-docs.py --check"
   },
   "devDependencies": {
     "mintlify": "^4.0.0"

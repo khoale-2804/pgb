@@ -12,53 +12,54 @@ Everything pgb generates is derived from one in-memory structure. Parsing (sqlc 
 package ir
 
 type Schema struct {
-    DefaultSchema string        // "public"
-    Tables        []Table
-    Enums         []Enum        // named, per schema
-    Composites    []Composite
-    Domains       map[string]string // domain -> base type
+	DefaultSchema string // "public"
+	Tables        []Table
+	Enums         []Enum // named, per schema
+	Composites    []Composite
+	Domains       map[string]string // domain -> base type
 }
 
 type Table struct {
-    Schema, Name string
-    Comment      string
-    Columns      []Column
-    PrimaryKey   []string
-    Uniques      [][]string     // incl. WITHOUT OVERLAPS (temporal)
-    ForeignKeys  []ForeignKey   // detected, kept inert in v1
-    Search       *SearchIndex   // non-nil iff a paradedb index exists
+	Schema, Name string
+	Comment      string
+	Columns      []Column
+	PrimaryKey   []string
+	Uniques      [][]string   // incl. WITHOUT OVERLAPS (temporal)
+	ForeignKeys  []ForeignKey // detected, kept inert in v1
+	Search       *SearchIndex // non-nil iff a paradedb index exists
 }
 
 type Column struct {
-    Name        string
-    PGType      string       // resolved base type (domain unwrapped)
-    NotNull     bool
-    IsArray     bool
-    HasDefault  bool
-    DefaultExpr string
-    // "stored" | "virtual" (PG18 virtual = default kind)
-    Generated   string
-    IsTemporal  bool         // participates in WITHOUT OVERLAPS
-    Comment     string
+	Name        string
+	PGType      string // resolved base type (domain unwrapped)
+	NotNull     bool
+	IsArray     bool
+	HasDefault  bool
+	DefaultExpr string
+	// "stored" | "virtual" (PG18 virtual = default kind)
+	Generated  string
+	IsTemporal bool // participates in WITHOUT OVERLAPS
+	Comment    string
 }
 
 type SearchIndex struct {
-    Name     string           // index name
-    Using    string           // "paradedb" | "bm25" (accepted alias)
-    KeyField string           // from WITH (key_field='id')
-    Fields   []SearchField    // ordered per DDL
-    Options  map[string]string // rest of WITH(...) raw
+	Name     string            // index name
+	Using    string            // "paradedb" | "bm25" (accepted alias)
+	KeyField string            // from WITH (key_field='id')
+	Fields   []SearchField     // ordered per DDL
+	Options  map[string]string // rest of WITH(...) raw
 }
 
 type SearchField struct {
-    Column    string
-    Path      string          // "metadata->'color'" for a JSON path
-    Alias     string          // alias=json_color
-    // icu | simple(stemmer=english) | literal | ngram(3,3) | fast=...
-    Tokenizer string
-    // text | numeric | timestamp | boolean | jsonb | range | array
-    PGType    string
+	Column string
+	Path   string // "metadata->'color'" for a JSON path
+	Alias  string // alias=json_color
+	// icu | simple(stemmer=english) | literal | ngram(3,3) | fast=...
+	Tokenizer string
+	// text | numeric | timestamp | boolean | jsonb | range | array
+	PGType string
 }
+
 ```
 
 ## Worked example: one table through the pipeline
@@ -78,17 +79,17 @@ The IR pgb builds from it (catalog gives types and nullability; oliphant recover
 
 ```go
 ir.Table{
-    Schema:     "public",
-    Name:       "tags",
-    PrimaryKey: []string{"id"},
-    Columns: []ir.Column{
-        {Name: "id",    PGType: "int8", NotNull: true, HasDefault: true,
-            DefaultExpr: "nextval('tags_id_seq'::regclass)"},
-        {Name: "name",  PGType: "text", NotNull: true},
-        {Name: "color", PGType: "text", NotNull: true, HasDefault: true,
-            DefaultExpr: "'gray'", Comment: "pgb:no_filter"},
-    },
-    // Search: nil — no USING paradedb index on this table
+	Schema:     "public",
+	Name:       "tags",
+	PrimaryKey: []string{"id"},
+	Columns: []ir.Column{
+		{Name: "id", PGType: "int8", NotNull: true, HasDefault: true,
+			DefaultExpr: "nextval('tags_id_seq'::regclass)"},
+		{Name: "name", PGType: "text", NotNull: true},
+		{Name: "color", PGType: "text", NotNull: true, HasDefault: true,
+			DefaultExpr: "'gray'", Comment: "pgb:no_filter"},
+	},
+	// Search: nil — no USING paradedb index on this table
 }
 ```
 
@@ -130,61 +131,61 @@ The complete IR pgb builds from it — the sqlc catalog supplies tables, columns
 
 ```go
 ir.Schema{
-    DefaultSchema: "public",
-    Tables: []ir.Table{
-        {
-            Schema:     "public",
-            Name:       "users",
-            PrimaryKey: []string{"id"},
-            Uniques:    [][]string{{"email"}},
-            Columns: []ir.Column{
-                {Name: "id",    PGType: "int8",
-                    NotNull: true, HasDefault: true,
-                    DefaultExpr: "nextval('users_id_seq'::regclass)"},
-                {Name: "email", PGType: "text", NotNull: true},
-                {Name: "bio", PGType: "text", Comment: "pgb:no_patch"},
-            },
-            ForeignKeys: nil,
-            Search:      nil, // no USING paradedb index on users
-        },
-        {
-            Schema:     "public",
-            Name:       "products",
-            PrimaryKey: []string{"id"},
-            Columns: []ir.Column{
-                {Name: "id",          PGType: "int8",
-                    DefaultExpr: "nextval('products_id_seq'::regclass)",
-                    NotNull: true, HasDefault: true},
-                {Name: "user_id", PGType: "int8", NotNull: true},
-                {Name: "title",       PGType: "text", NotNull: true},
-                {Name: "description", PGType: "text", NotNull: true},
-                {Name: "rating",      PGType: "int4",
-                    NotNull: true, HasDefault: true, DefaultExpr: "0"},
-            },
-            // detected from REFERENCES, kept inert in v1
-            ForeignKeys: []ir.ForeignKey{{
-                Columns:    []string{"user_id"},
-                RefTable:   "users",
-                RefColumns: []string{"id"},
-            }},
-            Search: &ir.SearchIndex{
-                Name:     "products_search",
-                Using:    "paradedb",
-                KeyField: "id",
-                Fields: []ir.SearchField{
-                    {Column: "id"}, // key field
-                    // no cast → default tokenizer (unicode)
-                    {Column: "title", PGType: "text"},
-                    {Column: "description", Tokenizer: "icu",
-                        PGType: "text"},
-                    // numeric family → fast field;
-                    // int4range casts on search-side ranges
-                    {Column: "rating", PGType: "numeric"},
-                },
-                Options: map[string]string{"key_field": "id"},
-            },
-        },
-    },
+	DefaultSchema: "public",
+	Tables: []ir.Table{
+		{
+			Schema:     "public",
+			Name:       "users",
+			PrimaryKey: []string{"id"},
+			Uniques:    [][]string{{"email"}},
+			Columns: []ir.Column{
+				{Name: "id", PGType: "int8",
+					NotNull: true, HasDefault: true,
+					DefaultExpr: "nextval('users_id_seq'::regclass)"},
+				{Name: "email", PGType: "text", NotNull: true},
+				{Name: "bio", PGType: "text", Comment: "pgb:no_patch"},
+			},
+			ForeignKeys: nil,
+			Search:      nil, // no USING paradedb index on users
+		},
+		{
+			Schema:     "public",
+			Name:       "products",
+			PrimaryKey: []string{"id"},
+			Columns: []ir.Column{
+				{Name: "id", PGType: "int8",
+					DefaultExpr: "nextval('products_id_seq'::regclass)",
+					NotNull:     true, HasDefault: true},
+				{Name: "user_id", PGType: "int8", NotNull: true},
+				{Name: "title", PGType: "text", NotNull: true},
+				{Name: "description", PGType: "text", NotNull: true},
+				{Name: "rating", PGType: "int4",
+					NotNull: true, HasDefault: true, DefaultExpr: "0"},
+			},
+			// detected from REFERENCES, kept inert in v1
+			ForeignKeys: []ir.ForeignKey{{
+				Columns:    []string{"user_id"},
+				RefTable:   "users",
+				RefColumns: []string{"id"},
+			}},
+			Search: &ir.SearchIndex{
+				Name:     "products_search",
+				Using:    "paradedb",
+				KeyField: "id",
+				Fields: []ir.SearchField{
+					{Column: "id"}, // key field
+					// no cast → default tokenizer (unicode)
+					{Column: "title", PGType: "text"},
+					{Column: "description", Tokenizer: "icu",
+						PGType: "text"},
+					// numeric family → fast field;
+					// int4range casts on search-side ranges
+					{Column: "rating", PGType: "numeric"},
+				},
+				Options: map[string]string{"key_field": "id"},
+			},
+		},
+	},
 }
 ```
 

@@ -41,12 +41,12 @@ For a table `users`, `db/users.gen.go` contains:
 // Descriptors — package-level, immutable
 var Users = newUserTable("public", "users")
 
-func (t UserTable) ID() UserIDCol             // typed wrapper
-                                              // around core.Col
+func (t UserTable) ID() UserIDCol // typed wrapper
+// around core.Col
 func (t UserTable) Email() UserEmailCol
 func (t UserTable) CreatedAt() UserCreatedAtCol
-func (t UserTable) Score() core.Expr          // pdb.score(id) —
-                                              // only for bm25 tables
+func (t UserTable) Score() core.Expr // pdb.score(id) —
+// only for bm25 tables
 ```
 
 ## Predicates, by column type family
@@ -56,15 +56,15 @@ func (t UserTable) Score() core.Expr          // pdb.score(id) —
 func (c UserIDCol) Eq(v int64) core.Expr
 func (c UserIDCol) Ne(v int64) core.Expr
 func (c UserIDCol) In(vs ...int64) core.Expr
-func (c UserIDCol) IsNull() core.Expr          // / NotNull()
+func (c UserIDCol) IsNull() core.Expr // / NotNull()
 
 // ordered types (ints, floats, numerics, timestamps, dates)
-func (c UserCreatedAtCol) Gt(v time.Time) core.Expr        // Lt Lte Gte
-                                                           // Between
+func (c UserCreatedAtCol) Gt(v time.Time) core.Expr // Lt Lte Gte
+// Between
 
 // text types
-func (c UserEmailCol) Like(p string) core.Expr             // ILike
-                                                           // NotLike
+func (c UserEmailCol) Like(p string) core.Expr // ILike
+// NotLike
 
 // jsonb types
 // metadata->>$2 = $3
@@ -86,10 +86,10 @@ Columns marked `pgb:no_filter` generate no predicate methods.
 
 ```go
 users, err := db.Users.Select().
-    Where(db.Users.Email().Like("%@corp.io")).
-    OrderBy(db.Users.CreatedAt().Desc()).
-    Limit(20).
-    All(ctx, pool)
+	Where(db.Users.Email().Like("%@corp.io")).
+	OrderBy(db.Users.CreatedAt().Desc()).
+	Limit(20).
+	All(ctx, pool)
 ```
 
 ```sql
@@ -104,16 +104,16 @@ LIMIT $2
 
 ```go
 active, err := db.Users.Select().
-    Where(
-        db.Or(
-            db.Users.Email().Like("%@corp.io"),
-            db.Users.Email().Like("%@example.com"),
-        ),
-        db.Users.LastLoginAt().Gte(since),
-        db.Users.Tags().Contains([]string{"beta"}),
-    ).
-    OrderBy(db.Users.ID().Asc()).
-    All(ctx, pool)
+	Where(
+		db.Or(
+			db.Users.Email().Like("%@corp.io"),
+			db.Users.Email().Like("%@example.com"),
+		),
+		db.Users.LastLoginAt().Gte(since),
+		db.Users.Tags().Contains([]string{"beta"}),
+	).
+	OrderBy(db.Users.ID().Asc()).
+	All(ctx, pool)
 ```
 
 ```sql
@@ -129,11 +129,11 @@ ORDER BY id ASC
 
 ```go
 older, err := db.Users.Select().
-    Where(db.Users.CreatedAt().Lt(cutoff)).
-    OrderBy(db.Users.ID().Asc()).
-    Limit(50).
-    Offset(100).
-    All(ctx, pool)
+	Where(db.Users.CreatedAt().Lt(cutoff)).
+	OrderBy(db.Users.ID().Asc()).
+	Limit(50).
+	Offset(100).
+	All(ctx, pool)
 ```
 
 ```sql
@@ -148,10 +148,10 @@ LIMIT $2 OFFSET $3
 
 ```go
 latest, err := db.Orders.Select().
-    DistinctOn(db.Orders.UserID()).
-    Where(db.Orders.Status().Eq("paid")).
-    OrderBy(db.Orders.UserID().Asc(), db.Orders.PlacedAt().Desc()).
-    All(ctx, pool)
+	DistinctOn(db.Orders.UserID()).
+	Where(db.Orders.Status().Eq("paid")).
+	OrderBy(db.Orders.UserID().Asc(), db.Orders.PlacedAt().Desc()).
+	All(ctx, pool)
 ```
 
 ```sql
@@ -170,38 +170,38 @@ Aggregate expressions are ordinary `core.Expr` values: numeric columns generate 
 
 ```go
 type TenantSpend struct {
-    TenantID   int64
-    OrderCount int64
-    Revenue    pgtype.Numeric
+	TenantID   int64
+	OrderCount int64
+	Revenue    pgtype.Numeric
 }
 
 rows, err := db.Orders.Select().
-    Cols(
-        db.Orders.TenantID(),
-        db.Orders.ID().Count().As("order_count"),
-        db.Orders.Total().Sum().As("revenue"),
-    ).
-    Group(db.Orders.TenantID()).
-    Having(db.Orders.ID().Count().Gt(5)).
-    OrderBy(db.Orders.Total().Sum().Desc()).
-    Rows(ctx, pool)
+	Cols(
+		db.Orders.TenantID(),
+		db.Orders.ID().Count().As("order_count"),
+		db.Orders.Total().Sum().As("revenue"),
+	).
+	Group(db.Orders.TenantID()).
+	Having(db.Orders.ID().Count().Gt(5)).
+	OrderBy(db.Orders.Total().Sum().Desc()).
+	Rows(ctx, pool)
 if err != nil {
-    return err
+	return err
 }
 defer rows.Close()
 
 var spend []TenantSpend
 for rows.Next() {
-    var s TenantSpend
-    if err := rows.Scan(
-        &s.TenantID, &s.OrderCount, &s.Revenue,
-    ); err != nil {
-        return err
-    }
-    spend = append(spend, s)
+	var s TenantSpend
+	if err := rows.Scan(
+		&s.TenantID, &s.OrderCount, &s.Revenue,
+	); err != nil {
+		return err
+	}
+	spend = append(spend, s)
 }
 if err := rows.Err(); err != nil {
-    return err
+	return err
 }
 ```
 
@@ -219,14 +219,14 @@ A builder statement is itself a value, so it can be passed as a CTE body. `core.
 
 ```go
 recent := db.Orders.Select().
-    Cols(db.Orders.UserID()).
-    Where(db.Orders.PlacedAt().Gte(since))
+	Cols(db.Orders.UserID()).
+	Where(db.Orders.PlacedAt().Gte(since))
 
 active, err := db.Users.Select().
-    With(db.CTE("recent_orders", recent)).
-    Where(core.Raw("id IN (SELECT user_id FROM recent_orders)")).
-    OrderBy(db.Users.ID().Asc()).
-    All(ctx, pool)
+	With(db.CTE("recent_orders", recent)).
+	Where(core.Raw("id IN (SELECT user_id FROM recent_orders)")).
+	OrderBy(db.Users.ID().Asc()).
+	All(ctx, pool)
 ```
 
 ```sql
@@ -247,18 +247,18 @@ ORDER BY id ASC
 
 ```go
 err := pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
-    o, err := db.Orders.Select().
-        Where(db.Orders.ID().Eq(orderID)).
-        ForUpdate().
-        One(ctx, tx)
-    if err != nil {
-        return err
-    }
-    _, err = db.Orders.Update().
-        Set(db.OrderSet{Status: pgb.Set("shipped")}).
-        Where(db.Orders.ID().Eq(orderID)).
-        Exec(ctx, tx)
-    return err
+	o, err := db.Orders.Select().
+		Where(db.Orders.ID().Eq(orderID)).
+		ForUpdate().
+		One(ctx, tx)
+	if err != nil {
+		return err
+	}
+	_, err = db.Orders.Update().
+		Set(db.OrderSet{Status: pgb.Set("shipped")}).
+		Where(db.Orders.ID().Eq(orderID)).
+		Exec(ctx, tx)
+	return err
 })
 ```
 
@@ -291,9 +291,9 @@ WHERE id = $2
 
 ```go
 users, err := db.Users.Select().
-    Where(db.Users.Tags().Contains([]string{"beta"})).
-    OrderBy(db.Users.ID().Asc()).
-    All(ctx, pool)
+	Where(db.Users.Tags().Contains([]string{"beta"})).
+	OrderBy(db.Users.ID().Asc()).
+	All(ctx, pool)
 ```
 
 ```sql
@@ -305,10 +305,10 @@ ORDER BY id ASC
 
 ```go
 u, err := db.Users.Select().
-    Where(db.Users.Email().Eq("ada@corp.io")).
-    One(ctx, pool)
+	Where(db.Users.Email().Eq("ada@corp.io")).
+	One(ctx, pool)
 if errors.Is(err, pgb.ErrNotFound) {
-    // no such user
+	// no such user
 }
 ```
 
@@ -321,8 +321,8 @@ LIMIT 2
 
 ```go
 n, err := db.Users.Select().
-    Where(db.Users.LastLoginAt().Gte(since)).
-    Count(ctx, pool)
+	Where(db.Users.LastLoginAt().Gte(since)).
+	Count(ctx, pool)
 ```
 
 ```sql
@@ -333,8 +333,8 @@ WHERE last_login_at >= $1
 
 ```go
 active, err := db.Users.Select().
-    Where(db.Users.LastLoginAt().Gte(since)).
-    Exists(ctx, pool)
+	Where(db.Users.LastLoginAt().Gte(since)).
+	Exists(ctx, pool)
 ```
 
 ```sql
@@ -347,9 +347,9 @@ Updates and deletes share the same `Set` structs as the static layer — `db.Use
 
 ```go
 n, err := db.Users.Update().
-    Set(db.UserSet{Bio: pgb.Set("Principal engineer")}).
-    Where(db.Users.Tags().Contains([]string{"staff"})).
-    Exec(ctx, pool)
+	Set(db.UserSet{Bio: pgb.Set("Principal engineer")}).
+	Where(db.Users.Tags().Contains([]string{"staff"})).
+	Exec(ctx, pool)
 ```
 
 ```sql
@@ -360,10 +360,10 @@ WHERE tags @> $2::text[]
 
 ```go
 updated, err := db.Users.Update().
-    Set(db.UserSet{Bio: pgb.Set("Principal engineer")}).
-    Where(db.Users.Tags().Contains([]string{"staff"})).
-    Returning().
-    All(ctx, pool)
+	Set(db.UserSet{Bio: pgb.Set("Principal engineer")}).
+	Where(db.Users.Tags().Contains([]string{"staff"})).
+	Returning().
+	All(ctx, pool)
 ```
 
 ```sql
@@ -376,8 +376,8 @@ RETURNING id, email, name, bio, metadata, tags,
 
 ```go
 deleted, err := db.Users.Delete().
-    Where(db.Users.LastLoginAt().Lt(cutoff), db.Users.Bio().IsNull()).
-    Exec(ctx, pool)
+	Where(db.Users.LastLoginAt().Lt(cutoff), db.Users.Bio().IsNull()).
+	Exec(ctx, pool)
 ```
 
 ```sql
@@ -392,7 +392,7 @@ WHERE last_login_at < $1 AND bio IS NULL
 ```go
 _, err := db.Users.Delete().Exec(ctx, pool)
 if errors.Is(err, pgb.ErrNoWhere) {
-    // refused at runtime — no WHERE, no mutation
+	// refused at runtime — no WHERE, no mutation
 }
 
 n, err := db.Users.Delete().AllowAll().Exec(ctx, pool)
@@ -413,11 +413,11 @@ Stage 2's static functions do not have a private SQL path — `ListUsers`, `Upda
 
 ```go
 users, err := db.ListUsers(ctx, pool, db.UserFilter{
-    EmailLike: pgb.Opt("%@corp.io"),
-    Extra: []core.Expr{
-        db.Users.Tags().Contains([]string{"beta"}),
-        db.Users.LastLoginAt().Gte(since),
-    },
+	EmailLike: pgb.Opt("%@corp.io"),
+	Extra: []core.Expr{
+		db.Users.Tags().Contains([]string{"beta"}),
+		db.Users.LastLoginAt().Gte(since),
+	},
 })
 ```
 

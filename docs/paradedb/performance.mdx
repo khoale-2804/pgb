@@ -39,11 +39,11 @@ Every generated search ends in an ordered `LIMIT` — that is what routes the qu
 
 ```go
 q := db.And(
-    db.Products.Description().Match("running shoes"),
-    db.Products.Rating().RangeTerm(pgtype.Range[int32]{
-        Lower:     4,
-        LowerType: pgtype.Inclusive,
-    }, "Intersects"),
+	db.Products.Description().Match("running shoes"),
+	db.Products.Rating().RangeTerm(pgtype.Range[int32]{
+		Lower:     4,
+		LowerType: pgtype.Inclusive,
+	}, "Intersects"),
 )
 
 rows, err := db.SearchProducts(ctx, pool, q, 10)
@@ -55,8 +55,8 @@ Three sizing rules:
 2. **Exports are List queries, not searches.** Pulling a whole table or a large filtered slice is the generated `List` path — plain Postgres, no scoring:
 
    ```go
-   rows, err := db.ListProducts(ctx, pool,
-       db.ProductFilter{InStock: pgb.Opt(true)})
+	rows, err := db.ListProducts(ctx, pool,
+		db.ProductFilter{InStock: pgb.Opt(true)})
    ```
 3. **The tiebreak column must be indexed.** pgb emits `ORDER BY pdb.score(id) DESC, id ASC` — the `id` tiebreak is what makes pagination stable, and it must appear in the index for Top-K to engage ([scoring](/paradedb/scoring), [pagination](/generated-code/pagination)). The same holds for any hand-written `ORDER BY`: a non-indexed sort column means no Top-K pushdown.
 

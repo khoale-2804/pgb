@@ -19,16 +19,16 @@ becomes:
 
 ```go
 SearchIndex{
-    Name:     "products_search",
-    Using:    "paradedb",
-    KeyField: "id",
-    Fields: []SearchField{
-        {Column: "id"},
-        {Column: "description", Tokenizer: "icu", PGType: "text"},
-        {Path: "metadata->'color'", Alias: "json_color",
-         Tokenizer: "literal", PGType: "jsonb"},
-        {Column: "rating", PGType: "numeric"},
-    },
+	Name:     "products_search",
+	Using:    "paradedb",
+	KeyField: "id",
+	Fields: []SearchField{
+		{Column: "id"},
+		{Column: "description", Tokenizer: "icu", PGType: "text"},
+		{Path: "metadata->'color'", Alias: "json_color",
+			Tokenizer: "literal", PGType: "jsonb"},
+		{Column: "rating", PGType: "numeric"},
+	},
 }
 ```
 
@@ -70,23 +70,23 @@ This is the index the [SchemaIR](/architecture/schema-ir) records for it — the
 
 ```go
 SearchIndex{
-    Name:     "products_search",
-    Using:    "paradedb",
-    KeyField: "id",
-    Fields: []SearchField{
-        {Column: "id"},
-        {Column: "sku", Tokenizer: "literal", PGType: "text"},
-        {Column: "title", Tokenizer: "simple",
-         Options: "stemmer=english, ascii_folding=true",
-         PGType: "text"},
-        {Column: "description", Tokenizer: "icu", PGType: "text"},
-        {Path: "metadata->'brand'", Alias: "json_brand",
-         Tokenizer: "literal", PGType: "jsonb"},
-        {Path: "metadata->'color'", Alias: "json_color",
-         Tokenizer: "literal", PGType: "jsonb"},
-        {Column: "rating", PGType: "numeric"},
-        {Column: "in_stock", PGType: "boolean"},
-    },
+	Name:     "products_search",
+	Using:    "paradedb",
+	KeyField: "id",
+	Fields: []SearchField{
+		{Column: "id"},
+		{Column: "sku", Tokenizer: "literal", PGType: "text"},
+		{Column: "title", Tokenizer: "simple",
+			Options: "stemmer=english, ascii_folding=true",
+			PGType:  "text"},
+		{Column: "description", Tokenizer: "icu", PGType: "text"},
+		{Path: "metadata->'brand'", Alias: "json_brand",
+			Tokenizer: "literal", PGType: "jsonb"},
+		{Path: "metadata->'color'", Alias: "json_color",
+			Tokenizer: "literal", PGType: "jsonb"},
+		{Column: "rating", PGType: "numeric"},
+		{Column: "in_stock", PGType: "boolean"},
+	},
 }
 ```
 

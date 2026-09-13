@@ -13,17 +13,35 @@ Every predicate and projection is a value implementing `Expr`:
 ```go
 type Expr interface{ emit(*emitter) }
 
-type Col   struct{ Table, Name string }
-type Lit   struct{ V any; Cast string }
+type Col struct{ Table, Name string }
+type Lit struct {
+	V    any
+	Cast string
+}
+
 // any operator: =, >, |||, ===, @@@, ##, <=>
-type Bin   struct{ Op string; L, R Expr }
+type Bin struct {
+	Op   string
+	L, R Expr
+}
+
 // pdb.snippet(col, start_tag => ...)
-type Call  struct{ Fn string; Args []Expr; Named []NamedArg }
-type Cast  struct{ E Expr; To string }
-type And   struct{ Parts []Expr }
-type Or    struct{ Parts []Expr }
-type Not   struct{ E Expr }
-type Raw   struct{ SQL string; Args []any }
+type Call struct {
+	Fn    string
+	Args  []Expr
+	Named []NamedArg
+}
+type Cast struct {
+	E  Expr
+	To string
+}
+type And struct{ Parts []Expr }
+type Or struct{ Parts []Expr }
+type Not struct{ E Expr }
+type Raw struct {
+	SQL  string
+	Args []any
+}
 ```
 
 You rarely construct these directly — the generated descriptors do — but `Raw` composes into any expression position.
@@ -36,14 +54,14 @@ You rarely construct these directly — the generated descriptors do — but `Ra
 
 ```go
 cheap, err := db.Products.Select().
-    Where(
-        db.Products.Description().Match("shoes"),              // $1
-        core.Raw("rating > $1 AND created_at > now() - $2::interval",
-            minRating, window),                            // renumbered
-                                                           // to $2, $3
-    ).
-    OrderBy(db.Products.ID().Asc()).
-    All(ctx, pool)
+	Where(
+		db.Products.Description().Match("shoes"), // $1
+		core.Raw("rating > $1 AND created_at > now() - $2::interval",
+			minRating, window), // renumbered
+		// to $2, $3
+	).
+	OrderBy(db.Products.ID().Asc()).
+	All(ctx, pool)
 ```
 
 ```sql
@@ -59,28 +77,28 @@ ORDER BY id ASC
 
 ```go
 rows, err := db.Products.Select().
-    Cols(
-        db.Products.ID(),
-        db.Products.Title(),
-        core.Raw("rating * 10 AS rating_scaled"),
-    ).
-    Where(db.Products.Rating().Gte(4)).
-    Rows(ctx, pool)
+	Cols(
+		db.Products.ID(),
+		db.Products.Title(),
+		core.Raw("rating * 10 AS rating_scaled"),
+	).
+	Where(db.Products.Rating().Gte(4)).
+	Rows(ctx, pool)
 if err != nil {
-    return err
+	return err
 }
 defer rows.Close()
 
 type scaled struct {
-    ID           int64
-    Title        string
-    RatingScaled int64
+	ID           int64
+	Title        string
+	RatingScaled int64
 }
 for rows.Next() {
-    var s scaled
-    if err := rows.Scan(&s.ID, &s.Name, &s.RatingScaled); err != nil {
-        return err
-    }
+	var s scaled
+	if err := rows.Scan(&s.ID, &s.Name, &s.RatingScaled); err != nil {
+		return err
+	}
 }
 ```
 
@@ -99,11 +117,11 @@ User-controlled values go in `Args`, never interpolated into the SQL string. The
 
 ```go
 type DBTX interface {
-    Query(ctx context.Context, sql string,
-        args ...any) (pgx.Rows, error)
-    QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
-    Exec(ctx context.Context, sql string,
-        args ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string,
+		args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Exec(ctx context.Context, sql string,
+		args ...any) (pgconn.CommandTag, error)
 }
 ```
 
@@ -113,44 +131,44 @@ type DBTX interface {
 
 ```go
 func WithTx[T any](ctx context.Context, db DBTX,
-    fn func(DBTX) (T, error)) (T, error)
+	fn func(DBTX) (T, error)) (T, error)
 ```
 
 The contract is one line: the closure returns `nil` and `WithTx` commits; it returns an error and `WithTx` rolls back. Inside, every generated function takes the handed `DBTX` — statics, builders, and handwritten wrappers all run on `tx` unchanged:
 
 ```go
 func ShipOrder(ctx context.Context, pool *pgxpool.Pool,
-    orderID int64) (db.Order, error) {
-    return pgb.WithTx(ctx, pool, func(tx pgb.DBTX) (db.Order, error) {
-        o, err := db.Orders.Select().
-            Where(db.Orders.ID().Eq(orderID)).
-            ForUpdate().
-            One(ctx, tx) // row lock for the duration of the tx
-        if err != nil {
-            return db.Order{}, err // → ROLLBACK
-        }
-        if o.Status != "paid" {
-            return db.Order{}, fmt.Errorf(
-                "order %d is %q, not paid", o.ID, o.Status)
-        }
-        updated, err := db.Orders.Update().
-            Set(db.OrderSet{Status: pgb.Set("shipped")}).
-            Where(db.Orders.ID().Eq(orderID)).
-            Returning().
-            All(ctx, tx)
-        if err != nil {
-            return db.Order{}, err // → ROLLBACK
-        }
-        _, err = db.UpdateUser(ctx, tx, updated[0].UserID, db.UserSet{
-            LastLoginAt: pgb.Set(pgtype.Timestamptz{
-                Time: time.Now(), Valid: true}),
-        })
-        if err != nil {
-            return db.Order{}, err // → ROLLBACK — including
-                                   // the shipped status
-        }
-        return updated[0], nil // nil error → COMMIT, all three writes
-    })
+	orderID int64) (db.Order, error) {
+	return pgb.WithTx(ctx, pool, func(tx pgb.DBTX) (db.Order, error) {
+		o, err := db.Orders.Select().
+			Where(db.Orders.ID().Eq(orderID)).
+			ForUpdate().
+			One(ctx, tx) // row lock for the duration of the tx
+		if err != nil {
+			return db.Order{}, err // → ROLLBACK
+		}
+		if o.Status != "paid" {
+			return db.Order{}, fmt.Errorf(
+				"order %d is %q, not paid", o.ID, o.Status)
+		}
+		updated, err := db.Orders.Update().
+			Set(db.OrderSet{Status: pgb.Set("shipped")}).
+			Where(db.Orders.ID().Eq(orderID)).
+			Returning().
+			All(ctx, tx)
+		if err != nil {
+			return db.Order{}, err // → ROLLBACK
+		}
+		_, err = db.UpdateUser(ctx, tx, updated[0].UserID, db.UserSet{
+			LastLoginAt: pgb.Set(pgtype.Timestamptz{
+				Time: time.Now(), Valid: true}),
+		})
+		if err != nil {
+			return db.Order{}, err // → ROLLBACK — including
+			// the shipped status
+		}
+		return updated[0], nil // nil error → COMMIT, all three writes
+	})
 }
 ```
 
@@ -185,34 +203,34 @@ All three match with `errors.Is` — pgb wraps driver errors with `%w`, so check
 
 ```go
 o, err := db.Orders.Select().
-    Where(db.Orders.ID().Eq(orderID)).
-    One(ctx, pool)
+	Where(db.Orders.ID().Eq(orderID)).
+	One(ctx, pool)
 switch {
 case errors.Is(err, pgb.ErrNotFound):
-    return ErrOrderNotFound // render a 404
+	return ErrOrderNotFound // render a 404
 case err != nil:
-    return err
+	return err
 }
 ```
 
 ```go
 _, err := db.Users.Delete().Exec(ctx, pool) // no Where
 if errors.Is(err, pgb.ErrNoWhere) {
-    // refused before any SQL was sent — pass a predicate
-    // or AllowAll()
+	// refused before any SQL was sent — pass a predicate
+	// or AllowAll()
 }
 ```
 
 ```go
 page, _, _, err := db.Users.Select().
-    OrderBy(db.Users.ID().Asc()).
-    Page(ctx, pool, pgb.CursorOf(prev), 50)
+	OrderBy(db.Users.ID().Asc()).
+	Page(ctx, pool, pgb.CursorOf(prev), 50)
 if errors.Is(err, pgb.ErrCursorMismatch) {
-    // token from a different sort key or a stale codegen —
-    // restart without it
-    page, _, _, err = db.Users.Select().
-        OrderBy(db.Users.ID().Asc()).
-        Page(ctx, pool, pgb.CursorOf(""), 50)
+	// token from a different sort key or a stale codegen —
+	// restart without it
+	page, _, _, err = db.Users.Select().
+		OrderBy(db.Users.ID().Asc()).
+		Page(ctx, pool, pgb.CursorOf(""), 50)
 }
 ```
 

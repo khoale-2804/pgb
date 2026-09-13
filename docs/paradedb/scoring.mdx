@@ -9,15 +9,15 @@ icon: "star"
 `pdb.score(...)` is emitted against the index's `key_field` (from `WITH (key_field='id')` or the table's primary key):
 
 ```go
-db.Products.Score()        // Call{Fn: "pdb.score", Args: [Products.ID]}
-                           //  →  pdb.score(id)
+db.Products.Score() // Call{Fn: "pdb.score", Args: [Products.ID]}
+//  →  pdb.score(id)
 ```
 
 Generated search functions always select and order by it. The full surface — predicate, score, snippet, and highlight projections in one call:
 
 ```go
 func SearchProducts(ctx context.Context, exec pgb.DBTX, q core.Expr,
-    limit int, projections ...core.Expr) ([]db.ProductHit, error)
+	limit int, projections ...core.Expr) ([]db.ProductHit, error)
 ```
 
 ## Worked example — score, snippet, highlight
@@ -27,22 +27,22 @@ Search for "running shoes" with the title boosted, an `<em>` snippet around each
 <CodeGroup>
 ```go
 q := db.And(
-    db.Products.Title().Match("running shoes").Boost(2.0),
-    db.Products.Description().Match("running shoes"),
+	db.Products.Title().Match("running shoes").Boost(2.0),
+	db.Products.Description().Match("running shoes"),
 )
 
 hits, err := db.SearchProducts(ctx, pool, q, 20,
-    db.Products.Description().Snippet(
-        pgb.StartTag("<em>"), pgb.MaxChars(150)),
-    db.Products.Title().Highlight(pgb.StartTag("<strong>"),
-        pgb.EndTag("</strong>")),
+	db.Products.Description().Snippet(
+		pgb.StartTag("<em>"), pgb.MaxChars(150)),
+	db.Products.Title().Highlight(pgb.StartTag("<strong>"),
+		pgb.EndTag("</strong>")),
 )
 if err != nil {
-    return err
+	return err
 }
 for _, h := range hits {
-    fmt.Printf("%.3f  %s  %s\n",
-        h.Score, h.Product.Title, h.Snippet["description"])
+	fmt.Printf("%.3f  %s  %s\n",
+		h.Score, h.Product.Title, h.Snippet["description"])
 }
 ```
 
@@ -66,12 +66,12 @@ Snippet and highlight options that are developer constants (the tags) are emitte
 
 ```go
 type ProductHit struct {
-    Product   db.Product
-    Score     float64
-    Snippet   map[string]string // one entry per snippet'd column —
-                                // "description" here
-    Highlight map[string]string // one entry per highlighted
-                                // column — "title" here
+	Product db.Product
+	Score   float64
+	Snippet map[string]string // one entry per snippet'd column —
+	// "description" here
+	Highlight map[string]string // one entry per highlighted
+	// column — "title" here
 }
 ```
 
@@ -118,9 +118,9 @@ Term-level boosts live on predicates (`::pdb.boost(n)`), so the weighting is par
 
 ```go
 q := db.Or(
-    db.Products.Title().Match("running shoes").Boost(2.0),
-    db.Products.Description().Match("running shoes").Boost(1.0),
-    db.Products.Category().Exact("shoes").Boost(3.0),
+	db.Products.Title().Match("running shoes").Boost(2.0),
+	db.Products.Description().Match("running shoes").Boost(1.0),
+	db.Products.Category().Exact("shoes").Boost(3.0),
 )
 // title ||| $1::pdb.boost(2) OR description ||| $2::pdb.boost(1)
 // OR category === $3::pdb.boost(3)

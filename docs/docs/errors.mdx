@@ -21,12 +21,12 @@ All three are plain values compared through the wrap chain. `pgb.ErrNotFound` wr
 ```go
 u, err := db.GetUser(ctx, pool, 4242)
 if errors.Is(err, pgb.ErrNotFound) {
-    // no such user — render a 404
-    return err
+	// no such user — render a 404
+	return err
 }
 if err != nil {
-    return err   // transport, context, scan —
-    // something else went wrong
+	return err // transport, context, scan —
+	// something else went wrong
 }
 ```
 
@@ -43,7 +43,7 @@ WHERE id = $1
 ```go
 _, err := db.DeleteUsers(ctx, pool, nil)
 if errors.Is(err, pgb.ErrNoWhere) {
-    // refused: pass at least one predicate, or opt in via AllowAll
+	// refused: pass at least one predicate, or opt in via AllowAll
 }
 ```
 
@@ -51,8 +51,8 @@ On builders, `.AllowAll()` is the deliberate opt-in for a table-wide statement:
 
 ```go
 n, err := db.Users.Delete().AllowAll().Exec(ctx, pool)
-fmt.Println("deleted", n)   // every row — call it on purpose
-                            // or not at all
+fmt.Println("deleted", n) // every row — call it on purpose
+// or not at all
 ```
 
 ### pgb.ErrCursorMismatch
@@ -61,13 +61,13 @@ Failing closed is deliberate: a mismatched keyset predicate could silently skip 
 
 ```go
 page, next, more, err := db.Users.Select().
-    OrderBy(db.Users.ID().Asc()).
-    Page(ctx, pool, pgb.CursorOf(prev), 50)
+	OrderBy(db.Users.ID().Asc()).
+	Page(ctx, pool, pgb.CursorOf(prev), 50)
 if errors.Is(err, pgb.ErrCursorMismatch) {
-    page, next, more, err = db.Users.Select().
-        OrderBy(db.Users.ID().Asc()).
-        Page(ctx, pool, pgb.CursorOf(""), 50)
-        // restart without the stale token
+	page, next, more, err = db.Users.Select().
+		OrderBy(db.Users.ID().Asc()).
+		Page(ctx, pool, pgb.CursorOf(""), 50)
+	// restart without the stale token
 }
 ```
 
@@ -93,21 +93,21 @@ Constraint failures are not sentinels — they surface as pgx errors wrapping a 
 
 ```go
 _, err := db.InsertUser(ctx, pool, db.InsertUserParams{
-    Email: "ada@corp.io",
-    Name:  "Ada Lovelace",
-    Tags:  []string{"staff"},
+	Email: "ada@corp.io",
+	Name:  "Ada Lovelace",
+	Tags:  []string{"staff"},
 })
 var pgErr *pgconn.PgError
 if errors.As(err, &pgErr) {
-    switch pgErr.Code {
-    case "23505":
-        // e.g. users_email_key
-        fmt.Println("unique:", pgErr.ConstraintName)
-    case "23503":
-        fmt.Println("foreign key:", pgErr.ConstraintName)
-    case "23514":
-        fmt.Println("check:", pgErr.ConstraintName)
-    }
+	switch pgErr.Code {
+	case "23505":
+		// e.g. users_email_key
+		fmt.Println("unique:", pgErr.ConstraintName)
+	case "23503":
+		fmt.Println("foreign key:", pgErr.ConstraintName)
+	case "23514":
+		fmt.Println("check:", pgErr.ConstraintName)
+	}
 }
 ```
 
@@ -120,25 +120,25 @@ For collisions a caller can resolve — a slug, a username, a generated email �
 // racing collision it retries with an incremented suffix
 // instead of failing the request.
 func reserveSeat(
-    ctx context.Context, pool *pgxpool.Pool, name string,
+	ctx context.Context, pool *pgxpool.Pool, name string,
 ) (db.User, error) {
-    email := name + "@corp.io"
-    for attempt := 0; ; attempt++ {
-        u, err := db.InsertUser(ctx, pool, db.InsertUserParams{
-            Email: email,
-            Name:  name,
-            Tags:  []string{"beta"},
-        })
-        var pgErr *pgconn.PgError
-        if errors.As(err, &pgErr) &&
-            pgErr.Code == "23505" &&
-            pgErr.ConstraintName == "users_email_key" &&
-            attempt < 3 {
-            email = fmt.Sprintf("%s-%d@corp.io", name, attempt+1)
-            continue
-        }
-        return u, err
-    }
+	email := name + "@corp.io"
+	for attempt := 0; ; attempt++ {
+		u, err := db.InsertUser(ctx, pool, db.InsertUserParams{
+			Email: email,
+			Name:  name,
+			Tags:  []string{"beta"},
+		})
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) &&
+			pgErr.Code == "23505" &&
+			pgErr.ConstraintName == "users_email_key" &&
+			attempt < 3 {
+			email = fmt.Sprintf("%s-%d@corp.io", name, attempt+1)
+			continue
+		}
+		return u, err
+	}
 }
 ```
 
@@ -166,21 +166,21 @@ A row of NULLs is a legitimate result, not an absence. The trap runs the other w
 // max(total) returns one row even on an empty table —
 // NULL, not ErrNotFound
 rows, err := db.Orders.Select().
-    Cols(core.Raw("max(total) AS max_total")).
-    Rows(ctx, pool)
+	Cols(core.Raw("max(total) AS max_total")).
+	Rows(ctx, pool)
 if err != nil {
-    return err
+	return err
 }
 defer rows.Close()
 
 var maxTotal pgtype.Numeric
 for rows.Next() {
-    if err := rows.Scan(&maxTotal); err != nil {
-        return err
-    }
+	if err := rows.Scan(&maxTotal); err != nil {
+		return err
+	}
 }
 if !maxTotal.Valid {
-    // empty table — absence shows up as NULL, not as an error
+	// empty table — absence shows up as NULL, not as an error
 }
 ```
 
@@ -220,11 +220,11 @@ If the diff shows the new column, ship it; if it shows nothing, your `schema.sql
 ```go
 // anti-pattern: one round trip per user
 for _, id := range ids {
-    u, err := db.GetUser(ctx, pool, id)
-    if err != nil {
-        return err
-    }
-    enrich(id, u)   // a 1ms round trip per row, serialized
+	u, err := db.GetUser(ctx, pool, id)
+	if err != nil {
+		return err
+	}
+	enrich(id, u) // a 1ms round trip per row, serialized
 }
 ```
 
@@ -232,8 +232,8 @@ If the generated filter struct carries a slice field for the column — `UserFil
 
 ```go
 users, err := db.Users.Select().
-    Where(db.Users.ID().In(ids...)).
-    All(ctx, pool)
+	Where(db.Users.ID().In(ids...)).
+	All(ctx, pool)
 ```
 
 ```sql
@@ -254,29 +254,29 @@ pgb emits real SQL with bound parameters, so what you see in logs maps 1:1 to th
 type queryLogTracer struct{}
 
 type queryStart struct {
-    at   time.Time
-    sql  string
-    args []any
+	at   time.Time
+	sql  string
+	args []any
 }
 
 type queryStartKey struct{}
 
 func (queryLogTracer) TraceQueryStart(
-    ctx context.Context, _ *pgx.Conn, data pgx.TraceQueryStartData,
+	ctx context.Context, _ *pgx.Conn, data pgx.TraceQueryStartData,
 ) context.Context {
-    return context.WithValue(ctx, queryStartKey{}, queryStart{
-        at:   time.Now(),
-        sql:  data.SQL,
-        args: data.Args,
-    })
+	return context.WithValue(ctx, queryStartKey{}, queryStart{
+		at:   time.Now(),
+		sql:  data.SQL,
+		args: data.Args,
+	})
 }
 
 func (queryLogTracer) TraceQueryEnd(
-    ctx context.Context, _ *pgx.Conn, data pgx.TraceQueryEndData,
+	ctx context.Context, _ *pgx.Conn, data pgx.TraceQueryEndData,
 ) {
-    st := ctx.Value(queryStartKey{}).(queryStart)
-    log.Printf("sql=%s args=%v took=%s err=%v",
-        st.sql, st.args, time.Since(st.at), data.Err)
+	st := ctx.Value(queryStartKey{}).(queryStart)
+	log.Printf("sql=%s args=%v took=%s err=%v",
+		st.sql, st.args, time.Since(st.at), data.Err)
 }
 ```
 
@@ -285,12 +285,12 @@ Wire it in and every generated call logs its statement, arguments, and duration:
 ```go
 cfg, err := pgxpool.ParseConfig(os.Getenv("DATABASE_URL"))
 if err != nil {
-    log.Fatalf("parse config: %v", err)
+	log.Fatalf("parse config: %v", err)
 }
 cfg.ConnConfig.Tracer = queryLogTracer{}
 pool, err := pgxpool.NewWithConfig(ctx, cfg)
 if err != nil {
-    log.Fatalf("connect: %v", err)
+	log.Fatalf("connect: %v", err)
 }
 defer pool.Close()
 ```

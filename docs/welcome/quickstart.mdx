@@ -281,7 +281,7 @@ func main() {
 		if _, err := db.InsertProduct(ctx, tx, db.InsertProductParams{
 			SellerID: ada.ID, Title: "Chalk bag",
 			Description: "Magnesium chalk bag for bouldering",
-			Category: "gear", Rating: 5, PriceCents: 2400, InStock: true,
+			Category:    "gear", Rating: 5, PriceCents: 2400, InStock: true,
 			Metadata: map[string]any{"color": "blue"},
 		}); err != nil {
 			return err
@@ -303,6 +303,7 @@ func main() {
 		log.Fatalf("tx: %v", err)
 	}
 }
+
 ```
 
 <Note>

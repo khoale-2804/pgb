@@ -53,17 +53,17 @@ Regenerate and the column joins every layer: a `DeletedAt()` descriptor method, 
 ```go
 // delete — an UPDATE, not a DELETE
 func SoftDeleteUser(
-    ctx context.Context, exec pgb.DBTX, id int64,
+	ctx context.Context, exec pgb.DBTX, id int64,
 ) error {
-    _, err := db.Users.Update().
-        Set(db.UserSet{
-            DeletedAt: pgb.Set(pgtype.Timestamptz{
-                Time: time.Now(), Valid: true,
-            }),
-        }).
-        Where(db.Users.ID().Eq(id), db.Users.DeletedAt().IsNull()).
-        Exec(ctx, exec)
-    return err
+	_, err := db.Users.Update().
+		Set(db.UserSet{
+			DeletedAt: pgb.Set(pgtype.Timestamptz{
+				Time: time.Now(), Valid: true,
+			}),
+		}).
+		Where(db.Users.ID().Eq(id), db.Users.DeletedAt().IsNull()).
+		Exec(ctx, exec)
+	return err
 }
 ```
 
@@ -76,11 +76,11 @@ WHERE id = $2 AND deleted_at IS NULL
 ```go
 // restore — write the column back to NULL
 func RestoreUser(ctx context.Context, exec pgb.DBTX, id int64) error {
-    _, err := db.Users.Update().
-        Set(db.UserSet{DeletedAt: pgb.Null[pgtype.Timestamptz]()}).
-        Where(db.Users.ID().Eq(id)).
-        Exec(ctx, exec)
-    return err
+	_, err := db.Users.Update().
+		Set(db.UserSet{DeletedAt: pgb.Null[pgtype.Timestamptz]()}).
+		Where(db.Users.ID().Eq(id)).
+		Exec(ctx, exec)
+	return err
 }
 ```
 
@@ -93,11 +93,11 @@ WHERE id = $1
 ```go
 // scoped reads — the guard rides along as an ordinary predicate
 func ListLiveUsers(
-    ctx context.Context, exec pgb.DBTX,
+	ctx context.Context, exec pgb.DBTX,
 ) ([]db.User, error) {
-    return db.ListUsers(ctx, exec, db.UserFilter{
-        Extra: []core.Expr{db.Users.DeletedAt().IsNull()},
-    }, pgb.Limit(100))
+	return db.ListUsers(ctx, exec, db.UserFilter{
+		Extra: []core.Expr{db.Users.DeletedAt().IsNull()},
+	}, pgb.Limit(100))
 }
 ```
 
@@ -117,12 +117,12 @@ The generated guard still applies to the soft path. A where-slice that is accide
 
 ```go
 _, err := db.UpdateUsers(ctx, pool, nil, db.UserSet{
-    DeletedAt: pgb.Set(pgtype.Timestamptz{
-        Time: time.Now(), Valid: true,
-    }),
+	DeletedAt: pgb.Set(pgtype.Timestamptz{
+		Time: time.Now(), Valid: true,
+	}),
 })
 if errors.Is(err, pgb.ErrNoWhere) {
-    // refused before any SQL was sent — no WHERE, no mass "deletion"
+	// refused before any SQL was sent — no WHERE, no mass "deletion"
 }
 ```
 
@@ -138,8 +138,8 @@ if errors.Is(err, pgb.ErrNoWhere) {
 // the tenant term is built once, by a function that
 // takes the tenant ID — not by call sites that might forget it
 func tenantScope(tenantID int64, preds ...core.Expr) []core.Expr {
-    return append([]core.Expr{db.Orders.TenantID().Eq(tenantID)},
-        preds...)
+	return append([]core.Expr{db.Orders.TenantID().Eq(tenantID)},
+		preds...)
 }
 ```
 
@@ -148,13 +148,13 @@ func tenantScope(tenantID int64, preds ...core.Expr) []core.Expr {
 ```go
 // paginated listing — the composite key serves the keyset directly
 func ListTenantOrders(
-    ctx context.Context, pool *pgxpool.Pool,
-    tenantID int64, prev string,
+	ctx context.Context, pool *pgxpool.Pool,
+	tenantID int64, prev string,
 ) ([]db.Order, string, bool, error) {
-    return db.Orders.Select().
-        Where(db.Orders.TenantID().Eq(tenantID)).
-        OrderBy(db.Orders.TenantID().Asc(), db.Orders.ID().Asc()).
-        Page(ctx, pool, pgb.CursorOf(prev), 100)
+	return db.Orders.Select().
+		Where(db.Orders.TenantID().Eq(tenantID)).
+		OrderBy(db.Orders.TenantID().Asc(), db.Orders.ID().Asc()).
+		Page(ctx, pool, pgb.CursorOf(prev), 100)
 }
 ```
 
@@ -178,13 +178,13 @@ LIMIT $4
 ```go
 // statics take the tenant term through the filter or the where slice
 func PurgeAbandoned(
-    ctx context.Context, pool *pgxpool.Pool,
-    tenantID int64, cutoff time.Time,
+	ctx context.Context, pool *pgxpool.Pool,
+	tenantID int64, cutoff time.Time,
 ) (int64, error) {
-    return db.DeleteOrders(ctx, pool, tenantScope(tenantID,
-        db.Orders.Status().Eq("abandoned"),
-        db.Orders.PlacedAt().Lt(cutoff),
-    ))
+	return db.DeleteOrders(ctx, pool, tenantScope(tenantID,
+		db.Orders.Status().Eq("abandoned"),
+		db.Orders.PlacedAt().Lt(cutoff),
+	))
 }
 ```
 
@@ -214,35 +214,35 @@ CREATE TABLE product_summaries (
 
 ```go
 type CatalogUpdate struct {
-    SKU        string
-    Title      string
-    PriceCents int64
+	SKU        string
+	Title      string
+	PriceCents int64
 }
 
 func WarmSummaries(
-    ctx context.Context, pool *pgxpool.Pool, feed []CatalogUpdate,
+	ctx context.Context, pool *pgxpool.Pool, feed []CatalogUpdate,
 ) error {
-    for _, u := range feed {
-        _, err := db.UpsertProductSummary(ctx, pool,
-            db.InsertProductSummaryParams{
-            SKU:        u.SKU,
-            Title:      u.Title,
-            PriceCents: u.PriceCents,
-        }, db.UpsertOpts{
-            Target: []string{"sku"},
-            Action: db.DoUpdate(db.ProductSummarySet{
-                Title:      pgb.Set(u.Title),
-                PriceCents: pgb.Set(u.PriceCents),
-                WarmedAt:   pgb.Set(pgtype.Timestamptz{
-                    Time: time.Now(), Valid: true,
-                }),
-            }),
-        })
-        if err != nil {
-            return err
-        }
-    }
-    return nil
+	for _, u := range feed {
+		_, err := db.UpsertProductSummary(ctx, pool,
+			db.InsertProductSummaryParams{
+				SKU:        u.SKU,
+				Title:      u.Title,
+				PriceCents: u.PriceCents,
+			}, db.UpsertOpts{
+				Target: []string{"sku"},
+				Action: db.DoUpdate(db.ProductSummarySet{
+					Title:      pgb.Set(u.Title),
+					PriceCents: pgb.Set(u.PriceCents),
+					WarmedAt: pgb.Set(pgtype.Timestamptz{
+						Time: time.Now(), Valid: true,
+					}),
+				}),
+			})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 ```
 
@@ -291,28 +291,28 @@ Neither index knows the other exists. The planner picks per query: a `|||` predi
 
 ```go
 func SearchProducts(
-    ctx context.Context, pool *pgxpool.Pool, q string, limit int,
+	ctx context.Context, pool *pgxpool.Pool, q string, limit int,
 ) ([]db.ProductHit, error) {
-    // short fragments: trigram path — ILIKE, no relevance order
-    if runes := utf8.RuneCountInString(
-        strings.TrimSpace(q)); runes <= 3 {
-        rows, err := db.Products.Select().
-            Where(db.Products.Description().ILike("%" + q + "%")).
-            OrderBy(db.Products.ID().Asc()).
-            Limit(limit).
-            All(ctx, pool)
-        if err != nil {
-            return nil, err
-        }
-        hits := make([]db.ProductHit, len(rows))
-        for i, r := range rows {
-            hits[i] = db.ProductHit{ID: r.ID, Title: r.Title, Score: 0}
-        }
-        return hits, nil
-    }
-    // real queries: BM25 path — the generated search layer
-    return db.SearchProducts(ctx, pool,
-        db.Products.Description().Match(q), limit)
+	// short fragments: trigram path — ILIKE, no relevance order
+	if runes := utf8.RuneCountInString(
+		strings.TrimSpace(q)); runes <= 3 {
+		rows, err := db.Products.Select().
+			Where(db.Products.Description().ILike("%"+q+"%")).
+			OrderBy(db.Products.ID().Asc()).
+			Limit(limit).
+			All(ctx, pool)
+		if err != nil {
+			return nil, err
+		}
+		hits := make([]db.ProductHit, len(rows))
+		for i, r := range rows {
+			hits[i] = db.ProductHit{ID: r.ID, Title: r.Title, Score: 0}
+		}
+		return hits, nil
+	}
+	// real queries: BM25 path — the generated search layer
+	return db.SearchProducts(ctx, pool,
+		db.Products.Description().Match(q), limit)
 }
 ```
 
@@ -348,9 +348,9 @@ The tickets table declares both columns with `DEFAULT now()`. The generated `INS
 
 ```go
 t, err := db.InsertTicket(ctx, pool, db.InsertTicketParams{
-    ExternalID: "zd-4821",
-    Subject:    "Login loop on Safari 17",
-    Priority:   "high",
+	ExternalID: "zd-4821",
+	Subject:    "Login loop on Safari 17",
+	Priority:   "high",
 })
 // both stamped by the server
 fmt.Println(t.CreatedAt.Time, t.UpdatedAt.Time)
@@ -367,26 +367,26 @@ Updates are one `Set` field away. A tiny helper keeps every mutation honest:
 
 ```go
 func stamp() core.Set[pgtype.Timestamptz] {
-    return pgb.Set(pgtype.Timestamptz{Time: time.Now(), Valid: true})
+	return pgb.Set(pgtype.Timestamptz{Time: time.Now(), Valid: true})
 }
 
 func CloseTicket(
-    ctx context.Context, pool *pgxpool.Pool, id int64,
+	ctx context.Context, pool *pgxpool.Pool, id int64,
 ) (db.Ticket, error) {
-    updated, err := db.Tickets.Update().
-        Set(db.TicketSet{
-            Status: pgb.Set("closed"), UpdatedAt: stamp(),
-        }).
-        Where(db.Tickets.ID().Eq(id)).
-        Returning().
-        All(ctx, pool)
-    if err != nil {
-        return db.Ticket{}, err
-    }
-    if len(updated) == 0 {
-        return db.Ticket{}, pgb.ErrNotFound
-    }
-    return updated[0], nil
+	updated, err := db.Tickets.Update().
+		Set(db.TicketSet{
+			Status: pgb.Set("closed"), UpdatedAt: stamp(),
+		}).
+		Where(db.Tickets.ID().Eq(id)).
+		Returning().
+		All(ctx, pool)
+	if err != nil {
+		return db.Ticket{}, err
+	}
+	if len(updated) == 0 {
+		return db.Ticket{}, pgb.ErrNotFound
+	}
+	return updated[0], nil
 }
 ```
 
@@ -402,17 +402,17 @@ The sync path — tickets arrive from an external system, keyed by `external_id`
 
 ```go
 t, err := db.UpsertTicket(ctx, pool, db.InsertTicketParams{
-    ExternalID: "zd-4821",
-    Subject:    "Login loop on Safari 17",
-    Priority:   "high",
+	ExternalID: "zd-4821",
+	Subject:    "Login loop on Safari 17",
+	Priority:   "high",
 }, db.UpsertOpts{
-    Target: []string{"external_id"},
-    Action: db.DoUpdate(db.TicketSet{
-        Subject:   pgb.Set("Login loop on Safari 17"),
-        Priority:  pgb.Set("high"),
-        Status:    pgb.Set("open"),
-        UpdatedAt: stamp(),
-    }),
+	Target: []string{"external_id"},
+	Action: db.DoUpdate(db.TicketSet{
+		Subject:   pgb.Set("Login loop on Safari 17"),
+		Priority:  pgb.Set("high"),
+		Status:    pgb.Set("open"),
+		UpdatedAt: stamp(),
+	}),
 })
 ```
 
@@ -458,14 +458,14 @@ sqlc resolves the query; pass A emits the Row struct and wrapper. Call sites are
 ```go
 // generated in db/orders.sql.gen.go
 type CustomerRecentOrdersRow struct {
-    ID          int64
-    UserID      int64
-    PlacedAt    pgtype.Timestamptz
-    RecencyRank int64
+	ID          int64
+	UserID      int64
+	PlacedAt    pgtype.Timestamptz
+	RecencyRank int64
 }
 
 func CustomerRecentOrders(
-    ctx context.Context, exec pgb.DBTX, tenantID int64, topN int32,
+	ctx context.Context, exec pgb.DBTX, tenantID int64, topN int32,
 ) ([]CustomerRecentOrdersRow, error)
 ```
 
@@ -473,24 +473,24 @@ Because both layers take the same executor, one report mixes them freely:
 
 ```go
 func TenantDigest(
-    ctx context.Context, pool *pgxpool.Pool, tenantID int64,
+	ctx context.Context, pool *pgxpool.Pool, tenantID int64,
 ) (string, error) {
-    n, err := db.CountOrders(ctx, pool,
-        db.OrderFilter{TenantID: pgb.Opt(tenantID)})
-    if err != nil {
-        return "", err
-    }
-    top, err := db.CustomerRecentOrders(ctx, pool, tenantID, 3)
-    if err != nil {
-        return "", err
-    }
-    var b strings.Builder
-    fmt.Fprintf(&b, "%d orders. Latest per customer:\n", n)
-    for _, r := range top {
-        fmt.Fprintf(&b, "  user %d — order %d, %s\n",
-            r.UserID, r.ID, r.PlacedAt.Time.Format("2006-01-02"))
-    }
-    return b.String(), nil
+	n, err := db.CountOrders(ctx, pool,
+		db.OrderFilter{TenantID: pgb.Opt(tenantID)})
+	if err != nil {
+		return "", err
+	}
+	top, err := db.CustomerRecentOrders(ctx, pool, tenantID, 3)
+	if err != nil {
+		return "", err
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "%d orders. Latest per customer:\n", n)
+	for _, r := range top {
+		fmt.Fprintf(&b, "  user %d — order %d, %s\n",
+			r.UserID, r.ID, r.PlacedAt.Time.Format("2006-01-02"))
+	}
+	return b.String(), nil
 }
 ```
 
@@ -520,26 +520,26 @@ The lane rule from [handwritten queries](/guides/handwritten-queries) applies pe
 
 ```go
 type AdminUserQuery struct {
-    // "" = no filter; caller supplies wildcards, e.g. "%@corp.io"
-    EmailLike string
-    Tag       string // "" = no filter
-    Prev      string // cursor token; "" on the first page
+	// "" = no filter; caller supplies wildcards, e.g. "%@corp.io"
+	EmailLike string
+	Tag       string // "" = no filter
+	Prev      string // cursor token; "" on the first page
 }
 
 func AdminUsers(
-    ctx context.Context, pool *pgxpool.Pool, q AdminUserQuery,
+	ctx context.Context, pool *pgxpool.Pool, q AdminUserQuery,
 ) ([]db.User, string, bool, error) {
-    preds := []core.Expr{}
-    if q.EmailLike != "" {
-        preds = append(preds, db.Users.Email().Like(q.EmailLike))
-    }
-    if q.Tag != "" {
-        preds = append(preds, db.Users.Tags().Contains([]string{q.Tag}))
-    }
-    return db.Users.Select().
-        Where(preds...).
-        OrderBy(db.Users.ID().Desc()).
-        Page(ctx, pool, pgb.CursorOf(q.Prev), 50)
+	preds := []core.Expr{}
+	if q.EmailLike != "" {
+		preds = append(preds, db.Users.Email().Like(q.EmailLike))
+	}
+	if q.Tag != "" {
+		preds = append(preds, db.Users.Tags().Contains([]string{q.Tag}))
+	}
+	return db.Users.Select().
+		Where(preds...).
+		OrderBy(db.Users.ID().Desc()).
+		Page(ctx, pool, pgb.CursorOf(q.Prev), 50)
 }
 ```
 
@@ -574,8 +574,8 @@ Sort-direction toggles change the cursor's sort key. Old tokens fail closed with
 ```go
 users, next, more, err := AdminUsers(ctx, pool, q)
 if errors.Is(err, pgb.ErrCursorMismatch) {
-    q.Prev = "" // the client mixed sort keys — restart cleanly
-    users, next, more, err = AdminUsers(ctx, pool, q)
+	q.Prev = "" // the client mixed sort keys — restart cleanly
+	users, next, more, err = AdminUsers(ctx, pool, q)
 }
 ```
 
@@ -587,44 +587,44 @@ if errors.Is(err, pgb.ErrCursorMismatch) {
 // the patch reuses the generated set type: pgb.Set writes a value,
 // pgb.Null clears, the zero value skips the column entirely
 type StockDelta struct {
-    SKU         string
-    WarehouseID int64
-    OnHand      core.Set[int64]
-    Reserved    core.Set[int64]
-    RestockAt   core.Set[pgtype.Timestamptz]
+	SKU         string
+	WarehouseID int64
+	OnHand      core.Set[int64]
+	Reserved    core.Set[int64]
+	RestockAt   core.Set[pgtype.Timestamptz]
 }
 
 func ApplyStockDeltas(
-    ctx context.Context, pool *pgxpool.Pool, deltas []StockDelta,
+	ctx context.Context, pool *pgxpool.Pool, deltas []StockDelta,
 ) error {
-    return pgb.WithTx(ctx, pool, func(tx pgb.DBTX) error {
-        for _, d := range deltas {
-            var action db.InventorySet
-            if d.OnHand.Defined {
-                action.OnHand = d.OnHand
-            }
-            if d.Reserved.Defined {
-                action.Reserved = d.Reserved
-            }
-            if d.RestockAt.Defined {
-                action.RestockAt = d.RestockAt
-            }
-            _, err := db.UpsertInventory(ctx, tx,
-                db.InsertInventoryParams{
-                SKU:          d.SKU,
-                WarehouseID:  d.WarehouseID,
-                OnHand:       d.OnHand.V,
-            }, db.UpsertOpts{
-                Target: []string{"sku"},
-                Action: db.DoUpdate(action),
-            })
-            if err != nil {
-                return err // the whole export rolls back —
-                // deltas are not applied halfway
-            }
-        }
-        return nil
-    })
+	return pgb.WithTx(ctx, pool, func(tx pgb.DBTX) error {
+		for _, d := range deltas {
+			var action db.InventorySet
+			if d.OnHand.Defined {
+				action.OnHand = d.OnHand
+			}
+			if d.Reserved.Defined {
+				action.Reserved = d.Reserved
+			}
+			if d.RestockAt.Defined {
+				action.RestockAt = d.RestockAt
+			}
+			_, err := db.UpsertInventory(ctx, tx,
+				db.InsertInventoryParams{
+					SKU:         d.SKU,
+					WarehouseID: d.WarehouseID,
+					OnHand:      d.OnHand.V,
+				}, db.UpsertOpts{
+					Target: []string{"sku"},
+					Action: db.DoUpdate(action),
+				})
+			if err != nil {
+				return err // the whole export rolls back —
+				// deltas are not applied halfway
+			}
+		}
+		return nil
+	})
 }
 ```
 

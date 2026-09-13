@@ -12,8 +12,8 @@ Generated search builders expose a raw passthrough today, listed as `.Agg(json)`
 
 ```go
 res, err := db.Products.Search().ForceIndex().
-    Agg(`{"terms": {"field": "category"}}`).
-    One(ctx, pool)
+	Agg(`{"terms": {"field": "category"}}`).
+	One(ctx, pool)
 // SELECT pdb.agg($1::jsonb) FROM products WHERE id @@@ pdb.all()
 ```
 
@@ -23,8 +23,8 @@ Predicates chain before `.Agg`, so the aggregation runs over the filtered set:
 
 ```go
 res, err := db.Products.Search().Match("shoes").
-    Agg(`{"terms": {"field": "category"}}`).
-    One(ctx, pool)
+	Agg(`{"terms": {"field": "category"}}`).
+	One(ctx, pool)
 // SELECT pdb.agg($2::jsonb) FROM products WHERE description ||| $1
 ```
 
@@ -88,14 +88,30 @@ The response comes back verbatim as `json.RawMessage`, one row, one column:
 ```json
 {
   "buckets": [
-    { "key": "shoes", "doc_count": 412,
-      "avg_rating": { "value": 4.3 } },
-    { "key": "boots", "doc_count": 187,
-      "avg_rating": { "value": 4.1 } },
-    { "key": "sandals", "doc_count": 95,
-      "avg_rating": { "value": 3.8 } }
+    {
+      "key": "shoes",
+      "doc_count": 412,
+      "avg_rating": {
+        "value": 4.3
+      }
+    },
+    {
+      "key": "boots",
+      "doc_count": 187,
+      "avg_rating": {
+        "value": 4.1
+      }
+    },
+    {
+      "key": "sandals",
+      "doc_count": 95,
+      "avg_rating": {
+        "value": 3.8
+      }
+    }
   ]
 }
+
 ```
 
 ## Date histogram — orders per month
@@ -129,20 +145,27 @@ WHERE id @@@ pdb.all();
     {
       "key_as_string": "2026-07",
       "doc_count": 1321,
-      "revenue": { "value": 89421.5 }
+      "revenue": {
+        "value": 89421.5
+      }
     },
     {
       "key_as_string": "2026-08",
       "doc_count": 1544,
-      "revenue": { "value": 101233.75 }
+      "revenue": {
+        "value": 101233.75
+      }
     },
     {
       "key_as_string": "2026-09",
       "doc_count": 610,
-      "revenue": { "value": 41290.0 }
+      "revenue": {
+        "value": 41290.0
+      }
     }
   ]
 }
+
 ```
 
 `calendar_interval` takes `minute` through `year`; use `fixed_interval` for non-calendar windows like `30d`.
@@ -239,9 +262,9 @@ Faceting on a dimension you also filter on collapses that facet — filter on th
 
 ```go
 res, err := db.Products.Search().ForceIndex().
-    Agg(`{"terms": {"field": "category"}}`,
-        pgb.Visibility("threshold")).
-    One(ctx, pool)
+	Agg(`{"terms": {"field": "category"}}`,
+		pgb.Visibility("threshold")).
+	One(ctx, pool)
 ```
 
 ```sql
@@ -279,10 +302,10 @@ The planned shape: typed `AggregateXxx` statics — `db.AggregateProducts`, one 
 ```go
 // proposed — does not exist in v0.1
 res, err := db.AggregateProducts(ctx, pool,
-    db.Products.Description().Match("shoes"),
-    pgb.Terms("category",
-        pgb.Avg("rating").As("avg_rating"),
-    ),
+	db.Products.Description().Match("shoes"),
+	pgb.Terms("category",
+		pgb.Avg("rating").As("avg_rating"),
+	),
 )
 // emits: SELECT pdb.agg($1::jsonb) FROM products
 //        WHERE description ||| $2

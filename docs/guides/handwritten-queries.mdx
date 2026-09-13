@@ -54,22 +54,22 @@ Because each query selects a column subset (not the full `db.Order` shape), pgb 
 ```go
 // generated in db/orders.sql.gen.go
 type ListOpenOrdersRow struct {
-    ID     int64
-    UserID int64
-    Status string
-    Total  pgtype.Numeric
+	ID     int64
+	UserID int64
+	Status string
+	Total  pgtype.Numeric
 }
 
 type OpenOrderCountRow struct {
-    N int64
+	N int64
 }
 
 func ListOpenOrders(
-    ctx context.Context, exec pgb.DBTX, tenantID int64, limit int32,
+	ctx context.Context, exec pgb.DBTX, tenantID int64, limit int32,
 ) ([]ListOpenOrdersRow, error)
 
 func OpenOrderCount(
-    ctx context.Context, exec pgb.DBTX, tenantID int64,
+	ctx context.Context, exec pgb.DBTX, tenantID int64,
 ) (OpenOrderCountRow, error)
 ```
 
@@ -78,7 +78,7 @@ Call sites look exactly like the static layer — executor first-class, typed re
 ```go
 open, err := db.ListOpenOrders(ctx, pool, tenantID, 50)
 if err != nil {
-    return err
+	return err
 }
 n, err := db.OpenOrderCount(ctx, pool, tenantID)
 ```

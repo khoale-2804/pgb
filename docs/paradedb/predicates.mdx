@@ -117,7 +117,7 @@ WHERE category === $1
 <CodeGroup>
 ```go
 q := db.Products.Category().ExactAny(
-    []string{"shoes", "boots", "sandals"})
+	[]string{"shoes", "boots", "sandals"})
 ```
 
 ```sql
@@ -155,7 +155,7 @@ db.Products.Description().Regex("water.*proof")
 // description @@@ pdb.regex($1)
 
 db.Products.Description().Parse(
-    "running AND (shoes OR boots) -trail", pgb.Lenient)
+	"running AND (shoes OR boots) -trail", pgb.Lenient)
 // description @@@ pdb.parse($1, lenient => true)
 ```
 </CodeGroup>
@@ -190,10 +190,10 @@ WHERE description @@@ pdb.regex_phrase($1)
 ```go
 // integer column → int4range: ratings 3 (inclusive) to 5 (exclusive)
 q := db.Products.Rating().RangeTerm(pgtype.Range[int32]{
-    Lower:     3,
-    Upper:     5,
-    LowerType: pgtype.Inclusive,
-    UpperType: pgtype.Exclusive,
+	Lower:     3,
+	Upper:     5,
+	LowerType: pgtype.Inclusive,
+	UpperType: pgtype.Exclusive,
 }, "Intersects")
 ```
 
@@ -206,8 +206,8 @@ WHERE rating @@@ pdb.range_term($1::int4range, 'Intersects')
 ```go
 // timestamptz column → tstzrange: everything created in the last week
 q := db.Products.CreatedAt().RangeTerm(pgtype.Range[pgtype.Timestamptz]{
-    Lower:     pgtype.Timestamptz{Time: weekAgo, Valid: true},
-    LowerType: pgtype.Inclusive,
+	Lower:     pgtype.Timestamptz{Time: weekAgo, Valid: true},
+	LowerType: pgtype.Inclusive,
 }, "Intersects")
 ```
 
@@ -278,18 +278,18 @@ Compound queries are plain SQL — `AND` / `OR` / `NOT` between predicates, comb
 <CodeGroup>
 ```go
 q := db.And(
-    // the user's words — title counts double,
-    // description is the baseline
-    db.Or(
-        db.Products.Title().Match("running shoes").Boost(2.0),
-        db.Products.Description().Match("running shoes").Boost(1.0),
-    ),
-    // typo tolerance on the same words, OR'd in as a fallback lane
-    db.Products.Description().Fuzzy("runing shose", 1, pgb.Prefix()),
-    // facet filter — the selected category, exact token
-    db.Products.Category().Exact("shoes"),
-    // never show out-of-stock rows
-    db.Not(db.Products.InStock().Exact(false)),
+	// the user's words — title counts double,
+	// description is the baseline
+	db.Or(
+		db.Products.Title().Match("running shoes").Boost(2.0),
+		db.Products.Description().Match("running shoes").Boost(1.0),
+	),
+	// typo tolerance on the same words, OR'd in as a fallback lane
+	db.Products.Description().Fuzzy("runing shose", 1, pgb.Prefix()),
+	// facet filter — the selected category, exact token
+	db.Products.Category().Exact("shoes"),
+	// never show out-of-stock rows
+	db.Not(db.Products.InStock().Exact(false)),
 )
 
 hits, err := db.SearchProducts(ctx, pool, q, 20)
@@ -341,8 +341,8 @@ Since pg_search 0.25.5, filters on columns indexed by *other* index types push d
 // category_path is a GiST-indexed ltree column —
 // not part of the paradedb index
 q := db.And(
-    db.Products.Description().Match("running"),
-    db.Raw("category_path <@ $1", "sports.running"),
+	db.Products.Description().Match("running"),
+	db.Raw("category_path <@ $1", "sports.running"),
 )
 
 hits, err := db.SearchProducts(ctx, pool, q, 20)

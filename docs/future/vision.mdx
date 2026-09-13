@@ -107,7 +107,7 @@ model Post {
 
 ```go
 users, err := client.User.FindMany(
-    User.Where(Email.Contains("@corp.io"), CreatedAt.Gte(since)),
+	User.Where(Email.Contains("@corp.io"), CreatedAt.Gte(since)),
 ).Include(User.Include.Posts()).Take(20).Exec(ctx)
 ```
 

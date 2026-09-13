@@ -64,8 +64,8 @@ options:
 
 ```go
 u, err := db.UpsertUser(ctx, pool, db.InsertUserParams{
-    Email: "ada@corp.io",
-    Name:  "Ada Lovelace",
+	Email: "ada@corp.io",
+	Name:  "Ada Lovelace",
 }, db.UpsertOpts{Target: []string{"email"}, OnSelect: true})
 ```
 

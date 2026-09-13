@@ -15,62 +15,62 @@ Both index spellings are accepted at DDL parse time: `USING paradedb` (0.25.0+) 
 1. **DDL extraction** — the `USING paradedb` index definition is parsed from your schema ([details](/paradedb/index-ddl)) and drives codegen: which columns get search predicates, the `key_field` for scoring, tokenizer metadata.
 
    ```go
-   // the .Description() descriptor exists only because description
-   // is in the index DDL
-   rows, err := db.SearchProducts(ctx, pool,
-       db.Products.Description().Match("trail running"), 10)
+	// the .Description() descriptor exists only because description
+	// is in the index DDL
+	rows, err := db.SearchProducts(ctx, pool,
+		db.Products.Description().Match("trail running"), 10)
    ```
 
 2. **Predicates** — typed methods emitting the complete v2 operator vocabulary ([reference](/paradedb/predicates)).
 
    ```go
-   // emits: WHERE description @@@ 'runing'::pdb.fuzzy(2)
-   rows, err := db.SearchProducts(ctx, pool,
-       db.Products.Description().Fuzzy("runing", 2), 10)
+	// emits: WHERE description @@@ 'runing'::pdb.fuzzy(2)
+	rows, err := db.SearchProducts(ctx, pool,
+		db.Products.Description().Fuzzy("runing", 2), 10)
    ```
 
 3. **Scoring & snippets** — `pdb.score(key_field)`, `pdb.snippet*` families with named arguments ([reference](/paradedb/scoring)).
 
    ```go
-   // rows[i].Score is populated from pdb.score(id)::float8
-   // in the emitted SELECT
-   rows, err := db.SearchProductsScored(ctx, pool,
-       db.Products.Description().Match("shoes"), 10)
+	// rows[i].Score is populated from pdb.score(id)::float8
+	// in the emitted SELECT
+	rows, err := db.SearchProductsScored(ctx, pool,
+		db.Products.Description().Match("shoes"), 10)
    ```
 
 4. **Hybrid search** — the documented RRF fusion pattern as a generated function ([reference](/paradedb/hybrid-search)).
 
    ```go
-   // one SQL statement: BM25 match + vector nearest neighbors
-   // fused with RRF
-   rows, err := db.SearchProductsHybrid(ctx, pool,
-       "trail running shoes", qvec, 10)
+	// one SQL statement: BM25 match + vector nearest neighbors
+	// fused with RRF
+	rows, err := db.SearchProductsHybrid(ctx, pool,
+		"trail running shoes", qvec, 10)
    ```
 
 5. **Aggregations** — the `pdb.agg` JSON aggregation DSL ([reference](/paradedb/aggregations)).
 
    ```go
-   // emits: SELECT pdb.agg(id, '<Elasticsearch-compatible JSON>')
-   // FROM products
-   res, err := db.AggregateProducts(ctx, pool,
-       db.Products.Agg().Terms("json_brand", 20))
+	// emits: SELECT pdb.agg(id, '<Elasticsearch-compatible JSON>')
+	// FROM products
+	res, err := db.AggregateProducts(ctx, pool,
+		db.Products.Agg().Terms("json_brand", 20))
    ```
 
 6. **Tokenizers** — the full tokenizer/token-filter list, extracted from DDL casts ([reference](/paradedb/tokenizers)).
 
    ```go
-   // sku::pdb.literal produces one token per value,
-   // so .Exact() rides the === family
-   rows, err := db.SearchProducts(ctx, pool,
-       db.Products.Sku().Exact("SHO-42"), 10)
+	// sku::pdb.literal produces one token per value,
+	// so .Exact() rides the === family
+	rows, err := db.SearchProducts(ctx, pool,
+		db.Products.Sku().Exact("SHO-42"), 10)
    ```
 
 7. **Architecture** — the LSM-tree index, custom-scan pushdown, and joins ([reference](/paradedb/architecture)).
 
    ```go
-   // every generated search ends in ORDER BY ... LIMIT n,
-   // which rides SegmentedTopKExec
-   rows, err := db.SearchProducts(ctx, pool, q, 10)
+	// every generated search ends in ORDER BY ... LIMIT n,
+	// which rides SegmentedTopKExec
+	rows, err := db.SearchProducts(ctx, pool, q, 10)
    ```
 
 ## Design implications for pgb

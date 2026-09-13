@@ -52,9 +52,15 @@ Regenerate and the column joins every layer: a `DeletedAt()` descriptor method, 
 
 ```go
 // delete — an UPDATE, not a DELETE
-func SoftDeleteUser(ctx context.Context, exec pgb.DBTX, id int64) error {
+func SoftDeleteUser(
+    ctx context.Context, exec pgb.DBTX, id int64,
+) error {
     _, err := db.Users.Update().
-        Set(db.UserSet{DeletedAt: pgb.Set(pgtype.Timestamptz{Time: time.Now(), Valid: true})}).
+        Set(db.UserSet{
+            DeletedAt: pgb.Set(pgtype.Timestamptz{
+                Time: time.Now(), Valid: true,
+            }),
+        }).
         Where(db.Users.ID().Eq(id), db.Users.DeletedAt().IsNull()).
         Exec(ctx, exec)
     return err
@@ -86,7 +92,9 @@ WHERE id = $1
 
 ```go
 // scoped reads — the guard rides along as an ordinary predicate
-func ListLiveUsers(ctx context.Context, exec pgb.DBTX) ([]db.User, error) {
+func ListLiveUsers(
+    ctx context.Context, exec pgb.DBTX,
+) ([]db.User, error) {
     return db.ListUsers(ctx, exec, db.UserFilter{
         Extra: []core.Expr{db.Users.DeletedAt().IsNull()},
     }, pgb.Limit(100))
@@ -94,7 +102,8 @@ func ListLiveUsers(ctx context.Context, exec pgb.DBTX) ([]db.User, error) {
 ```
 
 ```sql
-SELECT id, email, name, bio, metadata, tags, created_at, last_login_at, deleted_at
+SELECT id, email, name, bio, metadata, tags,
+       created_at, last_login_at, deleted_at
 FROM public.users
 WHERE deleted_at IS NULL
 LIMIT $1
@@ -108,7 +117,9 @@ The generated guard still applies to the soft path. A where-slice that is accide
 
 ```go
 _, err := db.UpdateUsers(ctx, pool, nil, db.UserSet{
-    DeletedAt: pgb.Set(pgtype.Timestamptz{Time: time.Now(), Valid: true}),
+    DeletedAt: pgb.Set(pgtype.Timestamptz{
+        Time: time.Now(), Valid: true,
+    }),
 })
 if errors.Is(err, pgb.ErrNoWhere) {
     // refused before any SQL was sent — no WHERE, no mass "deletion"
@@ -124,10 +135,11 @@ if errors.Is(err, pgb.ErrNoWhere) {
 **Problem:** every row belongs to a `tenant_id`, and every query must say so. The orders table carries `UNIQUE (tenant_id, id)`, which doubles as the composite keyset key.
 
 ```go
-// the tenant term is built once, by a function that takes the tenant ID —
-// not by call sites that might forget it
+// the tenant term is built once, by a function that
+// takes the tenant ID — not by call sites that might forget it
 func tenantScope(tenantID int64, preds ...core.Expr) []core.Expr {
-    return append([]core.Expr{db.Orders.TenantID().Eq(tenantID)}, preds...)
+    return append([]core.Expr{db.Orders.TenantID().Eq(tenantID)},
+        preds...)
 }
 ```
 
@@ -135,7 +147,10 @@ func tenantScope(tenantID int64, preds ...core.Expr) []core.Expr {
 
 ```go
 // paginated listing — the composite key serves the keyset directly
-func ListTenantOrders(ctx context.Context, pool *pgxpool.Pool, tenantID int64, prev string) ([]db.Order, string, bool, error) {
+func ListTenantOrders(
+    ctx context.Context, pool *pgxpool.Pool,
+    tenantID int64, prev string,
+) ([]db.Order, string, bool, error) {
     return db.Orders.Select().
         Where(db.Orders.TenantID().Eq(tenantID)).
         OrderBy(db.Orders.TenantID().Asc(), db.Orders.ID().Asc()).
@@ -162,7 +177,10 @@ LIMIT $4
 
 ```go
 // statics take the tenant term through the filter or the where slice
-func PurgeAbandoned(ctx context.Context, pool *pgxpool.Pool, tenantID int64, cutoff time.Time) (int64, error) {
+func PurgeAbandoned(
+    ctx context.Context, pool *pgxpool.Pool,
+    tenantID int64, cutoff time.Time,
+) (int64, error) {
     return db.DeleteOrders(ctx, pool, tenantScope(tenantID,
         db.Orders.Status().Eq("abandoned"),
         db.Orders.PlacedAt().Lt(cutoff),
@@ -201,9 +219,12 @@ type CatalogUpdate struct {
     PriceCents int64
 }
 
-func WarmSummaries(ctx context.Context, pool *pgxpool.Pool, feed []CatalogUpdate) error {
+func WarmSummaries(
+    ctx context.Context, pool *pgxpool.Pool, feed []CatalogUpdate,
+) error {
     for _, u := range feed {
-        _, err := db.UpsertProductSummary(ctx, pool, db.InsertProductSummaryParams{
+        _, err := db.UpsertProductSummary(ctx, pool,
+            db.InsertProductSummaryParams{
             SKU:        u.SKU,
             Title:      u.Title,
             PriceCents: u.PriceCents,
@@ -212,7 +233,9 @@ func WarmSummaries(ctx context.Context, pool *pgxpool.Pool, feed []CatalogUpdate
             Action: db.DoUpdate(db.ProductSummarySet{
                 Title:      pgb.Set(u.Title),
                 PriceCents: pgb.Set(u.PriceCents),
-                WarmedAt:   pgb.Set(pgtype.Timestamptz{Time: time.Now(), Valid: true}),
+                WarmedAt:   pgb.Set(pgtype.Timestamptz{
+                    Time: time.Now(), Valid: true,
+                }),
             }),
         })
         if err != nil {
@@ -227,10 +250,11 @@ func WarmSummaries(ctx context.Context, pool *pgxpool.Pool, feed []CatalogUpdate
 INSERT INTO public.product_summaries (sku, title, price_cents)
 VALUES ($1, $2, $3)
 ON CONFLICT (sku) DO UPDATE
-SET title = EXCLUDED.title, price_cents = EXCLUDED.price_cents, warmed_at = EXCLUDED.warmed_at
+SET title = EXCLUDED.title, price_cents = EXCLUDED.price_cents,
+    warmed_at = EXCLUDED.warmed_at
 WHERE product_summaries.title IS DISTINCT FROM EXCLUDED.title
-   OR product_summaries.price_cents IS DISTINCT FROM EXCLUDED.price_cents
-   OR product_summaries.warmed_at IS DISTINCT FROM EXCLUDED.warmed_at
+  OR product_summaries.price_cents IS DISTINCT FROM EXCLUDED.price_cents
+  OR product_summaries.warmed_at IS DISTINCT FROM EXCLUDED.warmed_at
 RETURNING sku, title, price_cents, warmed_at
 ```
 
@@ -266,9 +290,12 @@ Neither index knows the other exists. The planner picks per query: a `|||` predi
 <CodeGroup>
 
 ```go
-func SearchProducts(ctx context.Context, pool *pgxpool.Pool, q string, limit int) ([]db.ProductHit, error) {
+func SearchProducts(
+    ctx context.Context, pool *pgxpool.Pool, q string, limit int,
+) ([]db.ProductHit, error) {
     // short fragments: trigram path — ILIKE, no relevance order
-    if runes := utf8.RuneCountInString(strings.TrimSpace(q)); runes <= 3 {
+    if runes := utf8.RuneCountInString(
+        strings.TrimSpace(q)); runes <= 3 {
         rows, err := db.Products.Select().
             Where(db.Products.Description().ILike("%" + q + "%")).
             OrderBy(db.Products.ID().Asc()).
@@ -284,7 +311,8 @@ func SearchProducts(ctx context.Context, pool *pgxpool.Pool, q string, limit int
         return hits, nil
     }
     // real queries: BM25 path — the generated search layer
-    return db.SearchProducts(ctx, pool, db.Products.Description().Match(q), limit)
+    return db.SearchProducts(ctx, pool,
+        db.Products.Description().Match(q), limit)
 }
 ```
 
@@ -324,13 +352,15 @@ t, err := db.InsertTicket(ctx, pool, db.InsertTicketParams{
     Subject:    "Login loop on Safari 17",
     Priority:   "high",
 })
-fmt.Println(t.CreatedAt.Time, t.UpdatedAt.Time) // both stamped by the server
+// both stamped by the server
+fmt.Println(t.CreatedAt.Time, t.UpdatedAt.Time)
 ```
 
 ```sql
 INSERT INTO public.tickets (external_id, subject, priority)
 VALUES ($1, $2, $3)
-RETURNING id, external_id, subject, priority, status, created_at, updated_at
+RETURNING id, external_id, subject, priority,
+           status, created_at, updated_at
 ```
 
 Updates are one `Set` field away. A tiny helper keeps every mutation honest:
@@ -340,9 +370,13 @@ func stamp() core.Set[pgtype.Timestamptz] {
     return pgb.Set(pgtype.Timestamptz{Time: time.Now(), Valid: true})
 }
 
-func CloseTicket(ctx context.Context, pool *pgxpool.Pool, id int64) (db.Ticket, error) {
+func CloseTicket(
+    ctx context.Context, pool *pgxpool.Pool, id int64,
+) (db.Ticket, error) {
     updated, err := db.Tickets.Update().
-        Set(db.TicketSet{Status: pgb.Set("closed"), UpdatedAt: stamp()}).
+        Set(db.TicketSet{
+            Status: pgb.Set("closed"), UpdatedAt: stamp(),
+        }).
         Where(db.Tickets.ID().Eq(id)).
         Returning().
         All(ctx, pool)
@@ -360,7 +394,8 @@ func CloseTicket(ctx context.Context, pool *pgxpool.Pool, id int64) (db.Ticket, 
 UPDATE public.tickets
 SET status = $1, updated_at = $2
 WHERE id = $3
-RETURNING id, external_id, subject, priority, status, created_at, updated_at
+RETURNING id, external_id, subject, priority,
+           status, created_at, updated_at
 ```
 
 The sync path — tickets arrive from an external system, keyed by `external_id` — is where `ON CONFLICT` must stamp too:
@@ -391,7 +426,8 @@ WHERE tickets.subject IS DISTINCT FROM EXCLUDED.subject
    OR tickets.priority IS DISTINCT FROM EXCLUDED.priority
    OR tickets.status IS DISTINCT FROM EXCLUDED.status
    OR tickets.updated_at IS DISTINCT FROM EXCLUDED.updated_at
-RETURNING id, external_id, subject, priority, status, created_at, updated_at
+RETURNING id, external_id, subject, priority,
+           status, created_at, updated_at
 ```
 
 <Note>
@@ -406,7 +442,8 @@ Including `updated_at` in the action defeats the no-op guard — the timestamp a
 -- name: CustomerRecentOrders :many
 WITH ranked AS (
     SELECT id, user_id, placed_at,
-           row_number() OVER (PARTITION BY user_id ORDER BY placed_at DESC) AS recency_rank
+           row_number() OVER (PARTITION BY user_id
+                              ORDER BY placed_at DESC) AS recency_rank
     FROM orders
     WHERE tenant_id = $1
 )
@@ -427,14 +464,19 @@ type CustomerRecentOrdersRow struct {
     RecencyRank int64
 }
 
-func CustomerRecentOrders(ctx context.Context, exec pgb.DBTX, tenantID int64, topN int32) ([]CustomerRecentOrdersRow, error)
+func CustomerRecentOrders(
+    ctx context.Context, exec pgb.DBTX, tenantID int64, topN int32,
+) ([]CustomerRecentOrdersRow, error)
 ```
 
 Because both layers take the same executor, one report mixes them freely:
 
 ```go
-func TenantDigest(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (string, error) {
-    n, err := db.CountOrders(ctx, pool, db.OrderFilter{TenantID: pgb.Opt(tenantID)})
+func TenantDigest(
+    ctx context.Context, pool *pgxpool.Pool, tenantID int64,
+) (string, error) {
+    n, err := db.CountOrders(ctx, pool,
+        db.OrderFilter{TenantID: pgb.Opt(tenantID)})
     if err != nil {
         return "", err
     }
@@ -445,7 +487,8 @@ func TenantDigest(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (stri
     var b strings.Builder
     fmt.Fprintf(&b, "%d orders. Latest per customer:\n", n)
     for _, r := range top {
-        fmt.Fprintf(&b, "  user %d — order %d, %s\n", r.UserID, r.ID, r.PlacedAt.Time.Format("2006-01-02"))
+        fmt.Fprintf(&b, "  user %d — order %d, %s\n",
+            r.UserID, r.ID, r.PlacedAt.Time.Format("2006-01-02"))
     }
     return b.String(), nil
 }
@@ -456,7 +499,8 @@ func TenantDigest(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (stri
 -- pgb only wrapped and typed it
 WITH ranked AS (
     SELECT id, user_id, placed_at,
-           row_number() OVER (PARTITION BY user_id ORDER BY placed_at DESC) AS recency_rank
+           row_number() OVER (PARTITION BY user_id
+                              ORDER BY placed_at DESC) AS recency_rank
     FROM orders
     WHERE tenant_id = $1
 )
@@ -476,12 +520,15 @@ The lane rule from [handwritten queries](/guides/handwritten-queries) applies pe
 
 ```go
 type AdminUserQuery struct {
-    EmailLike string // "" = no filter; caller supplies wildcards, e.g. "%@corp.io"
+    // "" = no filter; caller supplies wildcards, e.g. "%@corp.io"
+    EmailLike string
     Tag       string // "" = no filter
     Prev      string // cursor token; "" on the first page
 }
 
-func AdminUsers(ctx context.Context, pool *pgxpool.Pool, q AdminUserQuery) ([]db.User, string, bool, error) {
+func AdminUsers(
+    ctx context.Context, pool *pgxpool.Pool, q AdminUserQuery,
+) ([]db.User, string, bool, error) {
     preds := []core.Expr{}
     if q.EmailLike != "" {
         preds = append(preds, db.Users.Email().Like(q.EmailLike))
@@ -498,14 +545,16 @@ func AdminUsers(ctx context.Context, pool *pgxpool.Pool, q AdminUserQuery) ([]db
 
 ```sql
 -- first page, both filters active
-SELECT id, email, name, bio, metadata, tags, created_at, last_login_at, deleted_at
+SELECT id, email, name, bio, metadata, tags,
+       created_at, last_login_at, deleted_at
 FROM public.users
 WHERE email LIKE $1 AND tags @> $2::text[]
 ORDER BY id DESC
 LIMIT $3
 
 -- next page — the cursor's last id extends the same predicate list
-SELECT id, email, name, bio, metadata, tags, created_at, last_login_at, deleted_at
+SELECT id, email, name, bio, metadata, tags,
+       created_at, last_login_at, deleted_at
 FROM public.users
 WHERE email LIKE $1 AND tags @> $2::text[] AND id < $3
 ORDER BY id DESC
@@ -545,7 +594,9 @@ type StockDelta struct {
     RestockAt   core.Set[pgtype.Timestamptz]
 }
 
-func ApplyStockDeltas(ctx context.Context, pool *pgxpool.Pool, deltas []StockDelta) error {
+func ApplyStockDeltas(
+    ctx context.Context, pool *pgxpool.Pool, deltas []StockDelta,
+) error {
     return pgb.WithTx(ctx, pool, func(tx pgb.DBTX) error {
         for _, d := range deltas {
             var action db.InventorySet
@@ -558,7 +609,8 @@ func ApplyStockDeltas(ctx context.Context, pool *pgxpool.Pool, deltas []StockDel
             if d.RestockAt.Defined {
                 action.RestockAt = d.RestockAt
             }
-            _, err := db.UpsertInventory(ctx, tx, db.InsertInventoryParams{
+            _, err := db.UpsertInventory(ctx, tx,
+                db.InsertInventoryParams{
                 SKU:          d.SKU,
                 WarehouseID:  d.WarehouseID,
                 OnHand:       d.OnHand.V,
@@ -567,7 +619,8 @@ func ApplyStockDeltas(ctx context.Context, pool *pgxpool.Pool, deltas []StockDel
                 Action: db.DoUpdate(action),
             })
             if err != nil {
-                return err // the whole export rolls back — deltas are not applied halfway
+                return err // the whole export rolls back —
+                // deltas are not applied halfway
             }
         }
         return nil
@@ -578,7 +631,8 @@ func ApplyStockDeltas(ctx context.Context, pool *pgxpool.Pool, deltas []StockDel
 ```sql
 -- one statement per delta, shaped by that delta's patch —
 -- here: set on_hand, clear reserved, leave restock_at alone
-INSERT INTO public.inventory (sku, warehouse_id, on_hand, reserved, restock_at)
+INSERT INTO public.inventory
+    (sku, warehouse_id, on_hand, reserved, restock_at)
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (sku) DO UPDATE
 SET on_hand = EXCLUDED.on_hand, reserved = NULL

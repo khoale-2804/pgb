@@ -15,7 +15,7 @@ CREATE INDEX products_search ON products USING paradedb
   (id,
    title,
    description::pdb.icu,
-   category::pdb.literal,                                    -- one token per value: the === family
+   category::pdb.literal,    -- one token per value: the === family
    rating,
    price_cents,
    created_at,
@@ -116,7 +116,8 @@ WHERE category === $1
 
 <CodeGroup>
 ```go
-q := db.Products.Category().ExactAny([]string{"shoes", "boots", "sandals"})
+q := db.Products.Category().ExactAny(
+    []string{"shoes", "boots", "sandals"})
 ```
 
 ```sql
@@ -153,7 +154,8 @@ The argument order and the prefix flag's position inside the cast are pinned by 
 db.Products.Description().Regex("water.*proof")
 // description @@@ pdb.regex($1)
 
-db.Products.Description().Parse("running AND (shoes OR boots) -trail", pgb.Lenient)
+db.Products.Description().Parse(
+    "running AND (shoes OR boots) -trail", pgb.Lenient)
 // description @@@ pdb.parse($1, lenient => true)
 ```
 </CodeGroup>
@@ -276,7 +278,8 @@ Compound queries are plain SQL — `AND` / `OR` / `NOT` between predicates, comb
 <CodeGroup>
 ```go
 q := db.And(
-    // the user's words — title counts double, description is the baseline
+    // the user's words — title counts double,
+    // description is the baseline
     db.Or(
         db.Products.Title().Match("running shoes").Boost(2.0),
         db.Products.Description().Match("running shoes").Boost(1.0),
@@ -335,7 +338,8 @@ Since pg_search 0.25.5, filters on columns indexed by *other* index types push d
 
 <CodeGroup>
 ```go
-// category_path is a GiST-indexed ltree column — not part of the paradedb index
+// category_path is a GiST-indexed ltree column —
+// not part of the paradedb index
 q := db.And(
     db.Products.Description().Match("running"),
     db.Raw("category_path <@ $1", "sports.running"),

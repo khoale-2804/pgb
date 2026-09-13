@@ -25,8 +25,11 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	pgb "github.com/your-org/pgb/core" // handwritten runtime — small, versioned, readable
-	"github.com/your-org/shop/db"     // generated — one package, DO NOT EDIT
+	// handwritten runtime — small, versioned, readable
+	pgb "github.com/your-org/pgb/core"
+
+	// generated — one package, DO NOT EDIT
+	"github.com/your-org/shop/db"
 )
 
 func main() {
@@ -49,7 +52,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// dynamic list — filters compose structurally; no (@x IS NULL OR col = @x)
+	// dynamic list — filters compose structurally;
+	// no (@x IS NULL OR col = @x)
 	users, err := db.ListUsers(ctx, pool, db.UserFilter{
 		EmailLike:    pgb.Opt("%@example.com"),
 		CreatedAfter: pgb.Opt(time.Now().Add(-30 * 24 * time.Hour)),
@@ -59,13 +63,15 @@ func main() {
 	}
 
 	// search — generated from the USING paradedb index in your schema
-	// WHERE description === $1::pdb.fuzzy(1) AND category ||| $2::pdb.boost(2)
+	// WHERE description === $1::pdb.fuzzy(1)
+	//   AND category ||| $2::pdb.boost(2)
 	// ORDER BY pdb.score(id) DESC, id ASC   -- Top-K pushdown
-	hits, err := db.SearchProducts(ctx, pool, "runing shoes", db.SearchOpts{
-		Fuzzy:         1, // tolerates the typo
-		BoostCategory: 2.0,
-		Snippet:       "description", // pdb.snippet(description, start_tag => '<em>')
-	})
+	hits, err := db.SearchProducts(ctx, pool, "runing shoes",
+		db.SearchOpts{
+			Fuzzy:         1, // tolerates the typo
+			BoostCategory: 2.0,
+			Snippet:       "description", // pdb.snippet(...)
+		})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -78,7 +84,8 @@ func main() {
 	case err != nil:
 		log.Fatal(err)
 	default:
-		fmt.Printf("%d users, %d hits, user exists\n", len(users), len(hits))
+		fmt.Printf("%d users, %d hits, user exists\n",
+			len(users), len(hits))
 	}
 }
 ```
@@ -117,11 +124,11 @@ pgb keeps sqlc where it is strong — parsing your schema, analyzing your handwr
 
 ```text
 db/
-├── models.gen.go           # User, Product · InsertUserParams, UserFilter, UserSet · scan funcs
-├── users.gen.go            # db.Users descriptor, typed predicates, builder, statics
+├── models.gen.go           # User, Product, params, filters, sets
+├── users.gen.go            # predicates, builder, statics
 ├── products.gen.go         # same for products
-└── products_search.gen.go  # SearchProducts / SearchProductsPage / SearchProductsHybrid
-                            # — only for tables with a USING paradedb index
+└── products_search.gen.go  # SearchProducts (+ Page/Hybrid)
+                            # for tables with a USING paradedb index
 ```
 
 One package (config `package: db`), flat files, `// Code generated ... DO NOT EDIT.` headers — on top of a small handwritten `core/` runtime the generated code imports. See the [quickstart](/welcome/quickstart) for the full walkthrough.

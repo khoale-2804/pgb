@@ -1,6 +1,90 @@
-/* pgb docs — minimal overrides on top of the Mintlify aspen theme.
+/* pgb docs — layout fixes on top of the Mintlify aspen theme.
    The indigo accent is set in docs.json (ParadeDB brand: primary/light #4f46e5, dark #818cf8);
-   aspen reads those top-level branding keys directly, so no CSS color overrides are needed. */
+   aspen reads those top-level branding keys directly, so no CSS color overrides are needed.
+   This file fixes content overflow: code blocks scroll with a visible bar,
+   wide tables scroll on narrow screens, long inline code wraps. */
+
 :root {
   --rounded-code: 0.5rem;
+}
+
+/* 1. Give code more room, three levers (aspen defaults are generous):
+      a) cap the "On this page" TOC column (aspen gives it 28rem),
+      b) slim main's page gutters (88px left / 40px right → 40/24),
+      c) halve the content↔TOC gap (48 → 24).
+      Net: the code column gains ~90px so existing code lines fit with no
+      horizontal scrolling; code font drops half a step as buffer. */
+@media (min-width: 1280px) {
+  main > div[class*="max-w-[28rem]"] {
+    max-width: 240px !important;
+  }
+  main[class*="lg:pl-[5.5rem]"] {
+    padding-left: 2.5rem !important;
+    padding-right: 1.5rem !important;
+    column-gap: 1.5rem !important;
+  }
+}
+.code-block pre,
+pre.shiki {
+  font-size: 13px !important;
+  tab-size: 2;
+}
+
+/* 2. Flex content column must be allowed to shrink below content size */
+main .grow {
+  min-width: 0;
+}
+
+/* 3. Code blocks: horizontal scroll WITH a visible scrollbar.
+      Mintlify's base-ui scroll-area hides scrollbars by default, which made
+      long Go/SQL lines look truncated. Force real scrolling + show a bar. */
+.code-block pre,
+pre.shiki,
+.code-block div[class*="size-full"] {
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(129, 140, 248, 0.45) transparent;
+}
+pre {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(129, 140, 248, 0.45) transparent;
+}
+.code-block ::-webkit-scrollbar,
+pre::-webkit-scrollbar {
+  height: 8px;
+}
+.code-block ::-webkit-scrollbar-track,
+pre::-webkit-scrollbar-track {
+  background: transparent;
+}
+.code-block ::-webkit-scrollbar-thumb,
+pre::-webkit-scrollbar-thumb {
+  background: rgba(129, 140, 248, 0.45);
+  border-radius: 9999px;
+}
+.code-block ::-webkit-scrollbar-thumb:hover,
+pre::-webkit-scrollbar-thumb:hover {
+  background: rgba(129, 140, 248, 0.7);
+}
+
+/* 4. Wide tables: the wrapper scrolls instead of pushing past the viewport */
+.mdx-content div:has(> table) {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+.mdx-content div:has(> table)::-webkit-scrollbar {
+  height: 8px;
+}
+.mdx-content div:has(> table)::-webkit-scrollbar-thumb {
+  background: rgba(129, 140, 248, 0.45);
+  border-radius: 9999px;
+}
+
+/* 5. Long inline code (function signatures, yaml keys) wraps instead of clipping */
+code:not(pre code) {
+  overflow-wrap: anywhere;
 }

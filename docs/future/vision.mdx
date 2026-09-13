@@ -20,18 +20,18 @@ Today pgb generates code *from* your schema but leaves schema management to you 
 pgb/*.pgb (multiple schema files)
      │
      ▼  pgb compiler (DSL parser)
-SchemaIR  ────────────────────────────────────────┐
+SchemaIR  ----------------------------------------┐
      │                                            │
      ▼                                            ▼
 db/ (models, builders,          .pgb/schema.bin (encoded IR:
 statics, ORM client)                IR + pgb version + content hash)
-                                                      │
-                                              pgb migrate (reads artifact)
-                                                      │
-                                              diff vs live pg_catalog
-                                                      │
-                                              DDL plan → auto-apply (dev)
-                                                        / explicit deploy (prod)
+                                    │
+                                    pgb migrate (reads artifact)
+                                    │
+                                    diff vs live pg_catalog
+                                    │
+                                    DDL plan → auto-apply (dev)
+                                      / explicit deploy (prod)
 ```
 
 **Why this is cheap for pgb specifically:** SchemaIR was designed as the contract between parsing and codegen. The DSL is a *new source* into the IR; the migrate tool is a *new consumer* of it; the ORM is an *extension* of stage 1 (relations). No re-architecture — the 2.0 work hangs off the decision made on day one.
@@ -45,12 +45,14 @@ Multiple `*.pgb` files (like Prisma's multi-file schema), concatenated and name-
 model Product {
   id          Uuid   @id @default(uuidv7())
   title       Text
-  description Text   @search(tokenizer: "simple", args: { stemmer: "english" })
+  description Text   @search(tokenizer: "simple",
+                             args: { stemmer: "english" })
   category    Text   @search(tokenizer: "literal")
   rating      Int    @search
   price       Numeric @pg(type: "json.Number")
   inStock     Bool   @default(true)
-  metadata    Jsonb  @search(path: "color", alias: "json_color", tokenizer: "literal")
+  metadata    Jsonb  @search(path: "color", alias: "json_color",
+                             tokenizer: "literal")
   embedding   Vector @dimension(768)
   createdAt   Timestamptz @default(now())
 
@@ -72,8 +74,8 @@ Design points:
 Every generation writes `.pgb/schema.bin`: protobuf-encoded SchemaIR + pgb version + content hash. It is the single artifact the migration tool trusts (Prisma's DMMF/migration-lock analogy).
 
 ```bash
-pgb migrate dev       # diff artifact vs shadow DB → generate + AUTO-APPLY DDL to the dev database
-pgb migrate deploy    # apply recorded migrations to staging/prod — explicit, no auto-diff
+pgb migrate dev       # diff vs shadow DB → generate + auto-apply
+pgb migrate deploy    # apply recorded migrations — explicit
 pgb migrate diff      # print the SQL plan without applying
 pgb migrate status    # drift report: artifact vs live catalog
 ```

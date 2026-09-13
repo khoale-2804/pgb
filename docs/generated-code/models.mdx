@@ -60,10 +60,13 @@ type User struct {
     Email       string
     Name        string
     Bio         pgtype.Text        // nullable text
-    Metadata    []byte             // jsonb — raw bytes unless overridden
+    Metadata    []byte             // jsonb — raw bytes
+                                   // unless overridden
     Tags        []string           // text[] — decoded natively by pgx
-    CreatedAt   pgtype.Timestamptz // NOT NULL, but the timestamp family still maps to pgtype
-    LastLoginAt pgtype.Timestamptz // nullable — Valid == false means SQL NULL
+    // NOT NULL, but the timestamp family still maps to pgtype
+    CreatedAt   pgtype.Timestamptz
+    LastLoginAt pgtype.Timestamptz // nullable — Valid == false
+                                   // means SQL NULL
 }
 ```
 
@@ -113,7 +116,10 @@ Writing a timestamp (and clearing it back to NULL) through the three-state `Set`
 
 ```go
 u, err := db.UpdateUser(ctx, pool, u.ID, db.UserSet{
-    LastLoginAt: pgb.Set(pgtype.Timestamptz{Time: time.Now(), Valid: true}),
+    LastLoginAt: pgb.Set(pgtype.Timestamptz{
+        Time:  time.Now(),
+        Valid: true,
+    }),
 })
 ```
 
@@ -121,12 +127,14 @@ u, err := db.UpdateUser(ctx, pool, u.ID, db.UserSet{
 UPDATE public.users
 SET last_login_at = $1
 WHERE id = $2
-RETURNING id, email, name, bio, metadata, tags, created_at, last_login_at
+RETURNING id, email, name, bio, metadata, tags,
+          created_at, last_login_at
 ```
 
 ```go
 _, err = db.UpdateUser(ctx, pool, u.ID, db.UserSet{
-    LastLoginAt: pgb.Null[pgtype.Timestamptz](),   // SET last_login_at = NULL
+    // SET last_login_at = NULL
+    LastLoginAt: pgb.Null[pgtype.Timestamptz](),
 })
 ```
 
@@ -139,7 +147,8 @@ if errors.Is(err, pgb.ErrNotFound) {
 }
 
 if u.LastLoginAt.Valid {
-    fmt.Println("last seen", u.LastLoginAt.Time.UTC().Format(time.RFC3339))
+    fmt.Println("last seen",
+        u.LastLoginAt.Time.UTC().Format(time.RFC3339))
 }
 if u.Bio.Valid {
     fmt.Println("bio:", u.Bio.String)
@@ -162,7 +171,8 @@ _, err = db.UpdateUser(ctx, pool, u.ID, db.UserSet{
 UPDATE public.users
 SET metadata = $1
 WHERE id = $2
-RETURNING id, email, name, bio, metadata, tags, created_at, last_login_at
+RETURNING id, email, name, bio, metadata, tags,
+          created_at, last_login_at
 ```
 
 ```go
@@ -237,7 +247,8 @@ type User struct {
 }
 
 type UserFilter struct {
-    Metadata map[string]any // generator 2 said: jsonb → map[string]any
+    Metadata map[string]any // generator 2 said:
+                            // jsonb → map[string]any
 }
 
 // every call site now needs a hand-rolled conversion, and nothing

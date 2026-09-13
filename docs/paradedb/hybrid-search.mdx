@@ -61,15 +61,17 @@ options:
 ```go
 import "github.com/pgvector/pgvector-go"
 
-qvec := pgvector.NewVector(queryEmbedding) // []float32(768) from your embedding model
+// []float32(768) from your embedding model
+qvec := pgvector.NewVector(queryEmbedding)
 
-hits, err := db.SearchProductsHybrid(ctx, pool, "running shoes", qvec, db.HybridOpts{
-    TextWeight: 0.7, // BM25 lane's share of the fused score
-    VecWeight:  0.3, // vector lane's share
-    K:          60,  // RRF constant
-    PerLane:    20,  // each lane's LIMIT before fusion
-    Limit:      10,  // final result count
-})
+hits, err := db.SearchProductsHybrid(ctx, pool, "running shoes", qvec,
+    db.HybridOpts{
+        TextWeight: 0.7, // BM25 lane's share of the fused score
+        VecWeight:  0.3, // vector lane's share
+        K:          60,  // RRF constant
+        PerLane:    20,  // each lane's LIMIT before fusion
+        Limit:      10,  // final result count
+    })
 if err != nil {
     return err
 }

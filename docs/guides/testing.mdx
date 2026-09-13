@@ -15,11 +15,14 @@ Table-driven: expression tree in, SQL + args out, byte-exact. Coverage includes 
 A canonical `testdata/schema.sql` (including `USING paradedb` DDL, enums, domains, generated columns) is run through the full pipeline; output is snapshotted.
 
 ```go
-// golden_test.go — harness shape; the real one lives beside the generator
-var update = flag.Bool("update", false, "rewrite golden files from current output")
+// golden_test.go — harness shape;
+// the real one lives beside the generator
+var update = flag.Bool("update", false,
+    "rewrite golden files from current output")
 
 func TestGolden(t *testing.T) {
-    got, err := generateAll(t, "testdata/schema.sql", "testdata/queries.sql")
+    got, err := generateAll(t,
+        "testdata/schema.sql", "testdata/queries.sql")
     if err != nil {
         t.Fatal(err)
     }
@@ -37,7 +40,8 @@ func TestGolden(t *testing.T) {
     }
     for file, wantSrc := range want {
         if got[file] != wantSrc {
-            t.Errorf("%s drifted from the golden file — run with -update and review the diff", file)
+            t.Errorf("%s drifted from the golden file — "+
+                "run with -update and review the diff", file)
         }
     }
 }
@@ -46,7 +50,8 @@ func TestGolden(t *testing.T) {
 The `-update` flow, end to end:
 
 ```bash
-# 1. change the generator (template, emitter, mapping) or the test schema
+# 1. change the generator (template, emitter, mapping)
+#    or the test schema
 # 2. regenerate the snapshot
 go test ./internal/gen -run TestGolden -update
 # 3. review what moved — every generated line is in the diff
@@ -65,7 +70,8 @@ The emitter's SQL is fed back through oliphant and must re-parse to the same sta
 ```text
 for each fuzz case (schema fragment + expression tree):
     sql  := emitter.Emit(tree)          # byte-deterministic output
-    stmt := oliphant.Parse(sql)         # PG18 grammar, in-process — no server
+    stmt := oliphant.Parse(sql)         # PG18 grammar,
+                                        # in-process — no server
     assert parse succeeds
     assert statement shape matches the tree
         same tables, same clause order,
@@ -87,8 +93,9 @@ Both lanes run side by side in one compose file — separate ports, one `docker 
 
 ```yaml
 services:
-  paradedb:                          # full lane — search + hybrid on PG18
-    image: paradedb/paradedb:0.25.9  # or an 0.26-rc tag; bundles pgvector (required since 0.25.0)
+  paradedb:                    # full lane — search + hybrid on PG18
+    # or an 0.26-rc tag; bundles pgvector (required since 0.25.0)
+    image: paradedb/paradedb:0.25.9
     environment:
       POSTGRES_USER: pgb
       POSTGRES_PASSWORD: pgb
@@ -96,7 +103,7 @@ services:
     ports:
       - "5432:5432"
 
-  pg19:                              # plain lane — non-search gates on 19 beta
+  pg19:                        # plain lane — non-search on PG19 beta
     image: postgres:19-beta
     environment:
       POSTGRES_USER: pgb

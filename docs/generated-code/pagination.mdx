@@ -21,7 +21,11 @@ rows, next, more, err := db.Users.Select().
 `Page` takes the previous page's token (empty string on the first request) and returns the token for the following page:
 
 ```go
-func listUsers(ctx context.Context, pool *pgxpool.Pool, prev string) ([]db.User, string, bool, error) {
+func listUsers(
+    ctx context.Context,
+    pool *pgxpool.Pool,
+    prev string,
+) ([]db.User, string, bool, error) {
     return db.Users.Select().
         OrderBy(db.Users.ID().Asc()).
         Page(ctx, pool, pgb.CursorOf(prev), 50)
@@ -62,7 +66,10 @@ Descending order flips the comparison: `OrderBy(db.Users.ID().Desc()).Page(...)`
 A drain loop over every page is just the same call with `prev = next`:
 
 ```go
-func allBetaUsers(ctx context.Context, pool *pgxpool.Pool) ([]db.User, error) {
+func allBetaUsers(
+    ctx context.Context,
+    pool *pgxpool.Pool,
+) ([]db.User, error) {
     var out []db.User
     prev := ""
     for {
@@ -113,7 +120,11 @@ The cursor carries both column values from the last row of the previous page.
 Score-ordered search has unstable keys (ties), so the search functions paginate on the **(score, id) composite** — which ParadeDB requires anyway: the tiebreak column must be indexed for Top-K execution.
 
 ```go
-func searchPage(ctx context.Context, pool *pgxpool.Pool, q, prev string) ([]db.ProductHit, string, bool, error) {
+func searchPage(
+    ctx context.Context,
+    pool *pgxpool.Pool,
+    q, prev string,
+) ([]db.ProductHit, string, bool, error) {
     return db.SearchProductsPage(ctx, pool, q, pgb.CursorOf(prev), 20)
 }
 

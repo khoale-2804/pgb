@@ -53,10 +53,12 @@ CREATE TABLE products (
     created_at  timestamptz NOT NULL DEFAULT now()
 );
 
--- one ParadeDB index per table: columns listed here get search predicates,
--- casts set tokenizers, WITH (key_field=) feeds pdb.score()
+-- one ParadeDB index per table: columns listed here get search
+-- predicates, casts set tokenizers,
+-- WITH (key_field=) feeds pdb.score()
 CREATE INDEX products_search ON products USING paradedb
-  (id, description::pdb.icu, (metadata->'color')::pdb.literal('alias=json_color'), rating)
+  (id, description::pdb.icu,
+   (metadata->'color')::pdb.literal('alias=json_color'), rating)
   WITH (key_field='id');
 ```
 
@@ -80,13 +82,13 @@ sql:
         options:
           package: db           # the ONE generated package name
           core: github.com/your-org/pgb/core
-          target: "18"          # or "19" — dialect gate for the SQL emitter
+          target: "18"          # or "19": SQL emitter dialect gate
           paradedb:
-            version: "0.26"     # gate for the pg_search emitter (0.25.9+ floor, tracks 0.26-rc)
+            version: "0.26"     # pg_search gate: 0.25.9+ floor
           emit:
-            batch: true         # InsertXxx batch functions (unnest-based)
+            batch: true         # InsertXxx batch funcs (unnest-based)
             keyset: true        # cursor pagination helpers
-            hybrid: true        # SearchXxxHybrid when a vector column exists
+            hybrid: true        # SearchXxxHybrid with a vector column
             merge: false        # MERGE builder (PG17+), off by default
           vector_dim:
             products: 768       # only needed for hybrid search
@@ -118,10 +120,10 @@ Output — one package, flat files:
 
 ```text
 db/
-├── models.gen.go           # models, params, filters, sets, explicit positional scan funcs
-├── users.gen.go            # db.Users descriptor, predicates, builder, CRUD statics
-├── products.gen.go         # db.Products descriptor, predicates, builder, CRUD statics
-└── products_search.gen.go  # SearchProducts, SearchProductsPage, SearchProductsHybrid, ProductHit
+├── models.gen.go           # models, params, filters, sets, scans
+├── users.gen.go            # predicates, builder, CRUD statics
+├── products.gen.go         # predicates, builder, CRUD statics
+└── products_search.gen.go  # SearchProducts (+ Page/Hybrid)
 ```
 
 What each file contains:
@@ -164,7 +166,8 @@ func main() {
 	defer pool.Close()
 
 	// 1. InsertUser — typed params, RETURNING gives the row back
-	// INSERT INTO users (email, name) VALUES ($1, $2) RETURNING id, email, name, bio, created_at
+	// INSERT INTO users (email, name) VALUES ($1, $2)
+	// RETURNING id, email, name, bio, created_at
 	ada, err := db.InsertUser(ctx, pool, db.InsertUserParams{
 		Email: "ada@example.com",
 		Name:  "Ada Lovelace",
@@ -174,18 +177,49 @@ func main() {
 	}
 
 	// 2. InsertProducts — batch insert via unnest, all rows returned
-	// INSERT INTO products (seller_id, title, description, category, rating, price_cents, in_stock, metadata)
-	// SELECT * FROM unnest($1::bigint[], $2::text[], ...) RETURNING id, seller_id, ...
-	products, err := db.InsertProducts(ctx, pool, []db.InsertProductParams{
-		{SellerID: ada.ID, Title: "Trail shoes", Description: "Lightweight trail-running shoes with a rock plate", Category: "shoes", Rating: 5, PriceCents: 11990, InStock: true, Metadata: map[string]any{"color": "orange"}},
-		{SellerID: ada.ID, Title: "Road shoes", Description: "Responsive road-running shoes for tempo days", Category: "shoes", Rating: 4, PriceCents: 9990, InStock: true, Metadata: map[string]any{"color": "red"}},
-		{SellerID: ada.ID, Title: "Headlamp", Description: "500-lumen rechargeable headlamp for night runs", Category: "gear", Rating: 4, PriceCents: 3450, InStock: false, Metadata: map[string]any{"color": "black"}},
-	})
+	// INSERT INTO products (seller_id, title, description, category,
+	// rating, price_cents, in_stock, metadata)
+	// SELECT * FROM unnest($1::bigint[], $2::text[], ...)
+	// RETURNING id, seller_id, ...
+	inserts := []db.InsertProductParams{
+		{
+			SellerID:    ada.ID,
+			Title:       "Trail shoes",
+			Description: "Lightweight trail-running shoes",
+			Category:    "shoes",
+			Rating:      5,
+			PriceCents:  11990,
+			InStock:     true,
+			Metadata:    map[string]any{"color": "orange"},
+		},
+		{
+			SellerID:    ada.ID,
+			Title:       "Road shoes",
+			Description: "Responsive road-running shoes",
+			Category:    "shoes",
+			Rating:      4,
+			PriceCents:  9990,
+			InStock:     true,
+			Metadata:    map[string]any{"color": "red"},
+		},
+		{
+			SellerID:    ada.ID,
+			Title:       "Headlamp",
+			Description: "500-lumen rechargeable headlamp for night runs",
+			Category:    "gear",
+			Rating:      4,
+			PriceCents:  3450,
+			InStock:     false,
+			Metadata:    map[string]any{"color": "black"},
+		},
+	}
+	products, err := db.InsertProducts(ctx, pool, inserts)
 	if err != nil {
 		log.Fatalf("insert products: %v", err)
 	}
 
-	// 3. ListUsers — typed, optional filters; nil/zero fields are simply not emitted
+	// 3. ListUsers — typed, optional filters;
+	// nil/zero fields are simply not emitted
 	// SELECT id, email, name, bio, created_at FROM users
 	// WHERE email LIKE $1 AND created_at >= $2 ORDER BY id LIMIT $3
 	users, err := db.ListUsers(ctx, pool, db.UserFilter{
@@ -194,36 +228,44 @@ func main() {
 	if err != nil {
 		log.Fatalf("list users: %v", err)
 	}
-	fmt.Printf("%d users, %d products seeded\n", len(users), len(products))
+	fmt.Printf("%d users, %d products seeded\n",
+		len(users), len(products))
 
-	// 4. SearchProducts — ParadeDB search generated from the USING paradedb index
+	// 4. SearchProducts — ParadeDB search generated from the
+	// USING paradedb index
 	// SELECT id, seller_id, ..., pdb.score(id) AS score,
 	//        pdb.snippet(description, start_tag => '<em>') AS snip
 	// FROM products
-	// WHERE description === $1::pdb.fuzzy(1) AND category ||| $2::pdb.boost(2)
+	// WHERE description === $1::pdb.fuzzy(1)
+	//   AND category ||| $2::pdb.boost(2)
 	// ORDER BY pdb.score(id) DESC, id ASC
 	// LIMIT $3
-	hits, err := db.SearchProducts(ctx, pool, "runing shoes", db.SearchOpts{
-		Fuzzy:         1, // === ::pdb.fuzzy(1) — tolerates the typo
-		BoostCategory: 2.0,
-		Snippet:       "description",
-	})
+	hits, err := db.SearchProducts(ctx, pool, "runing shoes",
+		db.SearchOpts{
+			Fuzzy:         1, // === ::pdb.fuzzy(1) — tolerates the typo
+			BoostCategory: 2.0,
+			Snippet:       "description",
+		})
 	if err != nil {
 		log.Fatalf("search products: %v", err)
 	}
 	for _, h := range hits {
-		fmt.Printf("%.2f  %-12s %s\n", h.Score, h.Product.Title, h.Snippet["description"])
+		fmt.Printf("%.2f  %-12s %s\n",
+			h.Score, h.Product.Title, h.Snippet["description"])
 	}
 
-	// 5. UpdateUser — three-state sets: pgb.Set / pgb.Null / zero (= skip)
-	// UPDATE users SET bio = $2 WHERE id = $1 RETURNING id, email, name, bio, created_at
+	// 5. UpdateUser — three-state sets:
+	// pgb.Set / pgb.Null / zero (= skip)
+	// UPDATE users SET bio = $2 WHERE id = $1
+	// RETURNING id, email, name, bio, created_at
 	if _, err := db.UpdateUser(ctx, pool, ada.ID, db.UserSet{
 		Bio: pgb.Set("author of the first published algorithm"),
 	}); err != nil {
 		log.Fatalf("update user: %v", err)
 	}
 
-	// 6. GetUser + sentinel error handling — pgb.ErrNotFound wraps pgx.ErrNoRows
+	// 6. GetUser + sentinel error handling —
+	// pgb.ErrNotFound wraps pgx.ErrNoRows
 	if _, err := db.GetUser(ctx, pool, 424242); err != nil {
 		if errors.Is(err, pgb.ErrNotFound) {
 			fmt.Println("user 424242 not found (expected)")
@@ -232,18 +274,23 @@ func main() {
 		}
 	}
 
-	// 7. Transaction — pgx.BeginFunc; every generated function takes any pgb.DBTX,
-	//    so the tx joins automatically. Builder + bulk update inside one commit.
+	// 7. Transaction — pgx.BeginFunc; every generated function
+	// takes any pgb.DBTX, so the tx joins automatically.
+	// Builder + bulk update inside one commit.
 	err = pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
 		if _, err := db.InsertProduct(ctx, tx, db.InsertProductParams{
-			SellerID: ada.ID, Title: "Chalk bag", Description: "Magnesium chalk bag for bouldering",
+			SellerID: ada.ID, Title: "Chalk bag",
+			Description: "Magnesium chalk bag for bouldering",
 			Category: "gear", Rating: 5, PriceCents: 2400, InStock: true,
 			Metadata: map[string]any{"color": "blue"},
 		}); err != nil {
 			return err
 		}
 		restocked, err := db.UpdateUsers(ctx, tx,
-			[]pgb.Expr{db.Products.Category().Exact("gear"), db.Products.InStock().Exact(false)},
+			[]pgb.Expr{
+				db.Products.Category().Exact("gear"),
+				db.Products.InStock().Exact(false),
+			},
 			db.ProductSet{InStock: pgb.Set(true)},
 		)
 		if err != nil {
@@ -267,7 +314,8 @@ Every generated function names its executor parameter `exec` (`func GetUser(ctx 
 Against the official ParadeDB image (pg_search preinstalled):
 
 ```bash
-docker run --name pgb-demo -e POSTGRES_PASSWORD=postgres -p 5432:5432 paradedb/paradedb
+docker run --name pgb-demo -e POSTGRES_PASSWORD=postgres \
+  -p 5432:5432 paradedb/paradedb
 export DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres
 psql "$DATABASE_URL" -f schema.sql
 sqlc generate
@@ -278,8 +326,8 @@ Expected output (search finds both "shoes" rows despite the typo — fuzzy):
 
 ```text
 1 users, 3 products seeded
-9.87  Trail shoes   Lightweight <em>trail-running shoes</em> with a rock plate
-8.21  Road shoes    Responsive <em>road-running shoes</em> for tempo days
+9.87  Trail shoes   Lightweight <em>trail-running shoes</em>
+8.21  Road shoes    Responsive <em>road-running shoes</em>
 user 424242 not found (expected)
 restocked 1 gear items in-tx
 ```

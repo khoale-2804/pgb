@@ -55,7 +55,8 @@ Three sizing rules:
 2. **Exports are List queries, not searches.** Pulling a whole table or a large filtered slice is the generated `List` path — plain Postgres, no scoring:
 
    ```go
-   rows, err := db.ListProducts(ctx, pool, db.ProductFilter{InStock: pgb.Opt(true)})
+   rows, err := db.ListProducts(ctx, pool,
+       db.ProductFilter{InStock: pgb.Opt(true)})
    ```
 3. **The tiebreak column must be indexed.** pgb emits `ORDER BY pdb.score(id) DESC, id ASC` — the `id` tiebreak is what makes pagination stable, and it must appear in the index for Top-K to engage ([scoring](/paradedb/scoring), [pagination](/generated-code/pagination)). The same holds for any hand-written `ORDER BY`: a non-indexed sort column means no Top-K pushdown.
 
@@ -103,7 +104,7 @@ Two server settings matter at the session or database level:
 
 ```sql
 SET paradedb.enable_join_custom_scan = on;
-SET paradedb.global_mutable_segment_rows = -1;  -- per-index settings decide
+SET paradedb.global_mutable_segment_rows = -1; -- per-index settings win
 ```
 
 Version availability for both GUCs is tracked in the [support matrix](/reference/support-matrix) — pgb targets pg_search 0.25.9+ with the 0.26-rc gate.
@@ -151,8 +152,9 @@ LIMIT 10;
 ```
 
 ```ini
-Limit  (cost=10.00..10.03 rows=10 width=64) (actual time=1.912..1.918 rows=10 loops=1)
-  ->  Custom Scan (ParadeDB Base Scan) on public.products  (cost=10.00..10.03 rows=10 width=64) (actual time=1.910..1.916 rows=10 loops=1)
+Limit  (cost=10.00..10.03 rows=10) (actual time=1.912..1.918 rows=10)
+  ->  Custom Scan (ParadeDB Base Scan) on public.products
+        (cost=10.00..10.03 rows=10) (actual time=1.910..1.916 rows=10)
         Table: products
         Index: products_search
         Segment Count: 3
@@ -160,7 +162,10 @@ Limit  (cost=10.00..10.03 rows=10 width=64) (actual time=1.912..1.918 rows=10 lo
         Scores: true
            TopK Order By: pdb.score(id) DESC, id ASC
            TopK Limit: 10
-        Tantivy Query: {"with_index":{"query":{"boolean":{"sub_queries":[{"term":{"field":"description","value":"running shoes"}},{"range":{"field":"rating","greater_than_or_eq":4.0}}]}}}}
+        Tantivy Query: {"with_index":{"query":{"boolean":{
+          "sub_queries":[
+            {"term":{"field":"description","value":"running shoes"}},
+            {"range":{"field":"rating","greater_than_or_eq":4.0}}]}}}}
 Planning Time: 0.241 ms
 Execution Time: 2.084 ms
 ```

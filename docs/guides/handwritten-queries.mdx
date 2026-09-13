@@ -64,9 +64,13 @@ type OpenOrderCountRow struct {
     N int64
 }
 
-func ListOpenOrders(ctx context.Context, exec pgb.DBTX, tenantID int64, limit int32) ([]ListOpenOrdersRow, error)
+func ListOpenOrders(
+    ctx context.Context, exec pgb.DBTX, tenantID int64, limit int32,
+) ([]ListOpenOrdersRow, error)
 
-func OpenOrderCount(ctx context.Context, exec pgb.DBTX, tenantID int64) (OpenOrderCountRow, error)
+func OpenOrderCount(
+    ctx context.Context, exec pgb.DBTX, tenantID int64,
+) (OpenOrderCountRow, error)
 ```
 
 Call sites look exactly like the static layer — executor first-class, typed results out:

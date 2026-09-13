@@ -9,14 +9,15 @@ icon: "star"
 `pdb.score(...)` is emitted against the index's `key_field` (from `WITH (key_field='id')` or the table's primary key):
 
 ```go
-db.Products.Score()        // Call{Fn: "pdb.score", Args: [Products.ID]}  →  pdb.score(id)
+db.Products.Score()        // Call{Fn: "pdb.score", Args: [Products.ID]}
+                           //  →  pdb.score(id)
 ```
 
 Generated search functions always select and order by it. The full surface — predicate, score, snippet, and highlight projections in one call:
 
 ```go
-func SearchProducts(ctx context.Context, exec pgb.DBTX, q core.Expr, limit int,
-    projections ...core.Expr) ([]db.ProductHit, error)
+func SearchProducts(ctx context.Context, exec pgb.DBTX, q core.Expr,
+    limit int, projections ...core.Expr) ([]db.ProductHit, error)
 ```
 
 ## Worked example — score, snippet, highlight
@@ -31,14 +32,17 @@ q := db.And(
 )
 
 hits, err := db.SearchProducts(ctx, pool, q, 20,
-    db.Products.Description().Snippet(pgb.StartTag("<em>"), pgb.MaxChars(150)),
-    db.Products.Title().Highlight(pgb.StartTag("<strong>"), pgb.EndTag("</strong>")),
+    db.Products.Description().Snippet(
+        pgb.StartTag("<em>"), pgb.MaxChars(150)),
+    db.Products.Title().Highlight(pgb.StartTag("<strong>"),
+        pgb.EndTag("</strong>")),
 )
 if err != nil {
     return err
 }
 for _, h := range hits {
-    fmt.Printf("%.3f  %s  %s\n", h.Score, h.Product.Title, h.Snippet["description"])
+    fmt.Printf("%.3f  %s  %s\n",
+        h.Score, h.Product.Title, h.Snippet["description"])
 }
 ```
 
@@ -46,8 +50,10 @@ for _, h := range hits {
 SELECT id, seller_id, title, description, category, rating,
        price_cents, in_stock, metadata, created_at,
        pdb.score(id) AS score,
-       pdb.snippet(description, start_tag => '<em>', max_num_chars => 150) AS snip,
-       pdb.highlight(title, start_tag => '<strong>', end_tag => '</strong>') AS hl
+       pdb.snippet(description, start_tag => '<em>',
+                   max_num_chars => 150) AS snip,
+       pdb.highlight(title, start_tag => '<strong>',
+                     end_tag => '</strong>') AS hl
 FROM products
 WHERE (title ||| $1::pdb.boost(2) AND description ||| $2)
 ORDER BY pdb.score(id) DESC, id ASC
@@ -62,8 +68,10 @@ Snippet and highlight options that are developer constants (the tags) are emitte
 type ProductHit struct {
     Product   db.Product
     Score     float64
-    Snippet   map[string]string // one entry per snippet'd column — "description" here
-    Highlight map[string]string // one entry per highlighted column — "title" here
+    Snippet   map[string]string // one entry per snippet'd column —
+                                // "description" here
+    Highlight map[string]string // one entry per highlighted
+                                // column — "title" here
 }
 ```
 

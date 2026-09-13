@@ -25,7 +25,8 @@ if errors.Is(err, pgb.ErrNotFound) {
     return err
 }
 if err != nil {
-    return err   // transport, context, scan — something else went wrong
+    return err   // transport, context, scan —
+    // something else went wrong
 }
 ```
 
@@ -50,7 +51,8 @@ On builders, `.AllowAll()` is the deliberate opt-in for a table-wide statement:
 
 ```go
 n, err := db.Users.Delete().AllowAll().Exec(ctx, pool)
-fmt.Println("deleted", n)   // every row — call it on purpose or not at all
+fmt.Println("deleted", n)   // every row — call it on purpose
+                            // or not at all
 ```
 
 ### pgb.ErrCursorMismatch
@@ -64,7 +66,8 @@ page, next, more, err := db.Users.Select().
 if errors.Is(err, pgb.ErrCursorMismatch) {
     page, next, more, err = db.Users.Select().
         OrderBy(db.Users.ID().Asc()).
-        Page(ctx, pool, pgb.CursorOf(""), 50)   // restart without the stale token
+        Page(ctx, pool, pgb.CursorOf(""), 50)
+        // restart without the stale token
 }
 ```
 
@@ -98,7 +101,8 @@ var pgErr *pgconn.PgError
 if errors.As(err, &pgErr) {
     switch pgErr.Code {
     case "23505":
-        fmt.Println("unique:", pgErr.ConstraintName)   // e.g. users_email_key
+        // e.g. users_email_key
+        fmt.Println("unique:", pgErr.ConstraintName)
     case "23503":
         fmt.Println("foreign key:", pgErr.ConstraintName)
     case "23514":
@@ -112,9 +116,12 @@ if errors.As(err, &pgErr) {
 For collisions a caller can resolve — a slug, a username, a generated email — the pattern is a bounded retry that mutates the colliding value:
 
 ```go
-// reserveSeat inserts a user keyed on users_email_key; on a racing collision
-// it retries with an incremented suffix instead of failing the request.
-func reserveSeat(ctx context.Context, pool *pgxpool.Pool, name string) (db.User, error) {
+// reserveSeat inserts a user keyed on users_email_key; on a
+// racing collision it retries with an incremented suffix
+// instead of failing the request.
+func reserveSeat(
+    ctx context.Context, pool *pgxpool.Pool, name string,
+) (db.User, error) {
     email := name + "@corp.io"
     for attempt := 0; ; attempt++ {
         u, err := db.InsertUser(ctx, pool, db.InsertUserParams{
@@ -138,7 +145,8 @@ func reserveSeat(ctx context.Context, pool *pgxpool.Pool, name string) (db.User,
 ```sql
 INSERT INTO public.users (email, name, tags)
 VALUES ($1, $2, $3)
-RETURNING id, email, name, bio, metadata, tags, created_at, last_login_at
+RETURNING id, email, name, bio, metadata, tags,
+          created_at, last_login_at
 ```
 
 <Tip>
@@ -155,7 +163,8 @@ If the conflict should resolve to "load the existing row instead", skip the retr
 A row of NULLs is a legitimate result, not an absence. The trap runs the other way too: hand-written aggregates always return exactly one row, so `ErrNotFound` never fires for them, and wrapping a missing value in `COALESCE` converts absence into a value you can no longer distinguish:
 
 ```go
-// max(total) returns one row even on an empty table — NULL, not ErrNotFound
+// max(total) returns one row even on an empty table —
+// NULL, not ErrNotFound
 rows, err := db.Orders.Select().
     Cols(core.Raw("max(total) AS max_total")).
     Rows(ctx, pool)
@@ -289,7 +298,11 @@ defer pool.Close()
 One logged line for `ListUsers`:
 
 ```text
-sql=SELECT id, email, name, bio, metadata, tags, created_at, last_login_at FROM public.users WHERE email LIKE $1 AND created_at > $2 LIMIT $3 args=[%@corp.io 2026-09-01 00:00:00 +0000 UTC 20] took=1.4ms err=<nil>
+sql=SELECT id, email, name, bio, metadata, tags, created_at,
+    last_login_at
+    FROM public.users WHERE email LIKE $1 AND created_at > $2 LIMIT $3
+    args=[%@corp.io 2026-09-01 00:00:00 +0000 UTC 20]
+    took=1.4ms err=<nil>
 ```
 
 <Note>

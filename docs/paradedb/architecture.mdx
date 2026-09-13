@@ -81,12 +81,14 @@ INSERT INTO products (id, title, description, rating)
 SELECT g, 'Item ' || g, 'a searchable description for item ' || g, 4.0
 FROM generate_series(1, 400) g;
 
--- statement 2: 500 more rows — still the same mutable segment (900 rows buffered)
+-- statement 2: 500 more rows — still the same mutable segment
+-- (900 rows buffered)
 INSERT INTO products (id, title, description, rating)
 SELECT g, 'Item ' || g, 'a searchable description for item ' || g, 4.5
 FROM generate_series(401, 900) g;
 
--- statement 3: rows 901-1000 freeze the mutable segment into an immutable one;
+-- statement 3: rows 901-1000 freeze the mutable segment
+-- into an immutable one;
 -- rows 1001-1400 open the next mutable segment
 INSERT INTO products (id, title, description, rating)
 SELECT g, 'Item ' || g, 'a searchable description for item ' || g, 3.8
@@ -131,8 +133,8 @@ LIMIT 10;
 ```
 
 ```ini
-Limit  (cost=10.00..10.02 rows=3 width=552)
-  ->  Custom Scan (ParadeDB Base Scan) on products  (cost=10.00..10.02 rows=3 width=552)
+Limit  (cost=10.00..10.02 rows=3)
+  ->  Custom Scan (ParadeDB Base Scan) on products  (rows=3)
         Table: products
         Index: products_search
         Segment Count: 3
@@ -140,7 +142,8 @@ Limit  (cost=10.00..10.02 rows=3 width=552)
         Scores: true
            TopK Order By: pdb.score(id) DESC
            TopK Limit: 10
-        Tantivy Query: {"with_index":{"query":{"match":{"field":"description","value":"running shoes"}}}}
+        Tantivy Query: {"with_index":{"query":{"match":{
+          "field":"description","value":"running shoes"}}}}
 ```
 
 The contrast, same table and same index, but **no ParadeDB operator in the query**:

@@ -24,9 +24,9 @@ type Table struct {
     Comment      string
     Columns      []Column
     PrimaryKey   []string
-    Uniques      [][]string     // incl. WITHOUT OVERLAPS (flagged temporal)
+    Uniques      [][]string     // incl. WITHOUT OVERLAPS (temporal)
     ForeignKeys  []ForeignKey   // detected, kept inert in v1
-    Search       *SearchIndex   // non-nil iff a USING paradedb/bm25 index exists
+    Search       *SearchIndex   // non-nil iff a paradedb index exists
 }
 
 type Column struct {
@@ -36,8 +36,9 @@ type Column struct {
     IsArray     bool
     HasDefault  bool
     DefaultExpr string
-    Generated   string       // "stored" | "virtual" (PG18 virtual = default kind)
-    IsTemporal  bool         // participates in a WITHOUT OVERLAPS constraint
+    // "stored" | "virtual" (PG18 virtual = default kind)
+    Generated   string
+    IsTemporal  bool         // participates in WITHOUT OVERLAPS
     Comment     string
 }
 
@@ -51,10 +52,12 @@ type SearchIndex struct {
 
 type SearchField struct {
     Column    string
-    Path      string          // "metadata->'color'" when a JSON path is indexed
+    Path      string          // "metadata->'color'" for a JSON path
     Alias     string          // alias=json_color
-    Tokenizer string          // icu | simple(stemmer=english) | literal | ngram(3,3) | fast=...
-    PGType    string          // text | numeric | timestamp | boolean | jsonb | range | array
+    // icu | simple(stemmer=english) | literal | ngram(3,3) | fast=...
+    Tokenizer string
+    // text | numeric | timestamp | boolean | jsonb | range | array
+    PGType    string
 }
 ```
 
@@ -79,9 +82,11 @@ ir.Table{
     Name:       "tags",
     PrimaryKey: []string{"id"},
     Columns: []ir.Column{
-        {Name: "id",    PGType: "int8", NotNull: true, HasDefault: true, DefaultExpr: "nextval('tags_id_seq'::regclass)"},
+        {Name: "id",    PGType: "int8", NotNull: true, HasDefault: true,
+            DefaultExpr: "nextval('tags_id_seq'::regclass)"},
         {Name: "name",  PGType: "text", NotNull: true},
-        {Name: "color", PGType: "text", NotNull: true, HasDefault: true, DefaultExpr: "'gray'", Comment: "pgb:no_filter"},
+        {Name: "color", PGType: "text", NotNull: true, HasDefault: true,
+            DefaultExpr: "'gray'", Comment: "pgb:no_filter"},
     },
     // Search: nil — no USING paradedb index on this table
 }
@@ -133,9 +138,11 @@ ir.Schema{
             PrimaryKey: []string{"id"},
             Uniques:    [][]string{{"email"}},
             Columns: []ir.Column{
-                {Name: "id",    PGType: "int8", NotNull: true, HasDefault: true, DefaultExpr: "nextval('users_id_seq'::regclass)"},
+                {Name: "id",    PGType: "int8",
+                    NotNull: true, HasDefault: true,
+                    DefaultExpr: "nextval('users_id_seq'::regclass)"},
                 {Name: "email", PGType: "text", NotNull: true},
-                {Name: "bio",   PGType: "text", Comment: "pgb:no_patch"},
+                {Name: "bio", PGType: "text", Comment: "pgb:no_patch"},
             },
             ForeignKeys: nil,
             Search:      nil, // no USING paradedb index on users
@@ -145,23 +152,34 @@ ir.Schema{
             Name:       "products",
             PrimaryKey: []string{"id"},
             Columns: []ir.Column{
-                {Name: "id",          PGType: "int8", NotNull: true, HasDefault: true, DefaultExpr: "nextval('products_id_seq'::regclass)"},
-                {Name: "user_id",     PGType: "int8", NotNull: true},
+                {Name: "id",          PGType: "int8",
+                    DefaultExpr: "nextval('products_id_seq'::regclass)",
+                    NotNull: true, HasDefault: true},
+                {Name: "user_id", PGType: "int8", NotNull: true},
                 {Name: "title",       PGType: "text", NotNull: true},
                 {Name: "description", PGType: "text", NotNull: true},
-                {Name: "rating",      PGType: "int4", NotNull: true, HasDefault: true, DefaultExpr: "0"},
+                {Name: "rating",      PGType: "int4",
+                    NotNull: true, HasDefault: true, DefaultExpr: "0"},
             },
             // detected from REFERENCES, kept inert in v1
-            ForeignKeys: []ir.ForeignKey{{Columns: []string{"user_id"}, RefTable: "users", RefColumns: []string{"id"}}},
+            ForeignKeys: []ir.ForeignKey{{
+                Columns:    []string{"user_id"},
+                RefTable:   "users",
+                RefColumns: []string{"id"},
+            }},
             Search: &ir.SearchIndex{
                 Name:     "products_search",
                 Using:    "paradedb",
                 KeyField: "id",
                 Fields: []ir.SearchField{
-                    {Column: "id"},                                          // key field
-                    {Column: "title", PGType: "text"},                       // no cast → default tokenizer (unicode)
-                    {Column: "description", Tokenizer: "icu", PGType: "text"},
-                    {Column: "rating", PGType: "numeric"},                   // numeric family → fast field; int4range casts on search-side ranges
+                    {Column: "id"}, // key field
+                    // no cast → default tokenizer (unicode)
+                    {Column: "title", PGType: "text"},
+                    {Column: "description", Tokenizer: "icu",
+                        PGType: "text"},
+                    // numeric family → fast field;
+                    // int4range casts on search-side ranges
+                    {Column: "rating", PGType: "numeric"},
                 },
                 Options: map[string]string{"key_field": "id"},
             },
@@ -196,10 +214,11 @@ Failure policy: if oliphant cannot parse a statement the sqlc catalog already re
 Ride in `COMMENT ON` statements so they are valid DDL:
 
 ```sql
-COMMENT ON TABLE  users            IS 'pgb:skip';              -- no codegen for this table
-COMMENT ON COLUMN users.password   IS 'pgb:no_filter';         -- not exposed as a predicate
-COMMENT ON COLUMN users.bio        IS 'pgb:no_patch';          -- excluded from Update sets
-COMMENT ON COLUMN users.embedding  IS 'pgb:type=github.com/pgvector/pgvector-go.Vector';
+COMMENT ON TABLE  users            IS 'pgb:skip';      -- no codegen
+COMMENT ON COLUMN users.password   IS 'pgb:no_filter'; -- no predicate
+COMMENT ON COLUMN users.bio        IS 'pgb:no_patch';  -- no Update set
+COMMENT ON COLUMN users.embedding  IS
+    'pgb:type=github.com/pgvector/pgvector-go.Vector';
 COMMENT ON COLUMN users.metadata   IS 'pgb:type=map[string]any';
 ```
 

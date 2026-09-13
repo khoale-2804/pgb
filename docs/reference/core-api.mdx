@@ -15,8 +15,10 @@ type Expr interface{ emit(*emitter) }
 
 type Col   struct{ Table, Name string }
 type Lit   struct{ V any; Cast string }
-type Bin   struct{ Op string; L, R Expr }             // any operator: =, >, |||, ===, @@@, ##, <=>
-type Call  struct{ Fn string; Args []Expr; Named []NamedArg }   // pdb.snippet(col, start_tag => ...)
+// any operator: =, >, |||, ===, @@@, ##, <=>
+type Bin   struct{ Op string; L, R Expr }
+// pdb.snippet(col, start_tag => ...)
+type Call  struct{ Fn string; Args []Expr; Named []NamedArg }
 type Cast  struct{ E Expr; To string }
 type And   struct{ Parts []Expr }
 type Or    struct{ Parts []Expr }
@@ -37,14 +39,16 @@ cheap, err := db.Products.Select().
     Where(
         db.Products.Description().Match("shoes"),              // $1
         core.Raw("rating > $1 AND created_at > now() - $2::interval",
-            minRating, window),                                // renumbered to $2, $3
+            minRating, window),                            // renumbered
+                                                           // to $2, $3
     ).
     OrderBy(db.Products.ID().Asc()).
     All(ctx, pool)
 ```
 
 ```sql
-SELECT id, seller_id, title, description, category, rating, price_cents, in_stock, metadata, created_at, embedding
+SELECT id, seller_id, title, description, category, rating, price_cents,
+       in_stock, metadata, created_at, embedding
 FROM public.products
 WHERE description ||| $1
   AND rating > $2 AND created_at > now() - $3::interval
@@ -95,9 +99,11 @@ User-controlled values go in `Args`, never interpolated into the SQL string. The
 
 ```go
 type DBTX interface {
-    Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+    Query(ctx context.Context, sql string,
+        args ...any) (pgx.Rows, error)
     QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
-    Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+    Exec(ctx context.Context, sql string,
+        args ...any) (pgconn.CommandTag, error)
 }
 ```
 
@@ -106,13 +112,15 @@ type DBTX interface {
 ## Transactions
 
 ```go
-func WithTx[T any](ctx context.Context, db DBTX, fn func(DBTX) (T, error)) (T, error)
+func WithTx[T any](ctx context.Context, db DBTX,
+    fn func(DBTX) (T, error)) (T, error)
 ```
 
 The contract is one line: the closure returns `nil` and `WithTx` commits; it returns an error and `WithTx` rolls back. Inside, every generated function takes the handed `DBTX` — statics, builders, and handwritten wrappers all run on `tx` unchanged:
 
 ```go
-func ShipOrder(ctx context.Context, pool *pgxpool.Pool, orderID int64) (db.Order, error) {
+func ShipOrder(ctx context.Context, pool *pgxpool.Pool,
+    orderID int64) (db.Order, error) {
     return pgb.WithTx(ctx, pool, func(tx pgb.DBTX) (db.Order, error) {
         o, err := db.Orders.Select().
             Where(db.Orders.ID().Eq(orderID)).
@@ -122,7 +130,8 @@ func ShipOrder(ctx context.Context, pool *pgxpool.Pool, orderID int64) (db.Order
             return db.Order{}, err // → ROLLBACK
         }
         if o.Status != "paid" {
-            return db.Order{}, fmt.Errorf("order %d is %q, not paid", o.ID, o.Status)
+            return db.Order{}, fmt.Errorf(
+                "order %d is %q, not paid", o.ID, o.Status)
         }
         updated, err := db.Orders.Update().
             Set(db.OrderSet{Status: pgb.Set("shipped")}).
@@ -133,10 +142,12 @@ func ShipOrder(ctx context.Context, pool *pgxpool.Pool, orderID int64) (db.Order
             return db.Order{}, err // → ROLLBACK
         }
         _, err = db.UpdateUser(ctx, tx, updated[0].UserID, db.UserSet{
-            LastLoginAt: pgb.Set(pgtype.Timestamptz{Time: time.Now(), Valid: true}),
+            LastLoginAt: pgb.Set(pgtype.Timestamptz{
+                Time: time.Now(), Valid: true}),
         })
         if err != nil {
-            return db.Order{}, err // → ROLLBACK — including the shipped status
+            return db.Order{}, err // → ROLLBACK — including
+                                   // the shipped status
         }
         return updated[0], nil // nil error → COMMIT, all three writes
     })
@@ -150,7 +161,8 @@ FROM public.orders WHERE id = $1 FOR UPDATE;
 UPDATE public.orders SET status = $1 WHERE id = $2
 RETURNING id, tenant_id, user_id, status, total, placed_at;
 UPDATE public.users SET last_login_at = $1 WHERE id = $2
-RETURNING id, email, name, bio, metadata, tags, created_at, last_login_at;
+RETURNING id, email, name, bio, metadata, tags, created_at,
+          last_login_at;
 COMMIT;
 -- any error before COMMIT → ROLLBACK, all writes undone
 ```
@@ -186,7 +198,8 @@ case err != nil:
 ```go
 _, err := db.Users.Delete().Exec(ctx, pool) // no Where
 if errors.Is(err, pgb.ErrNoWhere) {
-    // refused before any SQL was sent — pass a predicate or AllowAll()
+    // refused before any SQL was sent — pass a predicate
+    // or AllowAll()
 }
 ```
 
@@ -195,7 +208,8 @@ page, _, _, err := db.Users.Select().
     OrderBy(db.Users.ID().Asc()).
     Page(ctx, pool, pgb.CursorOf(prev), 50)
 if errors.Is(err, pgb.ErrCursorMismatch) {
-    // token from a different sort key or a stale codegen — restart without it
+    // token from a different sort key or a stale codegen —
+    // restart without it
     page, _, _, err = db.Users.Select().
         OrderBy(db.Users.ID().Asc()).
         Page(ctx, pool, pgb.CursorOf(""), 50)

@@ -41,10 +41,12 @@ For a table `users`, `db/users.gen.go` contains:
 // Descriptors — package-level, immutable
 var Users = newUserTable("public", "users")
 
-func (t UserTable) ID() UserIDCol             // typed wrapper around core.Col
+func (t UserTable) ID() UserIDCol             // typed wrapper
+                                              // around core.Col
 func (t UserTable) Email() UserEmailCol
 func (t UserTable) CreatedAt() UserCreatedAtCol
-func (t UserTable) Score() core.Expr          // pdb.score(id) — only for bm25 tables
+func (t UserTable) Score() core.Expr          // pdb.score(id) —
+                                              // only for bm25 tables
 ```
 
 ## Predicates, by column type family
@@ -57,16 +59,20 @@ func (c UserIDCol) In(vs ...int64) core.Expr
 func (c UserIDCol) IsNull() core.Expr          // / NotNull()
 
 // ordered types (ints, floats, numerics, timestamps, dates)
-func (c UserCreatedAtCol) Gt(v time.Time) core.Expr        // Lt Lte Gte Between
+func (c UserCreatedAtCol) Gt(v time.Time) core.Expr        // Lt Lte Gte
+                                                           // Between
 
 // text types
-func (c UserEmailCol) Like(p string) core.Expr             // ILike NotLike
+func (c UserEmailCol) Like(p string) core.Expr             // ILike
+                                                           // NotLike
 
 // jsonb types
-func (c UserMetadataCol) KeyEq(path string, v any) core.Expr   // metadata->>$2 = $3
+// metadata->>$2 = $3
+func (c UserMetadataCol) KeyEq(path string, v any) core.Expr
 
 // array types
-func (c UserTagsCol) Contains(v []string) core.Expr            // tags @> $1::text[]
+// tags @> $1::text[]
+func (c UserTagsCol) Contains(v []string) core.Expr
 
 // bm25 columns only — see the ParadeDB section
 func (c UserBioCol) Match(q string) core.Expr
@@ -149,7 +155,8 @@ latest, err := db.Orders.Select().
 ```
 
 ```sql
-SELECT DISTINCT ON (user_id) id, tenant_id, user_id, status, total, placed_at
+SELECT DISTINCT ON (user_id)
+    id, tenant_id, user_id, status, total, placed_at
 FROM public.orders
 WHERE status = $1
 ORDER BY user_id ASC, placed_at DESC
@@ -186,7 +193,9 @@ defer rows.Close()
 var spend []TenantSpend
 for rows.Next() {
     var s TenantSpend
-    if err := rows.Scan(&s.TenantID, &s.OrderCount, &s.Revenue); err != nil {
+    if err := rows.Scan(
+        &s.TenantID, &s.OrderCount, &s.Revenue,
+    ); err != nil {
         return err
     }
     spend = append(spend, s)
@@ -361,7 +370,8 @@ updated, err := db.Users.Update().
 UPDATE public.users
 SET bio = $1
 WHERE tags @> $2::text[]
-RETURNING id, email, name, bio, metadata, tags, created_at, last_login_at
+RETURNING id, email, name, bio, metadata, tags,
+          created_at, last_login_at
 ```
 
 ```go

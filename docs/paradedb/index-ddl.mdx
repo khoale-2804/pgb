@@ -10,7 +10,8 @@ sqlc's plugin protocol drops `CREATE INDEX` entirely — the plugin receives no 
 
 ```sql
 CREATE INDEX products_search ON products USING paradedb
-  (id, description::pdb.icu, (metadata->'color')::pdb.literal('alias=json_color'), rating)
+  (id, description::pdb.icu,
+   (metadata->'color')::pdb.literal('alias=json_color'), rating)
   WITH (key_field='id');
 ```
 
@@ -24,7 +25,8 @@ SearchIndex{
     Fields: []SearchField{
         {Column: "id"},
         {Column: "description", Tokenizer: "icu", PGType: "text"},
-        {Path: "metadata->'color'", Alias: "json_color", Tokenizer: "literal", PGType: "jsonb"},
+        {Path: "metadata->'color'", Alias: "json_color",
+         Tokenizer: "literal", PGType: "jsonb"},
         {Column: "rating", PGType: "numeric"},
     },
 }
@@ -54,9 +56,9 @@ CREATE TABLE products (
 
 CREATE INDEX products_search ON products USING paradedb
   (id,
-   sku::pdb.literal,                                        -- one token per value; the === family
+   sku::pdb.literal,         -- one token per value; the === family
    title::pdb.simple('stemmer=english', 'ascii_folding=true'),
-   description::pdb.icu,                                    -- robust multilingual segmentation
+   description::pdb.icu,     -- robust multilingual segmentation
    (metadata->'brand')::pdb.literal('alias=json_brand'),
    (metadata->'color')::pdb.literal('alias=json_color'),
    rating,
@@ -74,10 +76,14 @@ SearchIndex{
     Fields: []SearchField{
         {Column: "id"},
         {Column: "sku", Tokenizer: "literal", PGType: "text"},
-        {Column: "title", Tokenizer: "simple", Options: "stemmer=english, ascii_folding=true", PGType: "text"},
+        {Column: "title", Tokenizer: "simple",
+         Options: "stemmer=english, ascii_folding=true",
+         PGType: "text"},
         {Column: "description", Tokenizer: "icu", PGType: "text"},
-        {Path: "metadata->'brand'", Alias: "json_brand", Tokenizer: "literal", PGType: "jsonb"},
-        {Path: "metadata->'color'", Alias: "json_color", Tokenizer: "literal", PGType: "jsonb"},
+        {Path: "metadata->'brand'", Alias: "json_brand",
+         Tokenizer: "literal", PGType: "jsonb"},
+        {Path: "metadata->'color'", Alias: "json_color",
+         Tokenizer: "literal", PGType: "jsonb"},
         {Column: "rating", PGType: "numeric"},
         {Column: "in_stock", PGType: "boolean"},
     },
@@ -95,8 +101,10 @@ CREATE TABLE docs (
 
 CREATE INDEX docs_search ON docs USING paradedb
   (id,
-   title::pdb.simple('stemmer=english'),                    -- un-aliased: the field's primary identity
-   title::pdb.edge_ngram(2, 12, 'alias=title_autocomplete'), -- search-as-you-type variant
+   -- un-aliased: the field's primary identity
+   title::pdb.simple('stemmer=english'),
+   -- search-as-you-type variant
+   title::pdb.edge_ngram(2, 12, 'alias=title_autocomplete'),
    body::pdb.simple('stemmer=english', 'ascii_folding=true'))
   WITH (key_field='id');
 ```
@@ -115,9 +123,9 @@ CREATE TABLE articles (
 
 CREATE INDEX articles_search ON articles USING paradedb
   (id,
-   title::pdb.unicode_words,     -- explicit spelling of the default tokenizer
+   title::pdb.unicode_words, -- explicit form of the default tokenizer
    body::pdb.unicode_words,
-   embedding vector_cosine_ops)  -- L2 is the default metric; cosine here
+   embedding vector_cosine_ops) -- L2 is the default metric; cosine here
   WITH (key_field='id');
 ```
 
@@ -158,9 +166,9 @@ WHERE index_relid = 'products_search'::regclass;
 ```
 
 ```ini
-     phase      | blocks_done | blocks_total | tuples_done | tuples_total
-----------------+-------------+--------------+-------------+--------------
- building index |      412348 |       611900 |     1832000 |      2741000
+     phase      | blocks_done | blocks_total | tuples_done
+----------------+-------------+--------------+-------------
+ building index |      412348 |       611900 |     1832000
 ```
 
 <Note>

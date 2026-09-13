@@ -11,7 +11,9 @@ Aggregations run through `pdb.agg`, which takes an Elasticsearch-compatible aggr
 Generated search builders expose a raw passthrough today, listed as `.Agg(json)` in the [predicates](/paradedb/predicates) table. The chain terminates with `.One(ctx, exec)`, which returns the response document as `json.RawMessage`:
 
 ```go
-res, err := db.Products.Search().ForceIndex().Agg(`{"terms": {"field": "category"}}`).One(ctx, pool)
+res, err := db.Products.Search().ForceIndex().
+    Agg(`{"terms": {"field": "category"}}`).
+    One(ctx, pool)
 // SELECT pdb.agg($1::jsonb) FROM products WHERE id @@@ pdb.all()
 ```
 
@@ -20,7 +22,9 @@ The JSON is emitted verbatim and validated server-side, where pg_search parses i
 Predicates chain before `.Agg`, so the aggregation runs over the filtered set:
 
 ```go
-res, err := db.Products.Search().Match("shoes").Agg(`{"terms": {"field": "category"}}`).One(ctx, pool)
+res, err := db.Products.Search().Match("shoes").
+    Agg(`{"terms": {"field": "category"}}`).
+    One(ctx, pool)
 // SELECT pdb.agg($2::jsonb) FROM products WHERE description ||| $1
 ```
 
@@ -84,9 +88,12 @@ The response comes back verbatim as `json.RawMessage`, one row, one column:
 ```json
 {
   "buckets": [
-    { "key": "shoes",   "doc_count": 412, "avg_rating": { "value": 4.3 } },
-    { "key": "boots",   "doc_count": 187, "avg_rating": { "value": 4.1 } },
-    { "key": "sandals", "doc_count": 95,  "avg_rating": { "value": 3.8 } }
+    { "key": "shoes", "doc_count": 412,
+      "avg_rating": { "value": 4.3 } },
+    { "key": "boots", "doc_count": 187,
+      "avg_rating": { "value": 4.1 } },
+    { "key": "sandals", "doc_count": 95,
+      "avg_rating": { "value": 3.8 } }
   ]
 }
 ```
@@ -119,9 +126,21 @@ WHERE id @@@ pdb.all();
 ```json
 {
   "buckets": [
-    { "key_as_string": "2026-07", "doc_count": 1321, "revenue": { "value": 89421.5 } },
-    { "key_as_string": "2026-08", "doc_count": 1544, "revenue": { "value": 101233.75 } },
-    { "key_as_string": "2026-09", "doc_count": 610,  "revenue": { "value": 41290.0 } }
+    {
+      "key_as_string": "2026-07",
+      "doc_count": 1321,
+      "revenue": { "value": 89421.5 }
+    },
+    {
+      "key_as_string": "2026-08",
+      "doc_count": 1544,
+      "revenue": { "value": 101233.75 }
+    },
+    {
+      "key_as_string": "2026-09",
+      "doc_count": 610,
+      "revenue": { "value": 41290.0 }
+    }
   ]
 }
 ```
@@ -190,13 +209,15 @@ q := db.Products.Description().Match("running shoes")
 // the page — top 12 hits
 hits, err := db.SearchProducts(ctx, pool, q, 12)
 
-// the sidebar — category counts, with colors and price stats nested per category
+// the sidebar — category counts, with colors and price
+// stats nested per category
 facets, err := db.Products.Search().Match("running shoes").Agg(`{
   "terms": {
     "field": "category",
     "size": 10,
     "aggs": {
-      "colors":      { "terms": { "field": "metadata->'color'", "size": 8 } },
+      "colors": { "terms": { "field": "metadata->'color'",
+                             "size": 8 } },
       "price_stats": { "stats": { "field": "price_cents" } }
     }
   }
@@ -218,7 +239,8 @@ Faceting on a dimension you also filter on collapses that facet — filter on th
 
 ```go
 res, err := db.Products.Search().ForceIndex().
-    Agg(`{"terms": {"field": "category"}}`, pgb.Visibility("threshold")).
+    Agg(`{"terms": {"field": "category"}}`,
+        pgb.Visibility("threshold")).
     One(ctx, pool)
 ```
 
@@ -262,8 +284,10 @@ res, err := db.AggregateProducts(ctx, pool,
         pgb.Avg("rating").As("avg_rating"),
     ),
 )
-// emits: SELECT pdb.agg($1::jsonb) FROM products WHERE description ||| $2
-//        $1 = {"terms":{"field":"category","aggs":{"avg_rating":{"avg":{"field":"rating"}}}}}
+// emits: SELECT pdb.agg($1::jsonb) FROM products
+//        WHERE description ||| $2
+//        $1 = {"terms":{"field":"category",
+//              "aggs":{"avg_rating":{"avg":{"field":"rating"}}}}}
 ```
 
 Typed descriptors turn misspelled field names into compile errors instead of server-side JSON errors, and the parameter binding keeps the document out of the SQL text.

@@ -7,23 +7,23 @@ icon: "book-open"
 ## Pipeline
 
 ```
-schema.sql (+ queries.sql)                       sqlc.yaml (options = pgb config)
-     │                                                │
-     ▼                                                ▼
-┌───────────────────────────  sqlc  ───────────────────────────────┐
-│  parse (libpg_query 18 via sqlc-dev/oliphant)                    │
-│  analyze → catalog (tables/columns/types) + resolved queries     │
-└──────────────┬───────────────────────────────────────────────────┘
+schema.sql (+ queries.sql)             sqlc.yaml (options = pgb config)
+     │                                      │
+     ▼                                      ▼
+┌----------------------------  sqlc  ----------------------------┐
+│  parse (libpg_query 18 via sqlc-dev/oliphant)                  │
+│  analyze → catalog (tables/columns/types) + resolved queries   │
+└--------------┬-------------------------------------------------┘
                │ GenerateRequest (protobuf, stdin)
                ▼
-┌───────────────────────────  pgb plugin  ─────────────────────────┐
-│ 1. build SchemaIR:  catalog proto + oliphant re-parse of the     │
-│    schema files (index DDL, generated columns, COMMENT ON        │
-│    directives — none of which survive into the proto)            │
-│ 2. pass A: models + handwritten-query wrappers                   │
-│ 3. pass B: descriptors + builders          (stage 1)             │
-│ 4. pass C: static functions + search layer (stage 2)             │
-└──────────────┬───────────────────────────────────────────────────┘
+┌-------------------------  pgb plugin  -------------------------┐
+│ 1. build SchemaIR:  catalog proto + oliphant re-parse of the   │
+│    schema files (index DDL, generated columns, COMMENT ON      │
+│    directives — none of which survive into the proto)          │
+│ 2. pass A: models + handwritten-query wrappers                 │
+│ 3. pass B: descriptors + builders          (stage 1)           │
+│ 4. pass C: static functions + search layer (stage 2)           │
+└--------------┬-------------------------------------------------┘
                │ GenerateResponse { File{name, contents} }
                ▼
 db/  — ONE generated package (config package: db), flat files:

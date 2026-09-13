@@ -10,7 +10,8 @@ Directives are the per-object annotation channel. They ride in `COMMENT ON` stat
 COMMENT ON TABLE  users            IS 'pgb:skip';
 COMMENT ON COLUMN users.password   IS 'pgb:no_filter';
 COMMENT ON COLUMN users.bio        IS 'pgb:no_patch';
-COMMENT ON COLUMN users.embedding  IS 'pgb:type=github.com/pgvector/pgvector-go.Vector';
+COMMENT ON COLUMN users.embedding  IS
+  'pgb:type=github.com/pgvector/pgvector-go.Vector';
 COMMENT ON COLUMN users.metadata   IS 'pgb:type=map[string]any';
 ```
 
@@ -32,7 +33,7 @@ CREATE TABLE articles (
     id          bigserial PRIMARY KEY,
     title       text        NOT NULL,
     body        text        NOT NULL,
-    secret_note text,                       -- never filtered, never patched
+    secret_note text,                   -- never filtered, never patched
     reviewer    text,
     embedding   vector(384)
 );
@@ -43,10 +44,12 @@ CREATE TABLE audit_log (
     at        timestamptz NOT NULL DEFAULT now()
 );
 
-COMMENT ON COLUMN articles.reviewer    IS 'internal QA notes — plain comment, not a directive';
+COMMENT ON COLUMN articles.reviewer    IS
+  'internal QA notes — plain comment, not a directive';
 COMMENT ON TABLE  audit_log            IS 'pgb:skip';
 COMMENT ON COLUMN articles.secret_note IS 'pgb:no_filter; pgb:no_patch';
-COMMENT ON COLUMN articles.embedding   IS 'pgb:type=github.com/pgvector/pgvector-go.Vector';
+COMMENT ON COLUMN articles.embedding   IS
+  'pgb:type=github.com/pgvector/pgvector-go.Vector';
 ```
 
 The generated surface, column by column:

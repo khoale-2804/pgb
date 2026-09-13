@@ -15,7 +15,7 @@ schema.sql + queries.sql + sqlc.yaml
 sqlc: parse + analyze (catalog, resolved queries)
         │  GenerateRequest (protobuf, stdin)
         ▼
-┌─ pgb plugin ─────────────────────────────────────────────┐
+┌- pgb plugin ---------------------------------------------┐
 │  0. build SchemaIR                                       │
 │       proto catalog  +  oliphant re-parse of the DDL     │
 │       (+ plugin IR enrichment: Table.Extensions[...])    │
@@ -24,7 +24,7 @@ sqlc: parse + analyze (catalog, resolved queries)
 │       (+ plugin method weaves, merged before writing)    │
 │  3. pass C — statics + search layer                      │
 │       (+ plugin static registrations, extra files)       │
-└───────────────────────────────────────────────────────────┘
+└-----------------------------------------------------------┘
         │  GenerateResponse (files on stdout)
         ▼
    db/*.gen.go — one package, one type map
@@ -124,12 +124,12 @@ One `db/` package; the filenames tell you which pass produced them:
 
 ```
 db/
-  models.gen.go           # pass A — one struct per table, shared by everything
-  users.gen.go            # pass B + C — descriptor, builders, statics for users
-  users_search.gen.go     # pass C — search layer; only for bm25-indexed tables
-  orders.sql.gen.go       # pass A — handwritten-query wrappers (queries.sql touching orders)
-  inventory.gen.go        # pass B + C — a table with no search index and no handwritten queries
-  ...                     # one <table>.gen.go per table, <table>_search.gen.go where indexed
+  models.gen.go         # pass A — one struct per table, shared by all
+  users.gen.go          # pass B + C — descriptor, builders, statics
+  users_search.gen.go   # pass C — search layer (bm25-indexed only)
+  orders.sql.gen.go     # pass A — handwritten wrappers (queries.sql)
+  inventory.gen.go      # pass B + C — neither search nor handwritten
+  ...                   # one file per table (+ _search where indexed)
 ```
 
 Plugin contributions land beside them as ordinary files naming the same package (`hypertables.gen.go` from a third-party plugin, `users_search.gen.go` from the paradedb layer).
@@ -156,7 +156,7 @@ The three passes expose exactly three hooks. Official plugins (like `pgb-paraded
 ```
 sqlc generate
   │
-  ├─ load: proto catalog + options ──────────────▶ SchemaIR
+  ├- load: proto catalog + options --------------▶ SchemaIR
   │
   ├─ [hook 1] IR enrichment
   │     plugins attach namespaced data:

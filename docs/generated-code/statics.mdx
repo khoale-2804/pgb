@@ -7,17 +7,57 @@ icon: "bolt"
 Stage 2 generates the static layer — the reason repetitive SQL never gets hand-written. Every function: explicit column lists, bound parameters, `pgb.ErrNotFound` sentinel wrapping `pgx.ErrNoRows`, tx-compatible via `pgb.DBTX`.
 
 ```go
-func GetUser(ctx context.Context, exec pgb.DBTX, id int64) (db.User, error)             // pgb.ErrNotFound
-func ListUsers(ctx context.Context, exec pgb.DBTX, f UserFilter, o ...pgb.ListOpt) ([]db.User, error)
-func CountUsers(ctx context.Context, exec pgb.DBTX, f UserFilter) (int64, error)
+func GetUser(
+    ctx context.Context,
+    exec pgb.DBTX,
+    id int64,
+) (db.User, error) // pgb.ErrNotFound
+func ListUsers(
+    ctx context.Context,
+    exec pgb.DBTX,
+    f UserFilter,
+    o ...pgb.ListOpt,
+) ([]db.User, error)
+func CountUsers(
+    ctx context.Context,
+    exec pgb.DBTX,
+    f UserFilter,
+) (int64, error)
 
-func InsertUser(ctx context.Context, exec pgb.DBTX, p InsertUserParams) (db.User, error)
-func InsertUsers(ctx context.Context, exec pgb.DBTX, ps []InsertUserParams) ([]db.User, error)
-func UpdateUser(ctx context.Context, exec pgb.DBTX, id int64, s UserSet) (db.User, error)
-func UpdateUsers(ctx context.Context, exec pgb.DBTX, where []core.Expr, s UserSet) (int64, error)
-func UpsertUser(ctx context.Context, exec pgb.DBTX, p InsertUserParams, o UpsertOpts) (db.User, error)
+func InsertUser(
+    ctx context.Context,
+    exec pgb.DBTX,
+    p InsertUserParams,
+) (db.User, error)
+func InsertUsers(
+    ctx context.Context,
+    exec pgb.DBTX,
+    ps []InsertUserParams,
+) ([]db.User, error)
+func UpdateUser(
+    ctx context.Context,
+    exec pgb.DBTX,
+    id int64,
+    s UserSet,
+) (db.User, error)
+func UpdateUsers(
+    ctx context.Context,
+    exec pgb.DBTX,
+    where []core.Expr,
+    s UserSet,
+) (int64, error)
+func UpsertUser(
+    ctx context.Context,
+    exec pgb.DBTX,
+    p InsertUserParams,
+    o UpsertOpts,
+) (db.User, error)
 func DeleteUser(ctx context.Context, exec pgb.DBTX, id int64) error
-func DeleteUsers(ctx context.Context, exec pgb.DBTX, where []core.Expr) (int64, error)
+func DeleteUsers(
+    ctx context.Context,
+    exec pgb.DBTX,
+    where []core.Expr,
+) (int64, error)
 ```
 
 ## Filters
@@ -31,7 +71,8 @@ type UserFilter struct {
     EmailLike    *string
     CreatedAfter *time.Time
     MetadataEq   map[string]any     // jsonb KeyEq shorthand
-    Extra        []core.Expr        // escape hatch — composes with generated filters
+    // escape hatch — composes with generated filters
+    Extra        []core.Expr
 }
 ```
 
@@ -59,7 +100,8 @@ fmt.Println(u.ID, u.CreatedAt.Time)   // RETURNING filled both in
 ```sql
 INSERT INTO public.users (email, name, bio, tags)
 VALUES ($1, $2, $3, $4)
-RETURNING id, email, name, bio, metadata, tags, created_at, last_login_at
+RETURNING id, email, name, bio, metadata, tags,
+          created_at, last_login_at
 ```
 
 Columns with defaults (`id`, `created_at`) are omitted from the column list; PG18 virtual generated columns are always omitted (both INSERT and UPDATE). Nullable columns with no default (`bio`, `metadata`, `tags`) stay in the list — their zero values bind as NULL.
@@ -85,7 +127,7 @@ WHERE id = $1
 ```go
 u, err = db.UpdateUser(ctx, pool, u.ID, db.UserSet{
     Email: pgb.Set("ada@newcorp.io"),
-    Bio:   pgb.Null[string](),   // cleared — see three-state sets below
+    Bio:   pgb.Null[string](), // cleared — see three-state sets below
 })
 if err != nil {
     return err
@@ -96,7 +138,8 @@ if err != nil {
 UPDATE public.users
 SET email = $1, bio = NULL
 WHERE id = $2
-RETURNING id, email, name, bio, metadata, tags, created_at, last_login_at
+RETURNING id, email, name, bio, metadata, tags,
+          created_at, last_login_at
 ```
 
 ### List
@@ -135,9 +178,12 @@ WHERE id = $1
 
 ```go
 inserted, err := db.InsertUsers(ctx, pool, []db.InsertUserParams{
-    {Email: "grace@corp.io", Name: "Grace Hopper", Tags: []string{"staff"}},
-    {Email: "alan@corp.io", Name: "Alan Turing", Tags: []string{"beta"}},
-    {Email: "edsger@corp.io", Name: "Edsger Dijkstra", Tags: []string{"beta", "speaker"}},
+    {Email: "grace@corp.io", Name: "Grace Hopper",
+        Tags: []string{"staff"}},
+    {Email: "alan@corp.io", Name: "Alan Turing",
+        Tags: []string{"beta"}},
+    {Email: "edsger@corp.io", Name: "Edsger Dijkstra",
+        Tags: []string{"beta", "speaker"}},
 })
 if err != nil {
     return err
@@ -147,8 +193,10 @@ fmt.Println(len(inserted), inserted[0].ID)   // all rows, ids included
 
 ```sql
 INSERT INTO public.users (email, name, bio, metadata, tags)
-SELECT * FROM unnest($1::text[], $2::text[], $3::text[], $4::jsonb[], $5::text[])
-RETURNING id, email, name, bio, metadata, tags, created_at, last_login_at
+SELECT * FROM unnest($1::text[], $2::text[], $3::text[],
+                      $4::jsonb[], $5::text[])
+RETURNING id, email, name, bio, metadata, tags,
+          created_at, last_login_at
 ```
 
 Each column becomes an array parameter; pgx encodes the Go slices natively, and `unnest` lines them back up into rows.
@@ -202,7 +250,8 @@ db.UpdateUser(ctx, pool, id, db.UserSet{
 UPDATE public.users
 SET email = $1, bio = NULL
 WHERE id = $2
-RETURNING id, email, name, bio, metadata, tags, created_at, last_login_at
+RETURNING id, email, name, bio, metadata, tags,
+          created_at, last_login_at
 ```
 
 `UpdateUsers` applies a set to every row matching composed predicates and returns the affected count:
@@ -229,7 +278,7 @@ u, err := db.UpsertUser(ctx, pool, db.InsertUserParams{
     Name:  "Ada Lovelace",
     Tags:  []string{"staff"},
 }, db.UpsertOpts{
-    Target: []string{"email"},                       // ON CONFLICT (email)
+    Target: []string{"email"}, // ON CONFLICT (email)
     Action: db.DoUpdate(db.UserSet{
         Name: pgb.Set("Ada King, Countess of Lovelace"),
     }),
@@ -242,7 +291,8 @@ VALUES ($1, $2, $3)
 ON CONFLICT (email) DO UPDATE
 SET name = EXCLUDED.name
 WHERE users.name IS DISTINCT FROM EXCLUDED.name
-RETURNING id, email, name, bio, metadata, tags, created_at, last_login_at
+RETURNING id, email, name, bio, metadata, tags,
+          created_at, last_login_at
 ```
 
 The generated `WHERE` on the `DO UPDATE` skips no-op writes — the row keeps its physical placement and nothing fires when the values didn't change. `db.DoNothing{}` is the other action, emitting `ON CONFLICT (email) DO NOTHING`.
@@ -257,7 +307,8 @@ db.UpsertOpts{Target: []string{"email"}, OnSelect: true}
 INSERT INTO public.users (email, name)
 VALUES ($1, $2)
 ON CONFLICT (email) DO SELECT
-RETURNING id, email, name, bio, metadata, tags, created_at, last_login_at
+RETURNING id, email, name, bio, metadata, tags,
+          created_at, last_login_at
 ```
 
 <Warning>
@@ -284,7 +335,9 @@ err := pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
         TenantID: 7,
         UserID:   u.ID,
         Status:   "paid",
-        Total:    pgtype.Numeric{Int: big.NewInt(12999), Exp: -2, Valid: true}, // 129.99
+        Total:    pgtype.Numeric{
+            Int: big.NewInt(12999), Exp: -2, Valid: true,
+        }, // 129.99
     })
     if err != nil {
         return err   // rollback — nothing was written
@@ -297,7 +350,8 @@ err := pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
 BEGIN;
 INSERT INTO public.users (email, name, tags)
 VALUES ($1, $2, $3)
-RETURNING id, email, name, bio, metadata, tags, created_at, last_login_at;
+RETURNING id, email, name, bio, metadata, tags,
+          created_at, last_login_at;
 INSERT INTO public.orders (tenant_id, user_id, status, total)
 VALUES ($1, $2, $3, $4)
 RETURNING id, tenant_id, user_id, status, total, placed_at;
@@ -321,12 +375,16 @@ o, err := pgb.WithTx(ctx, pool, func(tx pgb.DBTX) (db.Order, error) {
         return db.Order{}, pgb.ErrNotFound
     }
     _, err = db.UpdateUser(ctx, tx, updated[0].UserID, db.UserSet{
-        LastLoginAt: pgb.Set(pgtype.Timestamptz{Time: time.Now(), Valid: true}),
+        LastLoginAt: pgb.Set(pgtype.Timestamptz{
+            Time:  time.Now(),
+            Valid: true,
+        }),
     })
     if err != nil {
         return db.Order{}, err
     }
-    return updated[0], nil   // err == nil → committed; err != nil → rolled back
+    return updated[0], nil   // err == nil → committed;
+                             // err != nil → rolled back
 })
 ```
 

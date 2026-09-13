@@ -15,7 +15,8 @@ type emitter struct {
     sb     strings.Builder
     args   []any
     n      int      // parameters emitted so far
-    dialect Dialect // operator/function whitelist, core + registered extensions
+    // operator/function whitelist, core + registered extensions
+    dialect Dialect
 }
 
 func (e *emitter) param(v any, cast string) string {
@@ -53,11 +54,19 @@ The descriptors never see SQL — they build a tree:
 ```go
 core.And{Parts: []core.Expr{
     core.Or{Parts: []core.Expr{
-        core.Bin{Op: "LIKE", L: core.Col{Table: "public", Name: "users.email"}, R: core.Lit{V: "%@corp.io"}},
-        core.Bin{Op: "LIKE", L: core.Col{Table: "public", Name: "users.email"}, R: core.Lit{V: "%@example.com"}},
+        core.Bin{Op: "LIKE",
+            L: core.Col{Table: "public", Name: "users.email"},
+            R: core.Lit{V: "%@corp.io"}},
+        core.Bin{Op: "LIKE",
+            L: core.Col{Table: "public", Name: "users.email"},
+            R: core.Lit{V: "%@example.com"}},
     }},
-    core.Bin{Op: ">=", L: core.Col{Table: "public", Name: "users.last_login_at"}, R: core.Lit{V: since}},
-    core.Bin{Op: "@>", L: core.Col{Table: "public", Name: "users.tags"}, R: core.Lit{V: []string{"beta"}, Cast: "text[]"}},
+    core.Bin{Op: ">=",
+        L: core.Col{Table: "public", Name: "users.last_login_at"},
+        R: core.Lit{V: since}},
+    core.Bin{Op: "@>",
+        L: core.Col{Table: "public", Name: "users.tags"},
+        R: core.Lit{V: []string{"beta"}, Cast: "text[]"}},
 }}
 ```
 
@@ -124,7 +133,8 @@ The empty-slice case is the one that bites hand-rolled SQL — a naive `fmt.Spri
 
 ```go
 db.Products.Title().Match("shoes").Boost(2.0)
-// (title::pdb.boost(2.0)) ||| $1 — the cast is part of the tree, not the value
+// (title::pdb.boost(2.0)) ||| $1 — the cast is part of
+// the tree, not the value
 ```
 
 ## Determinism
@@ -192,11 +202,16 @@ A descriptor predicate physically cannot smuggle a value into the text: identifi
 The core emitter only emits operators and functions it knows. Plugin runtimes widen that vocabulary through a `DialectExtension` registration — operator tokens, function names, cast shapes — and the emitter validates against the union:
 
 ```go
-// the shape of the registration (see /future/plugins for the full system)
+// the shape of the registration
+// (see /future/plugins for the full system)
 pgb.RegisterDialect(pgb.DialectExtension{
     Operators: []string{"|||", "&&&", "###", "===", "@@@", "##", "##>"},
-    Functions: []string{"pdb.score", "pdb.match", "pdb.snippet", "pdb.agg"},
-    Casts:     []string{"pdb.fuzzy", "pdb.boost", "pdb.slop", "pdb.whitespace"},
+    Functions: []string{
+        "pdb.score", "pdb.match", "pdb.snippet", "pdb.agg",
+    },
+    Casts: []string{
+        "pdb.fuzzy", "pdb.boost", "pdb.slop", "pdb.whitespace",
+    },
 })
 ```
 

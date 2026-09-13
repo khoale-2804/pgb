@@ -58,18 +58,22 @@ CREATE TABLE documents (
     embedding  vector(384)
 );
 
-COMMENT ON COLUMN documents.embedding IS 'pgb:type=github.com/pgvector/pgvector-go.Vector';
+COMMENT ON COLUMN documents.embedding IS
+  'pgb:type=github.com/pgvector/pgvector-go.Vector';
 ```
 
 ```go
 type Document struct {
     ID        uuid.UUID          // uuid — github.com/google/uuid
-    Price     pgtype.Numeric     // numeric — exact decimal, never a float
+    Price     pgtype.Numeric     // numeric — exact decimal,
+                                 // never a float
     Note      pgtype.Text        // nullable text
-    Meta      []byte             // jsonb — raw bytes unless overridden
+    Meta      []byte             // jsonb — raw bytes
+                                 // unless overridden
     Tags      []string           // text[]
     UpdatedAt pgtype.Timestamptz // nullable timestamp
-    Embedding pgvector.Vector    // via the directive (vector has no default Go type)
+    Embedding pgvector.Vector   // via the directive
+                                // (vector has no default Go type)
 }
 ```
 
@@ -79,13 +83,15 @@ Write with the exact-decimal constructor; floats cannot represent money:
 
 ```go
 db.UpdateDocument(ctx, pool, doc.ID, db.DocumentSet{
-    Price: pgb.Set(pgtype.Numeric{Int: big.NewInt(19999), Exp: -2, Valid: true}), // 199.99
+    Price: pgb.Set(pgtype.Numeric{
+        Int: big.NewInt(19999), Exp: -2, Valid: true}), // 199.99
 })
 ```
 
 ```go
 if v, err := doc.Price.Value(); err == nil {
-    fmt.Println(v.(string)) // "199.99" — string form of the exact decimal
+    fmt.Println(v.(string)) // "199.99" — string form
+                            // of the exact decimal
 }
 ```
 
@@ -100,7 +106,8 @@ raw, err := json.Marshal(map[string]any{"plan": "pro", "seats": 12})
 if err != nil {
     return err
 }
-_, err = db.UpdateDocument(ctx, pool, doc.ID, db.DocumentSet{Meta: pgb.Set(raw)})
+_, err = db.UpdateDocument(ctx, pool, doc.ID,
+    db.DocumentSet{Meta: pgb.Set(raw)})
 ```
 
 ```go
@@ -137,7 +144,8 @@ for _, t := range doc.Tags { // SQL NULL arrives as a nil slice
 
 ```go
 db.UpdateDocument(ctx, pool, doc.ID, db.DocumentSet{
-    UpdatedAt: pgb.Set(pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}),
+    UpdatedAt: pgb.Set(pgtype.Timestamptz{
+        Time: time.Now().UTC(), Valid: true}),
 })
 ```
 
@@ -159,8 +167,10 @@ A plain `uuid.UUID` value — construct, scan, and print without glue:
 
 ```go
 _, err := db.InsertDocument(ctx, pool, db.InsertDocumentParams{
-    Price: pgtype.Numeric{Int: big.NewInt(4999), Exp: -2, Valid: true}, // 49.99
-    // ID is omitted: gen_random_uuid() is a default, and include_defaults is false
+    Price: pgtype.Numeric{
+        Int: big.NewInt(4999), Exp: -2, Valid: true}, // 49.99
+    // ID is omitted: gen_random_uuid() is a default, and
+    // include_defaults is false
 })
 ```
 
@@ -180,10 +190,12 @@ db.UpdateDocument(ctx, pool, doc.ID, db.DocumentSet{
 ```
 
 ```go
-if err := doc.Embedding.Validate(384); err != nil { // optional check against the column dim
+// optional check against the column dim
+if err := doc.Embedding.Validate(384); err != nil {
     return err
 }
-floats := doc.Embedding.Slice() // []float32 — feed hybrid search or your own math
+floats := doc.Embedding.Slice() // []float32 — feed hybrid
+                                // search or your own math
 ```
 
 ### The same schema under `pointers`

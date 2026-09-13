@@ -39,7 +39,8 @@ func migrate(ctx context.Context) error {
     }
     defer pool.Close()
 
-    db := stdlib.OpenDBFromPool(pool)   // goose speaks database/sql; pgx stdlib bridges
+    // goose speaks database/sql; pgx stdlib bridges
+    db := stdlib.OpenDBFromPool(pool)
     defer db.Close()
 
     goose.SetBaseFS(migrationsFS)
@@ -50,11 +51,16 @@ func migrate(ctx context.Context) error {
 The per-change loop — apply, mirror, regenerate, review:
 
 ```bash
-goose -dir migrations postgres "$DATABASE_URL" up   # 1. apply the migration
-$EDITOR schema.sql                                  # 2. mirror the same change
-sqlc generate                                       # 3. regenerate db/
-git diff --stat db/                                 # 4. review the generated diff
-go test ./...                                       # 5. tests run against a migrated scratch DB
+# 1. apply the migration
+goose -dir migrations postgres "$DATABASE_URL" up
+# 2. mirror the same change
+$EDITOR schema.sql
+# 3. regenerate db/
+sqlc generate
+# 4. review the generated diff
+git diff --stat db/
+# 5. tests run against a migrated scratch DB
+go test ./...
 ```
 
 Commit the migration file, the `schema.sql` update, and the regenerated `db/` package in the same commit — the diff is the review artifact for all three.
@@ -121,7 +127,8 @@ Run `sqlc generate`, and the diff shows every layer picking the column up on its
 +++ b/db/users.gen.go
 @@ GetUser, ListUsers, UpdateUser, UpsertUser @@
 -SELECT id, email, name, bio, metadata, tags, created_at, last_login_at
-+SELECT id, email, name, bio, metadata, tags, created_at, last_login_at, last_seen_at
++SELECT id, email, name, bio, metadata, tags, created_at, last_login_at,
++       last_seen_at
 ```
 
 The new field is immediately usable at every layer — model scan, filter, three-state set:
@@ -133,7 +140,8 @@ stale, err := db.ListUsers(ctx, pool, db.UserFilter{
 ```
 
 ```sql
-SELECT id, email, name, bio, metadata, tags, created_at, last_login_at, last_seen_at
+SELECT id, email, name, bio, metadata, tags,
+       created_at, last_login_at, last_seen_at
 FROM public.users
 WHERE last_seen_at > $1
 LIMIT $2
@@ -182,8 +190,10 @@ The rename sequence with pgb: the expanding migration adds `last_seen_at` alongs
 The hand-run loop above is temporary. pgb 2.0 ([vision](/future/vision)) replaces it with a declarative schema DSL compiled into an encoded artifact, and `pgb migrate` (P2) becomes the executor:
 
 ```bash
-pgb migrate dev      # diff artifact vs shadow DB → generate + auto-apply DDL to the dev database
-pgb migrate deploy   # apply recorded migrations to staging/prod — explicit, no auto-diff
+pgb migrate dev      # diff artifact vs shadow DB → generate +
+                     # auto-apply DDL to the dev database
+pgb migrate deploy   # apply recorded migrations to staging/prod —
+                     # explicit, no auto-diff
 pgb migrate diff     # print the SQL plan without applying
 pgb migrate status   # drift report: artifact vs live catalog
 ```

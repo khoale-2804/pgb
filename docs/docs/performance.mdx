@@ -46,7 +46,9 @@ WHERE (@email IS NULL OR email = @email)
 ```
 
 ```sql
--- what pgb emits for UserFilter{EmailLike: pgb.Opt("%@corp.io"), CreatedAfter: pgb.Opt(since)}
+-- what pgb emits for
+-- UserFilter{EmailLike: pgb.Opt("%@corp.io"),
+--            CreatedAfter: pgb.Opt(since)}
 SELECT id, email, name, bio, metadata, tags, created_at, last_login_at
 FROM public.users
 WHERE email LIKE $1 AND created_at > $2
@@ -106,15 +108,17 @@ LIMIT $2;
 ```
 
 ```text
-Limit (cost=0.00..358.21 rows=20) (actual time=41.902..41.910 rows=20 loops=1)
-  ->  Sort (cost=358.16..369.41 rows=4500 width=120) (actual time=41.898..41.903 rows=20 loops=1)
+Limit (cost=0.00..358.21 rows=20) (actual time=41.902..41.910 rows=20)
+  ->  Sort (cost=358.16..369.41 rows=4500)
+      (actual time=41.898..41.903 rows=20)
         Sort Key: id
         Sort Method: top-N heapsort  Memory Usage: 27kB
-        ->  Seq Scan on users (cost=0.00..242.00 rows=4500 width=120)
-            (actual time=0.021..33.580 rows=4382 loops=1)
-            Filter: (created_at > '2026-09-01 00:00:00+00'::timestamp with time zone)
-            Rows Removed by Filter: 15618
-            Buffers: shared hit=142 read=98
+        ->  Seq Scan on users (cost=0.00..242.00 rows=4500)
+          (actual time=0.021..33.580 rows=4382)
+          Filter: (created_at > '2026-09-01 00:00:00+00'::timestamp
+                   with time zone)
+          Rows Removed by Filter: 15618
+          Buffers: shared hit=142 read=98
 Planning Time: 0.145 ms
 Execution Time: 41.943 ms
 ```
@@ -127,10 +131,12 @@ ANALYZE public.users;
 ```
 
 ```text
-Limit (cost=0.29..108.71 rows=20) (actual time=0.118..0.174 rows=20 loops=1)
-  ->  Index Scan using users_pkey on users (cost=0.29..24280.02 rows=4500 width=120)
-      (actual time=0.116..0.169 rows=20 loops=1)
-        Filter: (created_at > '2026-09-01 00:00:00+00'::timestamp with time zone)
+Limit (cost=0.29..108.71 rows=20) (actual time=0.118..0.174 rows=20)
+  ->  Index Scan using users_pkey on users
+      (cost=0.29..24280.02 rows=4500)
+      (actual time=0.116..0.169 rows=20)
+        Filter: (created_at > '2026-09-01 00:00:00+00'::timestamp
+                 with time zone)
         Buffers: shared hit=5
 Planning Time: 0.231 ms
 Execution Time: 0.192 ms

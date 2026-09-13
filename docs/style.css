@@ -1,90 +1,161 @@
-/* pgb docs — layout fixes on top of the Mintlify aspen theme.
-   The indigo accent is set in docs.json (ParadeDB brand: primary/light #4f46e5, dark #818cf8);
-   aspen reads those top-level branding keys directly, so no CSS color overrides are needed.
-   This file fixes content overflow: code blocks scroll with a visible bar,
-   wide tables scroll on narrow screens, long inline code wraps. */
+/* pgb docs — visual layer on the Mintlify aspen theme.
+   Accent: ParadeDB indigo (#4f46e5 / #818cf8, set in docs.json).
+   Signature: the compiler-pipeline hero (schema.sql → sqlc generate → db/).
+   Everything else stays quiet — this file is polish, not decoration. */
 
 :root {
   --rounded-code: 0.5rem;
+  --pgb-indigo: #4f46e5;
+  --pgb-indigo-bright: #818cf8;
+  --pgb-ink: #0f172a;
 }
 
-/* 1. Give code more room, three levers (aspen defaults are generous):
-      a) cap the "On this page" TOC column (aspen gives it 28rem),
-      b) slim main's page gutters (88px left / 40px right → 40/24),
-      c) halve the content↔TOC gap (48 → 24).
-      Net: the code column gains ~90px so existing code lines fit with no
-      horizontal scrolling; code font drops half a step as buffer. */
-@media (min-width: 1280px) {
-  main > div[class*="max-w-[28rem]"] {
-    max-width: 240px !important;
-  }
-  main[class*="lg:pl-[5.5rem]"] {
-    padding-left: 2.5rem !important;
-    padding-right: 1.5rem !important;
-    column-gap: 1.5rem !important;
-  }
-}
-.code-block pre,
-pre.shiki {
-  font-size: 13px !important;
-  tab-size: 2;
+/* ── Hero ──────────────────────────────────────────────────────────── */
+
+/* Home page: the hero replaces the theme's page-header (title + description) */
+.pgb-home header[class*="page-header"] {
+  display: none;
 }
 
-/* 2. Flex content column must be allowed to shrink below content size */
-main .grow {
-  min-width: 0;
+.pgb-hero {
+  padding: 1.5rem 0 0.5rem;
 }
 
-/* 3. Code blocks: horizontal scroll WITH a visible scrollbar.
-      Mintlify's base-ui scroll-area hides scrollbars by default, which made
-      long Go/SQL lines look truncated. Force real scrolling + show a bar. */
-.code-block pre,
-pre.shiki,
-.code-block div[class*="size-full"] {
-  overflow-x: auto !important;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(129, 140, 248, 0.45) transparent;
+.pgb-hero > * {
+  animation: pgb-fade-up 0.5s ease-out backwards;
 }
-pre {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(129, 140, 248, 0.45) transparent;
+.pgb-hero > *:nth-child(2) { animation-delay: 60ms; }
+.pgb-hero > *:nth-child(3) { animation-delay: 120ms; }
+.pgb-hero > *:nth-child(4) { animation-delay: 180ms; }
+.pgb-hero > *:nth-child(5) { animation-delay: 240ms; }
+
+@keyframes pgb-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-.code-block ::-webkit-scrollbar,
-pre::-webkit-scrollbar {
-  height: 8px;
+@media (prefers-reduced-motion: reduce) {
+  .pgb-hero > * { animation: none; }
 }
-.code-block ::-webkit-scrollbar-track,
-pre::-webkit-scrollbar-track {
-  background: transparent;
+
+.pgb-eyebrow {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--pgb-indigo);
+  margin-bottom: 0.9rem;
 }
-.code-block ::-webkit-scrollbar-thumb,
-pre::-webkit-scrollbar-thumb {
-  background: rgba(129, 140, 248, 0.45);
+
+.pgb-title {
+  font-size: clamp(2.3rem, 5vw, 3.4rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  margin: 0 0 1.1rem;
+  color: var(--pgb-ink);
+}
+.dark .pgb-title { color: #f1f5f9; }
+
+.pgb-grad {
+  background: linear-gradient(100deg, var(--pgb-indigo) 10%, var(--pgb-indigo-bright) 55%, #38bdf8 110%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.pgb-sub {
+  font-size: 1.12rem;
+  line-height: 1.65;
+  max-width: 44rem;
+  color: #475569;
+  margin: 0 0 1.6rem;
+}
+.dark .pgb-sub { color: #94a3b8; }
+.pgb-sub code {
+  padding: 0.1em 0.4em;
+  border-radius: 0.375rem;
+}
+
+.pgb-cta {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.75rem;
+}
+
+.pgb-btn,
+.pgb-btn-ghost {
+  display: inline-block;
+  padding: 0.6rem 1.15rem;
+  border-radius: 0.6rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-decoration: none !important;
+  transition: transform 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+}
+.pgb-btn {
+  background: var(--pgb-indigo);
+  color: #fff !important;
+  box-shadow: 0 1px 2px rgba(79, 70, 229, 0.35);
+}
+.pgb-btn:hover { background: #4338ca; transform: translateY(-1px); }
+.pgb-btn-ghost {
+  color: var(--pgb-indigo) !important;
+  border: 1px solid rgba(79, 70, 229, 0.35);
+}
+.pgb-btn-ghost:hover { background: rgba(79, 70, 229, 0.06); border-color: rgba(79, 70, 229, 0.6); }
+
+.pgb-pipe {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.82rem;
+  margin-bottom: 1.5rem;
+}
+.pgb-pill {
+  padding: 0.3rem 0.75rem;
   border-radius: 9999px;
+  border: 1px solid rgba(100, 116, 139, 0.28);
+  background: rgba(100, 116, 139, 0.06);
+  color: #475569;
 }
-.code-block ::-webkit-scrollbar-thumb:hover,
-pre::-webkit-scrollbar-thumb:hover {
-  background: rgba(129, 140, 248, 0.7);
+.dark .pgb-pill {
+  border-color: rgba(148, 163, 184, 0.25);
+  background: rgba(148, 163, 184, 0.08);
+  color: #cbd5e1;
+}
+.pgb-pill-out {
+  border-color: rgba(79, 70, 229, 0.45);
+  background: rgba(79, 70, 229, 0.08);
+  color: var(--pgb-indigo);
+}
+.dark .pgb-pill-out { color: var(--pgb-indigo-bright); }
+.pgb-arrow { color: #94a3b8; }
+
+/* ── Cards: quiet until hovered ────────────────────────────────────── */
+
+.card {
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+.card:hover {
+  border-color: rgba(79, 70, 229, 0.45);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px -12px rgba(79, 70, 229, 0.35);
 }
 
-/* 4. Wide tables: the wrapper scrolls instead of pushing past the viewport */
-.mdx-content div:has(> table) {
-  display: block;
-  max-width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
+/* ── Code blocks: calmer frame, roomier padding ────────────────────── */
+
+.code-block {
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
-.mdx-content div:has(> table)::-webkit-scrollbar {
-  height: 8px;
-}
-.mdx-content div:has(> table)::-webkit-scrollbar-thumb {
-  background: rgba(129, 140, 248, 0.45);
-  border-radius: 9999px;
+.dark .code-block {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
-/* 5. Long inline code (function signatures, yaml keys) wraps instead of clipping */
-code:not(pre code) {
-  overflow-wrap: anywhere;
+/* ── Headings: Space Grotesk carries the display voice ─────────────── */
+
+h1, h2, h3 {
+  letter-spacing: -0.02em;
 }

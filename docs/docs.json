@@ -12,6 +12,11 @@
     "default": "light",
     "strict": false
   },
+  "fonts": {
+    "heading": {
+      "family": "Space Grotesk"
+    }
+  },
   "navigation": {
     "tabs": [
       {

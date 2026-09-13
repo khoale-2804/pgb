@@ -126,9 +126,8 @@ CREATE INDEX products_title_trgm ON products USING gin (title gin_trgm_ops);
 	if si.KeyField != "id" {
 		t.Errorf("KeyField = %q, want id", si.KeyField)
 	}
-	if got := si.Options["default_field"]; got != "description" {
-		t.Errorf("Options[default_field] = %q, want description", got)
-	}
+	// Non-key_field WITH options (default_field=description here) are
+	// intentionally not stored — they are not needed for emission.
 	want := []ir.SearchField{
 		{Column: "id", PGType: "int8"},
 		{Column: "title", Tokenizer: "icu", PGType: "text"},
@@ -576,5 +575,52 @@ func TestJoinPathEscapesQuotes(t *testing.T) {
 	}
 	if got := joinPath("metadata->'a'", "b'c"); got != "metadata->'a'->'b''c'" {
 		t.Errorf("chained quoted key: got %q", got)
+	}
+}
+
+// TestParseDirectivesWarnsOnUnknown pins the stderr warning for unknown or
+// malformed pgb:* tokens (a silently dropped directive is indistinguishable
+// from a typo).
+func TestParseDirectivesWarnsOnUnknown(t *testing.T) {
+	log := captureStderr(t, func() {
+		d, plain := parseDirectives("pgb:skip; pgb:whatevr; pgb:type=; keep me", "public.users")
+		if !d.Skip {
+			t.Error("skip directive lost")
+		}
+		if d.TypeOverride != "" {
+			t.Errorf("empty type override accepted: %q", d.TypeOverride)
+		}
+		if plain != "keep me" {
+			t.Errorf("plain comment = %q", plain)
+		}
+	})
+	for _, want := range []string{"public.users", `"pgb:whatevr"`, "pgb:type="} {
+		if !bytes.Contains([]byte(log), []byte(want)) {
+			t.Errorf("warning missing %q; log = %q", want, log)
+		}
+	}
+	// Valid directives warn nothing.
+	log = captureStderr(t, func() {
+		parseDirectives("pgb:skip; pgb:type=map[string]any; note", "public.users")
+	})
+	if log != "" {
+		t.Errorf("valid directives must not warn; log = %q", log)
+	}
+}
+
+// TestParseOptionsMalformedJSON pins the stderr warning when the plugin
+// options blob is not valid JSON (previously it silently reverted to
+// defaults).
+func TestParseOptionsMalformedJSON(t *testing.T) {
+	log := captureStderr(t, func() {
+		opts := ParseOptions(&plugin.GenerateRequest{
+			PluginOptions: []byte(`{"package": 42,`),
+		})
+		if opts.Package != "db" {
+			t.Errorf("defaults must apply: package = %q", opts.Package)
+		}
+	})
+	if !bytes.Contains([]byte(log), []byte("malformed plugin options")) {
+		t.Errorf("malformed-JSON warning missing; log = %q", log)
 	}
 }

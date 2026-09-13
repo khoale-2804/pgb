@@ -166,12 +166,10 @@ func enrichIndex(sch *ir.Schema, st *ast.IndexStmt) {
 		}
 		if de.GetDefname() == "key_field" {
 			si.KeyField = v
-			continue
 		}
-		if si.Options == nil {
-			si.Options = map[string]string{}
-		}
-		si.Options[de.GetDefname()] = v
+		// Non-key_field WITH options (text_fields, etc.) are intentionally
+		// dropped: the emitted predicates need only key_field plus the
+		// per-field casts already extracted above.
 	}
 	// Fallback when WITH (key_field=...) is absent: the first plain column.
 	if si.KeyField == "" {
@@ -536,7 +534,7 @@ func enrichComment(sch *ir.Schema, dir *DirectiveSet, st *ast.CommentStmt) {
 	if len(names) == 0 {
 		return
 	}
-	d, plain := parseDirectives(st.GetComment())
+	d, plain := parseDirectives(st.GetComment(), strings.Join(names, "."))
 	switch st.GetObjtype() {
 	case ast.ObjectType_OBJECT_TABLE:
 		t := findTable(sch, schemaPart(names[:len(names)-1]), names[len(names)-1])

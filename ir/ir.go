@@ -59,7 +59,6 @@ type SearchIndex struct {
 	Using    string // "paradedb" | "bm25"
 	KeyField string
 	Fields   []SearchField
-	Options  map[string]string
 }
 
 // SearchField is one column (or JSON path) covered by the search index.

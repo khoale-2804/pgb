@@ -79,6 +79,7 @@ func ParseOptions(req *plugin.GenerateRequest) Options {
 		Overrides       []json.RawMessage `json:"overrides"`
 	}
 	if err := json.Unmarshal(req.PluginOptions, &raw); err != nil {
+		warnf("malformed plugin options JSON (%v); defaults apply", err)
 		return opts
 	}
 	if raw.Package != "" {

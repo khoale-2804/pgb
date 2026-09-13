@@ -114,7 +114,7 @@ func Build(req *plugin.GenerateRequest, opts Options) (ir.Schema, DirectiveSet, 
 				Schema: schemaName,
 				Name:   name,
 			}
-			td, plain := parseDirectives(t.GetComment())
+			td, plain := parseDirectives(t.GetComment(), schemaName+"."+name)
 			tbl.Comment = plain
 			tbl.Skip = td.Skip
 			if td.Has() {
@@ -127,7 +127,7 @@ func Build(req *plugin.GenerateRequest, opts Options) (ir.Schema, DirectiveSet, 
 					NotNull: c.GetNotNull(),
 					IsArray: c.GetIsArray(),
 				}
-				cd, colPlain := parseDirectives(c.GetComment())
+				cd, colPlain := parseDirectives(c.GetComment(), schemaName+"."+name+"."+col.Name)
 				col.Comment = colPlain
 				tbl.Columns = append(tbl.Columns, col)
 				if cd.Has() {
@@ -151,8 +151,10 @@ func baseTypeName(name string) string {
 
 // parseDirectives splits a catalog comment on ";" and reads the "pgb:"
 // tokens. Non-directive text is returned joined as the human-readable
-// comment; unknown pgb:* tokens are ignored.
-func parseDirectives(comment string) (Directives, string) {
+// comment. Unknown or malformed pgb:* tokens are skipped with a warning
+// naming the object (where) they were found on — a silently dropped
+// directive is indistinguishable from a typo-free config.
+func parseDirectives(comment, where string) (Directives, string) {
 	var d Directives
 	if strings.TrimSpace(comment) == "" {
 		return d, ""
@@ -177,6 +179,11 @@ func parseDirectives(comment string) (Directives, string) {
 			d.NoPatch = true
 		case strings.HasPrefix(rest, "type="):
 			d.TypeOverride = strings.TrimPrefix(rest, "type=")
+			if d.TypeOverride == "" {
+				warnf("%s: pgb:type= directive carries no type; ignored", where)
+			}
+		default:
+			warnf("%s: unknown pgb directive %q; ignored", where, t)
 		}
 	}
 	return d, strings.Join(plain, "; ")

@@ -10,7 +10,7 @@ import (
 	"errors"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 )
 
 // CategoryFilter narrows ListCategories and CountCategories:
@@ -32,13 +32,13 @@ type CategoryFilter struct {
 	ParentIDLt  *pgtype.Int8
 	ParentIDGte *pgtype.Int8
 	ParentIDLte *pgtype.Int8
-	Extra       []core.Expr
+	Extra       []pgb.Expr
 }
 
 // categoriesFilterWhere compiles f into the ANDed predicate list; an empty
 // filter yields an empty list (no WHERE).
-func categoriesFilterWhere(f CategoryFilter) []core.Expr {
-	var w []core.Expr
+func categoriesFilterWhere(f CategoryFilter) []pgb.Expr {
+	var w []pgb.Expr
 	if f.ID != nil {
 		w = append(w, Categories.ID().Eq(*f.ID))
 	}
@@ -116,15 +116,15 @@ func scanCategory(row pgx.CollectableRow) (Category, error) {
 	return m, nil
 }
 
-// GetCategory returns one row by id; core.ErrNotFound when absent
+// GetCategory returns one row by id; pgb.ErrNotFound when absent
 // (pgx.ErrNoRows mapped — errors.Is keeps working for both).
-func GetCategory(ctx context.Context, exec core.DBTX, id int64) (Category, error) {
+func GetCategory(ctx context.Context, exec pgb.DBTX, id int64) (Category, error) {
 	sql, args := Categories.Select().Where(Categories.ID().Eq(id)).SQL()
 	var m Category
 	err := exec.QueryRow(ctx, sql, args...).Scan(&m.ID, &m.Name, &m.ParentID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Category{}, core.ErrNotFound
+			return Category{}, pgb.ErrNotFound
 		}
 		return Category{}, err
 	}
@@ -132,8 +132,9 @@ func GetCategory(ctx context.Context, exec core.DBTX, id int64) (Category, error
 }
 
 // ListCategories returns the rows matching f; limit <= 0 means no LIMIT.
-func ListCategories(ctx context.Context, exec core.DBTX, f CategoryFilter, limit int) ([]Category, error) {
-	rows, err := Categories.Select().Where(categoriesFilterWhere(f)...).Limit(limit).Run(ctx, exec)
+func ListCategories(ctx context.Context, exec pgb.DBTX, f CategoryFilter, opts ...pgb.ListOpt) ([]Category, error) {
+	sel := Categories.Select().Where(categoriesFilterWhere(f)...).ApplyList(opts...)
+	rows, err := sel.Run(ctx, exec)
 	if err != nil {
 		return nil, err
 	}
@@ -141,8 +142,8 @@ func ListCategories(ctx context.Context, exec core.DBTX, f CategoryFilter, limit
 }
 
 // CountCategories counts the rows matching f.
-func CountCategories(ctx context.Context, exec core.DBTX, f CategoryFilter) (int64, error) {
-	sql, args := core.NewSelect("public.categories", core.Raw{SQL: "count(*)"}).Where(categoriesFilterWhere(f)...).SQL()
+func CountCategories(ctx context.Context, exec pgb.DBTX, f CategoryFilter) (int64, error) {
+	sql, args := pgb.NewSelect("public.categories", pgb.Raw{SQL: "count(*)"}).Where(categoriesFilterWhere(f)...).SQL()
 	var n int64
 	if err := exec.QueryRow(ctx, sql, args...).Scan(&n); err != nil {
 		return 0, err
@@ -152,11 +153,11 @@ func CountCategories(ctx context.Context, exec core.DBTX, f CategoryFilter) (int
 
 // InsertCategory inserts one row and returns it (RETURNING every
 // column, defaults included).
-func InsertCategory(ctx context.Context, exec core.DBTX, p InsertCategoryParams) (Category, error) {
-	rows, err := core.NewInsert("public.categories",
+func InsertCategory(ctx context.Context, exec pgb.DBTX, p InsertCategoryParams) (Category, error) {
+	rows, err := pgb.NewInsert("public.categories",
 		[]string{"name", "parent_id"},
-		[]core.Expr{core.Lit{V: p.Name}, core.Lit{V: p.ParentID}},
-	).Returning(core.Col{Table: "categories", Name: "id"}, core.Col{Table: "categories", Name: "name"}, core.Col{Table: "categories", Name: "parent_id"}).Run(ctx, exec)
+		[]pgb.Expr{pgb.Lit{V: p.Name}, pgb.Lit{V: p.ParentID}},
+	).Returning(pgb.Col{Table: "categories", Name: "id"}, pgb.Col{Table: "categories", Name: "name"}, pgb.Col{Table: "categories", Name: "parent_id"}).Run(ctx, exec)
 	if err != nil {
 		return Category{}, err
 	}
@@ -165,7 +166,7 @@ func InsertCategory(ctx context.Context, exec core.DBTX, p InsertCategoryParams)
 		return Category{}, err
 	}
 	if len(us) == 0 {
-		return Category{}, core.ErrNotFound
+		return Category{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
@@ -174,7 +175,7 @@ const insertCategoriesSQL = "INSERT INTO public.categories (name, parent_id) SEL
 
 // InsertCategories inserts a whole batch in one round trip via
 // unnest and returns every inserted row.
-func InsertCategories(ctx context.Context, exec core.DBTX, ps []InsertCategoryParams) ([]Category, error) {
+func InsertCategories(ctx context.Context, exec pgb.DBTX, ps []InsertCategoryParams) ([]Category, error) {
 	if len(ps) == 0 {
 		return nil, nil
 	}
@@ -194,30 +195,30 @@ func InsertCategories(ctx context.Context, exec core.DBTX, ps []InsertCategoryPa
 }
 
 // UpdateCategory applies the non-zero fields of s to one row and
-// returns the updated row; core.ErrNotFound when absent.
-func UpdateCategory(ctx context.Context, exec core.DBTX, id int64, s CategorySet) (Category, error) {
+// returns the updated row; pgb.ErrNotFound when absent.
+func UpdateCategory(ctx context.Context, exec pgb.DBTX, id int64, s CategorySet) (Category, error) {
 	u := Categories.Update()
 	n := 0
 	if s.Name.Valid {
 		n++
 		if s.Name.Null {
-			u.Set("name", core.Lit{V: nil})
+			u.Set("name", pgb.Lit{V: nil})
 		} else {
-			u.Set("name", core.Lit{V: s.Name.V})
+			u.Set("name", pgb.Lit{V: s.Name.V})
 		}
 	}
 	if s.ParentID.Valid {
 		n++
 		if s.ParentID.Null {
-			u.Set("parent_id", core.Lit{V: nil})
+			u.Set("parent_id", pgb.Lit{V: nil})
 		} else {
-			u.Set("parent_id", core.Lit{V: s.ParentID.V})
+			u.Set("parent_id", pgb.Lit{V: s.ParentID.V})
 		}
 	}
 	if n == 0 {
 		return GetCategory(ctx, exec, id)
 	}
-	u.Where(Categories.ID().Eq(id)).Returning(core.Col{Table: "categories", Name: "id"}, core.Col{Table: "categories", Name: "name"}, core.Col{Table: "categories", Name: "parent_id"})
+	u.Where(Categories.ID().Eq(id)).Returning(pgb.Col{Table: "categories", Name: "id"}, pgb.Col{Table: "categories", Name: "name"}, pgb.Col{Table: "categories", Name: "parent_id"})
 	rows, err := u.Run(ctx, exec)
 	if err != nil {
 		return Category{}, err
@@ -227,38 +228,38 @@ func UpdateCategory(ctx context.Context, exec core.DBTX, id int64, s CategorySet
 		return Category{}, err
 	}
 	if len(us) == 0 {
-		return Category{}, core.ErrNotFound
+		return Category{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // UpdateCategories applies s to every row matching where and
 // returns the affected count; an empty where is refused with
-// core.ErrNoWhere before any SQL is sent.
-func UpdateCategories(ctx context.Context, exec core.DBTX, where []core.Expr, s CategorySet) (int64, error) {
+// pgb.ErrNoWhere before any SQL is sent.
+func UpdateCategories(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, s CategorySet) (int64, error) {
 	u := Categories.Update()
 	n := 0
 	if s.Name.Valid {
 		n++
 		if s.Name.Null {
-			u.Set("name", core.Lit{V: nil})
+			u.Set("name", pgb.Lit{V: nil})
 		} else {
-			u.Set("name", core.Lit{V: s.Name.V})
+			u.Set("name", pgb.Lit{V: s.Name.V})
 		}
 	}
 	if s.ParentID.Valid {
 		n++
 		if s.ParentID.Null {
-			u.Set("parent_id", core.Lit{V: nil})
+			u.Set("parent_id", pgb.Lit{V: nil})
 		} else {
-			u.Set("parent_id", core.Lit{V: s.ParentID.V})
+			u.Set("parent_id", pgb.Lit{V: s.ParentID.V})
 		}
 	}
 	if n == 0 {
 		return 0, nil
 	}
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	u.Where(where...)
 	tag, err := u.Exec(ctx, exec)
@@ -270,18 +271,18 @@ func UpdateCategories(ctx context.Context, exec core.DBTX, where []core.Expr, s 
 
 // UpsertCategory inserts p under id, or on conflict updates
 // every settable column from the proposed row (EXCLUDED.*) and returns
-// the resulting row; core.ErrNotFound when DO NOTHING matched.
-func UpsertCategory(ctx context.Context, exec core.DBTX, id int64, p InsertCategoryParams) (Category, error) {
-	rows, err := core.NewInsert("public.categories",
+// the resulting row; pgb.ErrNotFound when DO NOTHING matched.
+func UpsertCategory(ctx context.Context, exec pgb.DBTX, id int64, p InsertCategoryParams) (Category, error) {
+	rows, err := pgb.NewInsert("public.categories",
 		[]string{"id", "name", "parent_id"},
-		[]core.Expr{core.Lit{V: id}, core.Lit{V: p.Name}, core.Lit{V: p.ParentID}},
-	).OnConflict(core.OnConflict{
+		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.Name}, pgb.Lit{V: p.ParentID}},
+	).OnConflict(pgb.OnConflict{
 		Target: []string{"id"},
-		Sets: []core.SetClause{
-			{Col: "name", E: core.Col{Table: "excluded", Name: "name"}},
-			{Col: "parent_id", E: core.Col{Table: "excluded", Name: "parent_id"}},
+		Sets: []pgb.SetClause{
+			{Col: "name", E: pgb.Col{Table: "excluded", Name: "name"}},
+			{Col: "parent_id", E: pgb.Col{Table: "excluded", Name: "parent_id"}},
 		},
-	}).Returning(core.Col{Table: "categories", Name: "id"}, core.Col{Table: "categories", Name: "name"}, core.Col{Table: "categories", Name: "parent_id"}).Run(ctx, exec)
+	}).Returning(pgb.Col{Table: "categories", Name: "id"}, pgb.Col{Table: "categories", Name: "name"}, pgb.Col{Table: "categories", Name: "parent_id"}).Run(ctx, exec)
 	if err != nil {
 		return Category{}, err
 	}
@@ -290,22 +291,22 @@ func UpsertCategory(ctx context.Context, exec core.DBTX, id int64, p InsertCateg
 		return Category{}, err
 	}
 	if len(us) == 0 {
-		return Category{}, core.ErrNotFound
+		return Category{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // DeleteCategory removes one row by id.
-func DeleteCategory(ctx context.Context, exec core.DBTX, id int64) error {
+func DeleteCategory(ctx context.Context, exec pgb.DBTX, id int64) error {
 	_, err := Categories.Delete().Where(Categories.ID().Eq(id)).Exec(ctx, exec)
 	return err
 }
 
 // DeleteCategories removes every row matching where and returns the
-// affected count; an empty where is refused with core.ErrNoWhere.
-func DeleteCategories(ctx context.Context, exec core.DBTX, where []core.Expr) (int64, error) {
+// affected count; an empty where is refused with pgb.ErrNoWhere.
+func DeleteCategories(ctx context.Context, exec pgb.DBTX, where []pgb.Expr) (int64, error) {
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	tag, err := Categories.Delete().Where(where...).Exec(ctx, exec)
 	if err != nil {

@@ -9,7 +9,7 @@ import (
 	"context"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 )
 
 // OrderItemFilter narrows ListOrderItems and CountOrderItems:
@@ -47,13 +47,13 @@ type OrderItemFilter struct {
 	UnitPriceLte   *pgtype.Numeric
 	GiftWrap       *bool
 	GiftWrapIn     []bool
-	Extra          []core.Expr
+	Extra          []pgb.Expr
 }
 
 // orderItemsFilterWhere compiles f into the ANDed predicate list; an empty
 // filter yields an empty list (no WHERE).
-func orderItemsFilterWhere(f OrderItemFilter) []core.Expr {
-	var w []core.Expr
+func orderItemsFilterWhere(f OrderItemFilter) []pgb.Expr {
+	var w []pgb.Expr
 	if f.OrderShopID != nil {
 		w = append(w, OrderItems.OrderShopID().Eq(*f.OrderShopID))
 	}
@@ -188,8 +188,9 @@ func scanOrderItem(row pgx.CollectableRow) (OrderItem, error) {
 }
 
 // ListOrderItems returns the rows matching f; limit <= 0 means no LIMIT.
-func ListOrderItems(ctx context.Context, exec core.DBTX, f OrderItemFilter, limit int) ([]OrderItem, error) {
-	rows, err := OrderItems.Select().Where(orderItemsFilterWhere(f)...).Limit(limit).Run(ctx, exec)
+func ListOrderItems(ctx context.Context, exec pgb.DBTX, f OrderItemFilter, opts ...pgb.ListOpt) ([]OrderItem, error) {
+	sel := OrderItems.Select().Where(orderItemsFilterWhere(f)...).ApplyList(opts...)
+	rows, err := sel.Run(ctx, exec)
 	if err != nil {
 		return nil, err
 	}
@@ -197,8 +198,8 @@ func ListOrderItems(ctx context.Context, exec core.DBTX, f OrderItemFilter, limi
 }
 
 // CountOrderItems counts the rows matching f.
-func CountOrderItems(ctx context.Context, exec core.DBTX, f OrderItemFilter) (int64, error) {
-	sql, args := core.NewSelect("public.order_items", core.Raw{SQL: "count(*)"}).Where(orderItemsFilterWhere(f)...).SQL()
+func CountOrderItems(ctx context.Context, exec pgb.DBTX, f OrderItemFilter) (int64, error) {
+	sql, args := pgb.NewSelect("public.order_items", pgb.Raw{SQL: "count(*)"}).Where(orderItemsFilterWhere(f)...).SQL()
 	var n int64
 	if err := exec.QueryRow(ctx, sql, args...).Scan(&n); err != nil {
 		return 0, err
@@ -208,11 +209,11 @@ func CountOrderItems(ctx context.Context, exec core.DBTX, f OrderItemFilter) (in
 
 // InsertOrderItem inserts one row and returns it (RETURNING every
 // column, defaults included).
-func InsertOrderItem(ctx context.Context, exec core.DBTX, p InsertOrderItemParams) (OrderItem, error) {
-	rows, err := core.NewInsert("public.order_items",
+func InsertOrderItem(ctx context.Context, exec pgb.DBTX, p InsertOrderItemParams) (OrderItem, error) {
+	rows, err := pgb.NewInsert("public.order_items",
 		[]string{"order_shop_id", "order_id", "product_id", "quantity", "unit_price", "gift_wrap"},
-		[]core.Expr{core.Lit{V: p.OrderShopID}, core.Lit{V: p.OrderID}, core.Lit{V: p.ProductID}, core.Lit{V: p.Quantity}, core.Lit{V: p.UnitPrice}, core.Lit{V: p.GiftWrap}},
-	).Returning(core.Col{Table: "order_items", Name: "order_shop_id"}, core.Col{Table: "order_items", Name: "order_id"}, core.Col{Table: "order_items", Name: "product_id"}, core.Col{Table: "order_items", Name: "quantity"}, core.Col{Table: "order_items", Name: "unit_price"}, core.Col{Table: "order_items", Name: "gift_wrap"}).Run(ctx, exec)
+		[]pgb.Expr{pgb.Lit{V: p.OrderShopID}, pgb.Lit{V: p.OrderID}, pgb.Lit{V: p.ProductID}, pgb.Lit{V: p.Quantity}, pgb.Lit{V: p.UnitPrice}, pgb.Lit{V: p.GiftWrap}},
+	).Returning(pgb.Col{Table: "order_items", Name: "order_shop_id"}, pgb.Col{Table: "order_items", Name: "order_id"}, pgb.Col{Table: "order_items", Name: "product_id"}, pgb.Col{Table: "order_items", Name: "quantity"}, pgb.Col{Table: "order_items", Name: "unit_price"}, pgb.Col{Table: "order_items", Name: "gift_wrap"}).Run(ctx, exec)
 	if err != nil {
 		return OrderItem{}, err
 	}
@@ -221,7 +222,7 @@ func InsertOrderItem(ctx context.Context, exec core.DBTX, p InsertOrderItemParam
 		return OrderItem{}, err
 	}
 	if len(us) == 0 {
-		return OrderItem{}, core.ErrNotFound
+		return OrderItem{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
@@ -230,7 +231,7 @@ const insertOrderItemsSQL = "INSERT INTO public.order_items (order_shop_id, orde
 
 // InsertOrderItems inserts a whole batch in one round trip via
 // unnest and returns every inserted row.
-func InsertOrderItems(ctx context.Context, exec core.DBTX, ps []InsertOrderItemParams) ([]OrderItem, error) {
+func InsertOrderItems(ctx context.Context, exec pgb.DBTX, ps []InsertOrderItemParams) ([]OrderItem, error) {
 	if len(ps) == 0 {
 		return nil, nil
 	}
@@ -259,63 +260,63 @@ func InsertOrderItems(ctx context.Context, exec core.DBTX, ps []InsertOrderItemP
 
 // UpdateOrderItems applies s to every row matching where and
 // returns the affected count; an empty where is refused with
-// core.ErrNoWhere before any SQL is sent.
-func UpdateOrderItems(ctx context.Context, exec core.DBTX, where []core.Expr, s OrderItemSet) (int64, error) {
+// pgb.ErrNoWhere before any SQL is sent.
+func UpdateOrderItems(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, s OrderItemSet) (int64, error) {
 	u := OrderItems.Update()
 	n := 0
 	if s.OrderShopID.Valid {
 		n++
 		if s.OrderShopID.Null {
-			u.Set("order_shop_id", core.Lit{V: nil})
+			u.Set("order_shop_id", pgb.Lit{V: nil})
 		} else {
-			u.Set("order_shop_id", core.Lit{V: s.OrderShopID.V})
+			u.Set("order_shop_id", pgb.Lit{V: s.OrderShopID.V})
 		}
 	}
 	if s.OrderID.Valid {
 		n++
 		if s.OrderID.Null {
-			u.Set("order_id", core.Lit{V: nil})
+			u.Set("order_id", pgb.Lit{V: nil})
 		} else {
-			u.Set("order_id", core.Lit{V: s.OrderID.V})
+			u.Set("order_id", pgb.Lit{V: s.OrderID.V})
 		}
 	}
 	if s.ProductID.Valid {
 		n++
 		if s.ProductID.Null {
-			u.Set("product_id", core.Lit{V: nil})
+			u.Set("product_id", pgb.Lit{V: nil})
 		} else {
-			u.Set("product_id", core.Lit{V: s.ProductID.V})
+			u.Set("product_id", pgb.Lit{V: s.ProductID.V})
 		}
 	}
 	if s.Quantity.Valid {
 		n++
 		if s.Quantity.Null {
-			u.Set("quantity", core.Lit{V: nil})
+			u.Set("quantity", pgb.Lit{V: nil})
 		} else {
-			u.Set("quantity", core.Lit{V: s.Quantity.V})
+			u.Set("quantity", pgb.Lit{V: s.Quantity.V})
 		}
 	}
 	if s.UnitPrice.Valid {
 		n++
 		if s.UnitPrice.Null {
-			u.Set("unit_price", core.Lit{V: nil})
+			u.Set("unit_price", pgb.Lit{V: nil})
 		} else {
-			u.Set("unit_price", core.Lit{V: s.UnitPrice.V})
+			u.Set("unit_price", pgb.Lit{V: s.UnitPrice.V})
 		}
 	}
 	if s.GiftWrap.Valid {
 		n++
 		if s.GiftWrap.Null {
-			u.Set("gift_wrap", core.Lit{V: nil})
+			u.Set("gift_wrap", pgb.Lit{V: nil})
 		} else {
-			u.Set("gift_wrap", core.Lit{V: s.GiftWrap.V})
+			u.Set("gift_wrap", pgb.Lit{V: s.GiftWrap.V})
 		}
 	}
 	if n == 0 {
 		return 0, nil
 	}
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	u.Where(where...)
 	tag, err := u.Exec(ctx, exec)
@@ -326,10 +327,10 @@ func UpdateOrderItems(ctx context.Context, exec core.DBTX, where []core.Expr, s 
 }
 
 // DeleteOrderItems removes every row matching where and returns the
-// affected count; an empty where is refused with core.ErrNoWhere.
-func DeleteOrderItems(ctx context.Context, exec core.DBTX, where []core.Expr) (int64, error) {
+// affected count; an empty where is refused with pgb.ErrNoWhere.
+func DeleteOrderItems(ctx context.Context, exec pgb.DBTX, where []pgb.Expr) (int64, error) {
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	tag, err := OrderItems.Delete().Where(where...).Exec(ctx, exec)
 	if err != nil {

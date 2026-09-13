@@ -7,177 +7,177 @@ package db
 
 import (
 	"github.com/jackc/pgx/v5/pgtype"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 )
 
 // Inventorys is the table descriptor for public.inventory; immutable, safe for
 // concurrent use.
-var Inventorys = InventoryTable{core.NewTableMeta("public", "inventory")}
+var Inventorys = InventoryTable{pgb.NewTableMeta("public", "inventory")}
 
 // InventoryTable provides typed column accessors and statement entry points.
-type InventoryTable struct{ core.TableMeta }
+type InventoryTable struct{ pgb.TableMeta }
 
 // ItemID returns the typed accessor for column item_id.
 func (t InventoryTable) ItemID() InventoryItemIDCol {
-	return InventoryItemIDCol{core.Col{Table: "inventory", Name: "item_id"}}
+	return InventoryItemIDCol{pgb.Col{Table: "inventory", Name: "item_id"}}
 }
 
 // InventoryItemIDCol is the typed column inventory.item_id.
-type InventoryItemIDCol struct{ core.Col }
+type InventoryItemIDCol struct{ pgb.Col }
 
-func (c InventoryItemIDCol) Eq(v int64) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c InventoryItemIDCol) Eq(v int64) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c InventoryItemIDCol) Ne(v int64) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c InventoryItemIDCol) Ne(v int64) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c InventoryItemIDCol) In(vs ...int64) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "int8[]"}}
+func (c InventoryItemIDCol) In(vs ...int64) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int8[]"}}
 }
 
-func (c InventoryItemIDCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c InventoryItemIDCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c InventoryItemIDCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c InventoryItemIDCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c InventoryItemIDCol) Gt(v int64) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c InventoryItemIDCol) Gt(v int64) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c InventoryItemIDCol) Lt(v int64) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c InventoryItemIDCol) Lt(v int64) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c InventoryItemIDCol) Gte(v int64) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c InventoryItemIDCol) Gte(v int64) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c InventoryItemIDCol) Lte(v int64) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c InventoryItemIDCol) Lte(v int64) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c InventoryItemIDCol) Between(a, b int64) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c InventoryItemIDCol) Between(a, b int64) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // Qty returns the typed accessor for column qty.
 func (t InventoryTable) Qty() InventoryQtyCol {
-	return InventoryQtyCol{core.Col{Table: "inventory", Name: "qty"}}
+	return InventoryQtyCol{pgb.Col{Table: "inventory", Name: "qty"}}
 }
 
 // InventoryQtyCol is the typed column inventory.qty.
-type InventoryQtyCol struct{ core.Col }
+type InventoryQtyCol struct{ pgb.Col }
 
-func (c InventoryQtyCol) Eq(v int32) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c InventoryQtyCol) Eq(v int32) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c InventoryQtyCol) Ne(v int32) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c InventoryQtyCol) Ne(v int32) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c InventoryQtyCol) In(vs ...int32) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "int4[]"}}
+func (c InventoryQtyCol) In(vs ...int32) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int4[]"}}
 }
 
-func (c InventoryQtyCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c InventoryQtyCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c InventoryQtyCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c InventoryQtyCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c InventoryQtyCol) Gt(v int32) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c InventoryQtyCol) Gt(v int32) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c InventoryQtyCol) Lt(v int32) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c InventoryQtyCol) Lt(v int32) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c InventoryQtyCol) Gte(v int32) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c InventoryQtyCol) Gte(v int32) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c InventoryQtyCol) Lte(v int32) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c InventoryQtyCol) Lte(v int32) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c InventoryQtyCol) Between(a, b int32) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c InventoryQtyCol) Between(a, b int32) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // UpdatedAt returns the typed accessor for column updated_at.
 func (t InventoryTable) UpdatedAt() InventoryUpdatedAtCol {
-	return InventoryUpdatedAtCol{core.Col{Table: "inventory", Name: "updated_at"}}
+	return InventoryUpdatedAtCol{pgb.Col{Table: "inventory", Name: "updated_at"}}
 }
 
 // InventoryUpdatedAtCol is the typed column inventory.updated_at.
-type InventoryUpdatedAtCol struct{ core.Col }
+type InventoryUpdatedAtCol struct{ pgb.Col }
 
-func (c InventoryUpdatedAtCol) Eq(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c InventoryUpdatedAtCol) Eq(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c InventoryUpdatedAtCol) Ne(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c InventoryUpdatedAtCol) Ne(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c InventoryUpdatedAtCol) In(vs ...pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "timestamptz[]"}}
+func (c InventoryUpdatedAtCol) In(vs ...pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "timestamptz[]"}}
 }
 
-func (c InventoryUpdatedAtCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c InventoryUpdatedAtCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c InventoryUpdatedAtCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c InventoryUpdatedAtCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c InventoryUpdatedAtCol) Gt(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c InventoryUpdatedAtCol) Gt(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c InventoryUpdatedAtCol) Lt(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c InventoryUpdatedAtCol) Lt(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c InventoryUpdatedAtCol) Gte(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c InventoryUpdatedAtCol) Gte(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c InventoryUpdatedAtCol) Lte(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c InventoryUpdatedAtCol) Lte(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c InventoryUpdatedAtCol) Between(a, b pgtype.Timestamptz) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c InventoryUpdatedAtCol) Between(a, b pgtype.Timestamptz) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // Select starts a SELECT of every column; chain Where/OrderBy/Limit/...
 // and terminate with Run (or a static function).
-func (t InventoryTable) Select() *core.Select {
-	return core.NewSelect("public.inventory", core.Col{Table: "inventory", Name: "item_id"}, core.Col{Table: "inventory", Name: "qty"}, core.Col{Table: "inventory", Name: "updated_at"})
+func (t InventoryTable) Select() *pgb.Select {
+	return pgb.NewSelect("public.inventory", pgb.Col{Table: "inventory", Name: "item_id"}, pgb.Col{Table: "inventory", Name: "qty"}, pgb.Col{Table: "inventory", Name: "updated_at"})
 }
 
-// Update starts an UPDATE; an empty WHERE fails with core.ErrNoWhere.
-func (t InventoryTable) Update() *core.Update { return core.NewUpdate("public.inventory") }
+// Update starts an UPDATE; an empty WHERE fails with pgb.ErrNoWhere.
+func (t InventoryTable) Update() *pgb.Update { return pgb.NewUpdate("public.inventory") }
 
-// Delete starts a DELETE; an empty WHERE fails with core.ErrNoWhere.
-func (t InventoryTable) Delete() *core.Delete { return core.NewDelete("public.inventory") }
+// Delete starts a DELETE; an empty WHERE fails with pgb.ErrNoWhere.
+func (t InventoryTable) Delete() *pgb.Delete { return pgb.NewDelete("public.inventory") }

@@ -9,7 +9,7 @@ import (
 	"context"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 )
 
 // Search surface for public.products (index products_search, key field id): predicate methods only
@@ -17,230 +17,230 @@ import (
 // query. Every value stays a bound parameter; operator shapes live in
 // core/search.go (the pg_search canon).
 // Score ranks by the index key field: pdb.score(products.id).
-func (t ProductTable) Score() core.Expr {
-	return core.Score(core.Col{Table: "products", Name: "id"})
+func (t ProductTable) Score() pgb.Expr {
+	return pgb.Score(pgb.Col{Table: "products", Name: "id"})
 }
 
-func (c ProductIDCol) Match(q string) core.Expr {
-	return core.Match(c.Col, q)
+func (c ProductIDCol) Match(q string) pgb.Expr {
+	return pgb.Match(c.Col, q)
 }
 
-func (c ProductIDCol) MatchAll(q string) core.Expr {
-	return core.MatchAll(c.Col, q)
+func (c ProductIDCol) MatchAll(q string) pgb.Expr {
+	return pgb.MatchAll(c.Col, q)
 }
 
-func (c ProductIDCol) Phrase(q string, slop int) core.Expr {
-	return core.Phrase(c.Col, q, slop)
+func (c ProductIDCol) Phrase(q string, slop int) pgb.Expr {
+	return pgb.Phrase(c.Col, q, slop)
 }
 
-func (c ProductIDCol) Exact(v any) core.Expr {
-	return core.Exact(c.Col, v)
+func (c ProductIDCol) Exact(v any) pgb.Expr {
+	return pgb.Exact(c.Col, v)
 }
 
-func (c ProductIDCol) Fuzzy(q string, dist int, prefix bool) core.Expr {
-	return core.Fuzzy(c.Col, q, dist, prefix)
+func (c ProductIDCol) Fuzzy(q string, dist int, prefix bool) pgb.Expr {
+	return pgb.Fuzzy(c.Col, q, dist, prefix)
 }
 
-func (c ProductIDCol) Regex(pattern string) core.Expr {
-	return core.Regex(c.Col, pattern)
+func (c ProductIDCol) Regex(pattern string) pgb.Expr {
+	return pgb.Regex(c.Col, pattern)
 }
 
-func (c ProductIDCol) Parse(q string) core.Expr {
-	return core.Parse(c.Col, q, false)
+func (c ProductIDCol) Parse(q string) pgb.Expr {
+	return pgb.Parse(c.Col, q, false)
 }
 
-func (c ProductIDCol) MatchB(q string, b float64) core.Expr {
-	return core.Boost(core.Match(c.Col, q), b)
+func (c ProductIDCol) MatchB(q string, b float64) pgb.Expr {
+	return pgb.Boost(pgb.Match(c.Col, q), b)
 }
 
-func (c ProductIDCol) RangeTerm(r any, mode string) core.Expr {
-	return core.RangeTerm(c.Col, r, "int8range", mode)
+func (c ProductIDCol) RangeTerm(r any, mode string) pgb.Expr {
+	return pgb.RangeTerm(c.Col, r, "int8range", mode)
 }
 
-func (c ProductIDCol) Snippet(startTag, endTag string, maxChars int) core.Expr {
-	return core.Snippet(c.Col, startTag, endTag, maxChars)
+func (c ProductIDCol) Snippet(startTag, endTag string, maxChars int) pgb.Expr {
+	return pgb.Snippet(c.Col, startTag, endTag, maxChars)
 }
 
-func (c ProductIDCol) Snippets(limitN, offsetN int, sortBy string) core.Expr {
-	return core.Snippets(c.Col, limitN, offsetN, sortBy)
+func (c ProductIDCol) Snippets(limitN, offsetN int, sortBy string) pgb.Expr {
+	return pgb.Snippets(c.Col, limitN, offsetN, sortBy)
 }
 
-func (c ProductIDCol) Highlight() core.Expr {
-	return core.Highlight(c.Col)
+func (c ProductIDCol) Highlight() pgb.Expr {
+	return pgb.Highlight(c.Col)
 }
 
-func (c ProductTitleCol) Match(q string) core.Expr {
-	return core.Match(c.Col, q)
+func (c ProductTitleCol) Match(q string) pgb.Expr {
+	return pgb.Match(c.Col, q)
 }
 
-func (c ProductTitleCol) MatchAll(q string) core.Expr {
-	return core.MatchAll(c.Col, q)
+func (c ProductTitleCol) MatchAll(q string) pgb.Expr {
+	return pgb.MatchAll(c.Col, q)
 }
 
-func (c ProductTitleCol) Phrase(q string, slop int) core.Expr {
-	return core.Phrase(c.Col, q, slop)
+func (c ProductTitleCol) Phrase(q string, slop int) pgb.Expr {
+	return pgb.Phrase(c.Col, q, slop)
 }
 
-func (c ProductTitleCol) Exact(v any) core.Expr {
-	return core.Exact(c.Col, v)
+func (c ProductTitleCol) Exact(v any) pgb.Expr {
+	return pgb.Exact(c.Col, v)
 }
 
-func (c ProductTitleCol) ExactAny(vs []string) core.Expr {
-	return core.ExactAny(c.Col, vs, "text")
+func (c ProductTitleCol) ExactAny(vs []string) pgb.Expr {
+	return pgb.ExactAny(c.Col, vs, "text")
 }
 
-func (c ProductTitleCol) Fuzzy(q string, dist int, prefix bool) core.Expr {
-	return core.Fuzzy(c.Col, q, dist, prefix)
+func (c ProductTitleCol) Fuzzy(q string, dist int, prefix bool) pgb.Expr {
+	return pgb.Fuzzy(c.Col, q, dist, prefix)
 }
 
-func (c ProductTitleCol) Regex(pattern string) core.Expr {
-	return core.Regex(c.Col, pattern)
+func (c ProductTitleCol) Regex(pattern string) pgb.Expr {
+	return pgb.Regex(c.Col, pattern)
 }
 
-func (c ProductTitleCol) Parse(q string) core.Expr {
-	return core.Parse(c.Col, q, false)
+func (c ProductTitleCol) Parse(q string) pgb.Expr {
+	return pgb.Parse(c.Col, q, false)
 }
 
-func (c ProductTitleCol) MatchB(q string, b float64) core.Expr {
-	return core.Boost(core.Match(c.Col, q), b)
+func (c ProductTitleCol) MatchB(q string, b float64) pgb.Expr {
+	return pgb.Boost(pgb.Match(c.Col, q), b)
 }
 
-func (c ProductTitleCol) Snippet(startTag, endTag string, maxChars int) core.Expr {
-	return core.Snippet(c.Col, startTag, endTag, maxChars)
+func (c ProductTitleCol) Snippet(startTag, endTag string, maxChars int) pgb.Expr {
+	return pgb.Snippet(c.Col, startTag, endTag, maxChars)
 }
 
-func (c ProductTitleCol) Snippets(limitN, offsetN int, sortBy string) core.Expr {
-	return core.Snippets(c.Col, limitN, offsetN, sortBy)
+func (c ProductTitleCol) Snippets(limitN, offsetN int, sortBy string) pgb.Expr {
+	return pgb.Snippets(c.Col, limitN, offsetN, sortBy)
 }
 
-func (c ProductTitleCol) Highlight() core.Expr {
-	return core.Highlight(c.Col)
+func (c ProductTitleCol) Highlight() pgb.Expr {
+	return pgb.Highlight(c.Col)
 }
 
-func (c ProductDescriptionCol) Match(q string) core.Expr {
-	return core.Match(c.Col, q)
+func (c ProductDescriptionCol) Match(q string) pgb.Expr {
+	return pgb.Match(c.Col, q)
 }
 
-func (c ProductDescriptionCol) MatchAll(q string) core.Expr {
-	return core.MatchAll(c.Col, q)
+func (c ProductDescriptionCol) MatchAll(q string) pgb.Expr {
+	return pgb.MatchAll(c.Col, q)
 }
 
-func (c ProductDescriptionCol) Phrase(q string, slop int) core.Expr {
-	return core.Phrase(c.Col, q, slop)
+func (c ProductDescriptionCol) Phrase(q string, slop int) pgb.Expr {
+	return pgb.Phrase(c.Col, q, slop)
 }
 
-func (c ProductDescriptionCol) Exact(v any) core.Expr {
-	return core.Exact(c.Col, v)
+func (c ProductDescriptionCol) Exact(v any) pgb.Expr {
+	return pgb.Exact(c.Col, v)
 }
 
-func (c ProductDescriptionCol) ExactAny(vs []string) core.Expr {
-	return core.ExactAny(c.Col, vs, "text")
+func (c ProductDescriptionCol) ExactAny(vs []string) pgb.Expr {
+	return pgb.ExactAny(c.Col, vs, "text")
 }
 
-func (c ProductDescriptionCol) Fuzzy(q string, dist int, prefix bool) core.Expr {
-	return core.Fuzzy(c.Col, q, dist, prefix)
+func (c ProductDescriptionCol) Fuzzy(q string, dist int, prefix bool) pgb.Expr {
+	return pgb.Fuzzy(c.Col, q, dist, prefix)
 }
 
-func (c ProductDescriptionCol) Regex(pattern string) core.Expr {
-	return core.Regex(c.Col, pattern)
+func (c ProductDescriptionCol) Regex(pattern string) pgb.Expr {
+	return pgb.Regex(c.Col, pattern)
 }
 
-func (c ProductDescriptionCol) Parse(q string) core.Expr {
-	return core.Parse(c.Col, q, false)
+func (c ProductDescriptionCol) Parse(q string) pgb.Expr {
+	return pgb.Parse(c.Col, q, false)
 }
 
-func (c ProductDescriptionCol) MatchB(q string, b float64) core.Expr {
-	return core.Boost(core.Match(c.Col, q), b)
+func (c ProductDescriptionCol) MatchB(q string, b float64) pgb.Expr {
+	return pgb.Boost(pgb.Match(c.Col, q), b)
 }
 
-func (c ProductDescriptionCol) Snippet(startTag, endTag string, maxChars int) core.Expr {
-	return core.Snippet(c.Col, startTag, endTag, maxChars)
+func (c ProductDescriptionCol) Snippet(startTag, endTag string, maxChars int) pgb.Expr {
+	return pgb.Snippet(c.Col, startTag, endTag, maxChars)
 }
 
-func (c ProductDescriptionCol) Snippets(limitN, offsetN int, sortBy string) core.Expr {
-	return core.Snippets(c.Col, limitN, offsetN, sortBy)
+func (c ProductDescriptionCol) Snippets(limitN, offsetN int, sortBy string) pgb.Expr {
+	return pgb.Snippets(c.Col, limitN, offsetN, sortBy)
 }
 
-func (c ProductDescriptionCol) Highlight() core.Expr {
-	return core.Highlight(c.Col)
+func (c ProductDescriptionCol) Highlight() pgb.Expr {
+	return pgb.Highlight(c.Col)
 }
 
 // ProductMetadataColorCol carries the pg_search surface for the indexed JSON path
 // products.metadata->'color' (index alias json_color): the path is re-emitted exactly as indexed,
-// through core.Raw. No Boost composition (MatchB) or snippets on path
+// through pgb.Raw. No Boost composition (MatchB) or snippets on path
 // fields.
-type ProductMetadataColorCol struct{ core.Col }
+type ProductMetadataColorCol struct{ pgb.Col }
 
-func (c ProductMetadataColorCol) Match(q string) core.Expr {
-	return core.Raw{SQL: "products.metadata->'color' ||| ?", Args: []any{q}}
+func (c ProductMetadataColorCol) Match(q string) pgb.Expr {
+	return pgb.Raw{SQL: "products.metadata->'color' ||| ?", Args: []any{q}}
 }
 
-func (c ProductMetadataColorCol) MatchAll(q string) core.Expr {
-	return core.Raw{SQL: "products.metadata->'color' &&& ?", Args: []any{q}}
+func (c ProductMetadataColorCol) MatchAll(q string) pgb.Expr {
+	return pgb.Raw{SQL: "products.metadata->'color' &&& ?", Args: []any{q}}
 }
 
-func (c ProductMetadataColorCol) Exact(v any) core.Expr {
-	return core.Raw{SQL: "products.metadata->'color' === ?", Args: []any{v}}
+func (c ProductMetadataColorCol) Exact(v any) pgb.Expr {
+	return pgb.Raw{SQL: "products.metadata->'color' === ?", Args: []any{v}}
 }
 
-func (c ProductMetadataColorCol) ExactAny(vs []string) core.Expr {
-	return core.Raw{SQL: "products.metadata->'color' === ?::text[]", Args: []any{vs}}
+func (c ProductMetadataColorCol) ExactAny(vs []string) pgb.Expr {
+	return pgb.Raw{SQL: "products.metadata->'color' === ?::text[]", Args: []any{vs}}
 }
 
-func (c ProductMetadataColorCol) Regex(pattern string) core.Expr {
-	return core.Raw{SQL: "products.metadata->'color' @@@ pdb.regex(?)", Args: []any{pattern}}
+func (c ProductMetadataColorCol) Regex(pattern string) pgb.Expr {
+	return pgb.Raw{SQL: "products.metadata->'color' @@@ pdb.regex(?)", Args: []any{pattern}}
 }
 
-func (c ProductMetadataColorCol) Parse(q string) core.Expr {
-	return core.Raw{SQL: "products.metadata->'color' @@@ pdb.parse(?)", Args: []any{q}}
+func (c ProductMetadataColorCol) Parse(q string) pgb.Expr {
+	return pgb.Raw{SQL: "products.metadata->'color' @@@ pdb.parse(?)", Args: []any{q}}
 }
 
-func (c ProductRatingCol) Match(q string) core.Expr {
-	return core.Match(c.Col, q)
+func (c ProductRatingCol) Match(q string) pgb.Expr {
+	return pgb.Match(c.Col, q)
 }
 
-func (c ProductRatingCol) MatchAll(q string) core.Expr {
-	return core.MatchAll(c.Col, q)
+func (c ProductRatingCol) MatchAll(q string) pgb.Expr {
+	return pgb.MatchAll(c.Col, q)
 }
 
-func (c ProductRatingCol) Phrase(q string, slop int) core.Expr {
-	return core.Phrase(c.Col, q, slop)
+func (c ProductRatingCol) Phrase(q string, slop int) pgb.Expr {
+	return pgb.Phrase(c.Col, q, slop)
 }
 
-func (c ProductRatingCol) Exact(v any) core.Expr {
-	return core.Exact(c.Col, v)
+func (c ProductRatingCol) Exact(v any) pgb.Expr {
+	return pgb.Exact(c.Col, v)
 }
 
-func (c ProductRatingCol) Fuzzy(q string, dist int, prefix bool) core.Expr {
-	return core.Fuzzy(c.Col, q, dist, prefix)
+func (c ProductRatingCol) Fuzzy(q string, dist int, prefix bool) pgb.Expr {
+	return pgb.Fuzzy(c.Col, q, dist, prefix)
 }
 
-func (c ProductRatingCol) Regex(pattern string) core.Expr {
-	return core.Regex(c.Col, pattern)
+func (c ProductRatingCol) Regex(pattern string) pgb.Expr {
+	return pgb.Regex(c.Col, pattern)
 }
 
-func (c ProductRatingCol) Parse(q string) core.Expr {
-	return core.Parse(c.Col, q, false)
+func (c ProductRatingCol) Parse(q string) pgb.Expr {
+	return pgb.Parse(c.Col, q, false)
 }
 
-func (c ProductRatingCol) MatchB(q string, b float64) core.Expr {
-	return core.Boost(core.Match(c.Col, q), b)
+func (c ProductRatingCol) MatchB(q string, b float64) pgb.Expr {
+	return pgb.Boost(pgb.Match(c.Col, q), b)
 }
 
-func (c ProductRatingCol) RangeTerm(r any, mode string) core.Expr {
-	return core.RangeTerm(c.Col, r, "numrange", mode)
+func (c ProductRatingCol) RangeTerm(r any, mode string) pgb.Expr {
+	return pgb.RangeTerm(c.Col, r, "numrange", mode)
 }
 
-func (c ProductRatingCol) Snippet(startTag, endTag string, maxChars int) core.Expr {
-	return core.Snippet(c.Col, startTag, endTag, maxChars)
+func (c ProductRatingCol) Snippet(startTag, endTag string, maxChars int) pgb.Expr {
+	return pgb.Snippet(c.Col, startTag, endTag, maxChars)
 }
 
-func (c ProductRatingCol) Snippets(limitN, offsetN int, sortBy string) core.Expr {
-	return core.Snippets(c.Col, limitN, offsetN, sortBy)
+func (c ProductRatingCol) Snippets(limitN, offsetN int, sortBy string) pgb.Expr {
+	return pgb.Snippets(c.Col, limitN, offsetN, sortBy)
 }
 
-func (c ProductRatingCol) Highlight() core.Expr {
-	return core.Highlight(c.Col)
+func (c ProductRatingCol) Highlight() pgb.Expr {
+	return pgb.Highlight(c.Col)
 }
 
 // SearchProductsOpts keeps the search entry surface small: Limit caps the
@@ -262,7 +262,7 @@ type ProductHit struct {
 }
 
 // ScanProducts scans one SearchProducts row positionally: every products column
-// in catalog order, then the score. Rows requested with a snippet
+// in catalog order, then the spgb. Rows requested with a snippet
 // projection carry one extra trailing column — SearchProducts scans those
 // rows itself.
 func ScanProducts(row pgx.CollectableRow) (ProductHit, error) {
@@ -280,19 +280,19 @@ func ScanProducts(row pgx.CollectableRow) (ProductHit, error) {
 // query-string syntax — selecting every column plus pdb.score(id),
 // optionally one pdb.snippet fragment, ordered pdb.score(id) DESC,
 // id ASC and LIMIT-bounded.
-func SearchProducts(ctx context.Context, exec core.DBTX, q string, o SearchProductsOpts) ([]ProductHit, error) {
+func SearchProducts(ctx context.Context, exec pgb.DBTX, q string, o SearchProductsOpts) ([]ProductHit, error) {
 	limit := o.Limit
 	if limit <= 0 {
 		limit = 20
 	}
-	key := core.Col{Table: "products", Name: "id"}
-	cols := []core.Expr{core.Col{Table: "products", Name: "id"}, core.Col{Table: "products", Name: "sku"}, core.Col{Table: "products", Name: "title"}, core.Col{Table: "products", Name: "description"}, core.Col{Table: "products", Name: "category"}, core.Col{Table: "products", Name: "rating"}, core.Col{Table: "products", Name: "price"}, core.Col{Table: "products", Name: "in_stock"}, core.Col{Table: "products", Name: "metadata"}, core.Col{Table: "products", Name: "embedding"}, core.Col{Table: "products", Name: "created_at"}, core.Score(key)}
+	key := pgb.Col{Table: "products", Name: "id"}
+	cols := []pgb.Expr{pgb.Col{Table: "products", Name: "id"}, pgb.Col{Table: "products", Name: "sku"}, pgb.Col{Table: "products", Name: "title"}, pgb.Col{Table: "products", Name: "description"}, pgb.Col{Table: "products", Name: "category"}, pgb.Col{Table: "products", Name: "rating"}, pgb.Col{Table: "products", Name: "price"}, pgb.Col{Table: "products", Name: "in_stock"}, pgb.Col{Table: "products", Name: "metadata"}, pgb.Col{Table: "products", Name: "embedding"}, pgb.Col{Table: "products", Name: "created_at"}, pgb.Score(key)}
 	if o.SnippetCol != "" {
-		cols = append(cols, core.Snippet(core.Col{Table: "products", Name: o.SnippetCol}, "", "", 0))
+		cols = append(cols, pgb.Snippet(pgb.Col{Table: "products", Name: o.SnippetCol}, "", "", 0))
 	}
-	rows, err := core.NewSelect("public.products", cols...).
-		WhereExpr(core.Parse(key, q, false)).
-		OrderBy(core.Desc(core.Score(key)), core.Asc(key)).
+	rows, err := pgb.NewSelect("public.products", cols...).
+		WhereExpr(pgb.Parse(key, q, false)).
+		OrderBy(pgb.Desc(pgb.Score(key)), pgb.Asc(key)).
 		Limit(limit).
 		Run(ctx, exec)
 	if err != nil {

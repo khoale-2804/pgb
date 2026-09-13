@@ -10,7 +10,7 @@ import (
 	"errors"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 )
 
 // AppAuditLogFilter narrows ListAppAuditLogs and CountAppAuditLogs:
@@ -39,13 +39,13 @@ type AppAuditLogFilter struct {
 	AtLt        *pgtype.Timestamptz
 	AtGte       *pgtype.Timestamptz
 	AtLte       *pgtype.Timestamptz
-	Extra       []core.Expr
+	Extra       []pgb.Expr
 }
 
 // appAuditLogsFilterWhere compiles f into the ANDed predicate list; an empty
 // filter yields an empty list (no WHERE).
-func appAuditLogsFilterWhere(f AppAuditLogFilter) []core.Expr {
-	var w []core.Expr
+func appAuditLogsFilterWhere(f AppAuditLogFilter) []pgb.Expr {
+	var w []pgb.Expr
 	if f.ID != nil {
 		w = append(w, AppAuditLogs.ID().Eq(*f.ID))
 	}
@@ -148,15 +148,15 @@ func scanAppAuditLog(row pgx.CollectableRow) (AppAuditLog, error) {
 	return m, nil
 }
 
-// GetAppAuditLog returns one row by id; core.ErrNotFound when absent
+// GetAppAuditLog returns one row by id; pgb.ErrNotFound when absent
 // (pgx.ErrNoRows mapped — errors.Is keeps working for both).
-func GetAppAuditLog(ctx context.Context, exec core.DBTX, id int64) (AppAuditLog, error) {
+func GetAppAuditLog(ctx context.Context, exec pgb.DBTX, id int64) (AppAuditLog, error) {
 	sql, args := AppAuditLogs.Select().Where(AppAuditLogs.ID().Eq(id)).SQL()
 	var m AppAuditLog
 	err := exec.QueryRow(ctx, sql, args...).Scan(&m.ID, &m.Entity, &m.EntityID, &m.Payload, &m.At)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return AppAuditLog{}, core.ErrNotFound
+			return AppAuditLog{}, pgb.ErrNotFound
 		}
 		return AppAuditLog{}, err
 	}
@@ -164,8 +164,9 @@ func GetAppAuditLog(ctx context.Context, exec core.DBTX, id int64) (AppAuditLog,
 }
 
 // ListAppAuditLogs returns the rows matching f; limit <= 0 means no LIMIT.
-func ListAppAuditLogs(ctx context.Context, exec core.DBTX, f AppAuditLogFilter, limit int) ([]AppAuditLog, error) {
-	rows, err := AppAuditLogs.Select().Where(appAuditLogsFilterWhere(f)...).Limit(limit).Run(ctx, exec)
+func ListAppAuditLogs(ctx context.Context, exec pgb.DBTX, f AppAuditLogFilter, opts ...pgb.ListOpt) ([]AppAuditLog, error) {
+	sel := AppAuditLogs.Select().Where(appAuditLogsFilterWhere(f)...).ApplyList(opts...)
+	rows, err := sel.Run(ctx, exec)
 	if err != nil {
 		return nil, err
 	}
@@ -173,8 +174,8 @@ func ListAppAuditLogs(ctx context.Context, exec core.DBTX, f AppAuditLogFilter, 
 }
 
 // CountAppAuditLogs counts the rows matching f.
-func CountAppAuditLogs(ctx context.Context, exec core.DBTX, f AppAuditLogFilter) (int64, error) {
-	sql, args := core.NewSelect("app.audit_log", core.Raw{SQL: "count(*)"}).Where(appAuditLogsFilterWhere(f)...).SQL()
+func CountAppAuditLogs(ctx context.Context, exec pgb.DBTX, f AppAuditLogFilter) (int64, error) {
+	sql, args := pgb.NewSelect("app.audit_log", pgb.Raw{SQL: "count(*)"}).Where(appAuditLogsFilterWhere(f)...).SQL()
 	var n int64
 	if err := exec.QueryRow(ctx, sql, args...).Scan(&n); err != nil {
 		return 0, err
@@ -184,11 +185,11 @@ func CountAppAuditLogs(ctx context.Context, exec core.DBTX, f AppAuditLogFilter)
 
 // InsertAppAuditLog inserts one row and returns it (RETURNING every
 // column, defaults included).
-func InsertAppAuditLog(ctx context.Context, exec core.DBTX, p InsertAppAuditLogParams) (AppAuditLog, error) {
-	rows, err := core.NewInsert("app.audit_log",
+func InsertAppAuditLog(ctx context.Context, exec pgb.DBTX, p InsertAppAuditLogParams) (AppAuditLog, error) {
+	rows, err := pgb.NewInsert("app.audit_log",
 		[]string{"entity", "entity_id", "payload", "at"},
-		[]core.Expr{core.Lit{V: p.Entity}, core.Lit{V: p.EntityID}, core.Lit{V: p.Payload, Cast: "jsonb"}, core.Lit{V: p.At}},
-	).Returning(core.Col{Table: "audit_log", Name: "id"}, core.Col{Table: "audit_log", Name: "entity"}, core.Col{Table: "audit_log", Name: "entity_id"}, core.Col{Table: "audit_log", Name: "payload"}, core.Col{Table: "audit_log", Name: "at"}).Run(ctx, exec)
+		[]pgb.Expr{pgb.Lit{V: p.Entity}, pgb.Lit{V: p.EntityID}, pgb.Lit{V: p.Payload, Cast: "jsonb"}, pgb.Lit{V: p.At}},
+	).Returning(pgb.Col{Table: "audit_log", Name: "id"}, pgb.Col{Table: "audit_log", Name: "entity"}, pgb.Col{Table: "audit_log", Name: "entity_id"}, pgb.Col{Table: "audit_log", Name: "payload"}, pgb.Col{Table: "audit_log", Name: "at"}).Run(ctx, exec)
 	if err != nil {
 		return AppAuditLog{}, err
 	}
@@ -197,7 +198,7 @@ func InsertAppAuditLog(ctx context.Context, exec core.DBTX, p InsertAppAuditLogP
 		return AppAuditLog{}, err
 	}
 	if len(us) == 0 {
-		return AppAuditLog{}, core.ErrNotFound
+		return AppAuditLog{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
@@ -206,7 +207,7 @@ const insertAppAuditLogsSQL = "INSERT INTO app.audit_log (entity, entity_id, pay
 
 // InsertAppAuditLogs inserts a whole batch in one round trip via
 // unnest and returns every inserted row.
-func InsertAppAuditLogs(ctx context.Context, exec core.DBTX, ps []InsertAppAuditLogParams) ([]AppAuditLog, error) {
+func InsertAppAuditLogs(ctx context.Context, exec pgb.DBTX, ps []InsertAppAuditLogParams) ([]AppAuditLog, error) {
 	if len(ps) == 0 {
 		return nil, nil
 	}
@@ -230,46 +231,46 @@ func InsertAppAuditLogs(ctx context.Context, exec core.DBTX, ps []InsertAppAudit
 }
 
 // UpdateAppAuditLog applies the non-zero fields of s to one row and
-// returns the updated row; core.ErrNotFound when absent.
-func UpdateAppAuditLog(ctx context.Context, exec core.DBTX, id int64, s AppAuditLogSet) (AppAuditLog, error) {
+// returns the updated row; pgb.ErrNotFound when absent.
+func UpdateAppAuditLog(ctx context.Context, exec pgb.DBTX, id int64, s AppAuditLogSet) (AppAuditLog, error) {
 	u := AppAuditLogs.Update()
 	n := 0
 	if s.Entity.Valid {
 		n++
 		if s.Entity.Null {
-			u.Set("entity", core.Lit{V: nil})
+			u.Set("entity", pgb.Lit{V: nil})
 		} else {
-			u.Set("entity", core.Lit{V: s.Entity.V})
+			u.Set("entity", pgb.Lit{V: s.Entity.V})
 		}
 	}
 	if s.EntityID.Valid {
 		n++
 		if s.EntityID.Null {
-			u.Set("entity_id", core.Lit{V: nil})
+			u.Set("entity_id", pgb.Lit{V: nil})
 		} else {
-			u.Set("entity_id", core.Lit{V: s.EntityID.V})
+			u.Set("entity_id", pgb.Lit{V: s.EntityID.V})
 		}
 	}
 	if s.Payload.Valid {
 		n++
 		if s.Payload.Null {
-			u.Set("payload", core.Lit{V: nil})
+			u.Set("payload", pgb.Lit{V: nil})
 		} else {
-			u.Set("payload", core.Lit{V: s.Payload.V, Cast: "jsonb"})
+			u.Set("payload", pgb.Lit{V: s.Payload.V, Cast: "jsonb"})
 		}
 	}
 	if s.At.Valid {
 		n++
 		if s.At.Null {
-			u.Set("at", core.Lit{V: nil})
+			u.Set("at", pgb.Lit{V: nil})
 		} else {
-			u.Set("at", core.Lit{V: s.At.V})
+			u.Set("at", pgb.Lit{V: s.At.V})
 		}
 	}
 	if n == 0 {
 		return GetAppAuditLog(ctx, exec, id)
 	}
-	u.Where(AppAuditLogs.ID().Eq(id)).Returning(core.Col{Table: "audit_log", Name: "id"}, core.Col{Table: "audit_log", Name: "entity"}, core.Col{Table: "audit_log", Name: "entity_id"}, core.Col{Table: "audit_log", Name: "payload"}, core.Col{Table: "audit_log", Name: "at"})
+	u.Where(AppAuditLogs.ID().Eq(id)).Returning(pgb.Col{Table: "audit_log", Name: "id"}, pgb.Col{Table: "audit_log", Name: "entity"}, pgb.Col{Table: "audit_log", Name: "entity_id"}, pgb.Col{Table: "audit_log", Name: "payload"}, pgb.Col{Table: "audit_log", Name: "at"})
 	rows, err := u.Run(ctx, exec)
 	if err != nil {
 		return AppAuditLog{}, err
@@ -279,54 +280,54 @@ func UpdateAppAuditLog(ctx context.Context, exec core.DBTX, id int64, s AppAudit
 		return AppAuditLog{}, err
 	}
 	if len(us) == 0 {
-		return AppAuditLog{}, core.ErrNotFound
+		return AppAuditLog{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // UpdateAppAuditLogs applies s to every row matching where and
 // returns the affected count; an empty where is refused with
-// core.ErrNoWhere before any SQL is sent.
-func UpdateAppAuditLogs(ctx context.Context, exec core.DBTX, where []core.Expr, s AppAuditLogSet) (int64, error) {
+// pgb.ErrNoWhere before any SQL is sent.
+func UpdateAppAuditLogs(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, s AppAuditLogSet) (int64, error) {
 	u := AppAuditLogs.Update()
 	n := 0
 	if s.Entity.Valid {
 		n++
 		if s.Entity.Null {
-			u.Set("entity", core.Lit{V: nil})
+			u.Set("entity", pgb.Lit{V: nil})
 		} else {
-			u.Set("entity", core.Lit{V: s.Entity.V})
+			u.Set("entity", pgb.Lit{V: s.Entity.V})
 		}
 	}
 	if s.EntityID.Valid {
 		n++
 		if s.EntityID.Null {
-			u.Set("entity_id", core.Lit{V: nil})
+			u.Set("entity_id", pgb.Lit{V: nil})
 		} else {
-			u.Set("entity_id", core.Lit{V: s.EntityID.V})
+			u.Set("entity_id", pgb.Lit{V: s.EntityID.V})
 		}
 	}
 	if s.Payload.Valid {
 		n++
 		if s.Payload.Null {
-			u.Set("payload", core.Lit{V: nil})
+			u.Set("payload", pgb.Lit{V: nil})
 		} else {
-			u.Set("payload", core.Lit{V: s.Payload.V, Cast: "jsonb"})
+			u.Set("payload", pgb.Lit{V: s.Payload.V, Cast: "jsonb"})
 		}
 	}
 	if s.At.Valid {
 		n++
 		if s.At.Null {
-			u.Set("at", core.Lit{V: nil})
+			u.Set("at", pgb.Lit{V: nil})
 		} else {
-			u.Set("at", core.Lit{V: s.At.V})
+			u.Set("at", pgb.Lit{V: s.At.V})
 		}
 	}
 	if n == 0 {
 		return 0, nil
 	}
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	u.Where(where...)
 	tag, err := u.Exec(ctx, exec)
@@ -338,20 +339,20 @@ func UpdateAppAuditLogs(ctx context.Context, exec core.DBTX, where []core.Expr, 
 
 // UpsertAppAuditLog inserts p under id, or on conflict updates
 // every settable column from the proposed row (EXCLUDED.*) and returns
-// the resulting row; core.ErrNotFound when DO NOTHING matched.
-func UpsertAppAuditLog(ctx context.Context, exec core.DBTX, id int64, p InsertAppAuditLogParams) (AppAuditLog, error) {
-	rows, err := core.NewInsert("app.audit_log",
+// the resulting row; pgb.ErrNotFound when DO NOTHING matched.
+func UpsertAppAuditLog(ctx context.Context, exec pgb.DBTX, id int64, p InsertAppAuditLogParams) (AppAuditLog, error) {
+	rows, err := pgb.NewInsert("app.audit_log",
 		[]string{"id", "entity", "entity_id", "payload", "at"},
-		[]core.Expr{core.Lit{V: id}, core.Lit{V: p.Entity}, core.Lit{V: p.EntityID}, core.Lit{V: p.Payload, Cast: "jsonb"}, core.Lit{V: p.At}},
-	).OnConflict(core.OnConflict{
+		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.Entity}, pgb.Lit{V: p.EntityID}, pgb.Lit{V: p.Payload, Cast: "jsonb"}, pgb.Lit{V: p.At}},
+	).OnConflict(pgb.OnConflict{
 		Target: []string{"id"},
-		Sets: []core.SetClause{
-			{Col: "entity", E: core.Col{Table: "excluded", Name: "entity"}},
-			{Col: "entity_id", E: core.Col{Table: "excluded", Name: "entity_id"}},
-			{Col: "payload", E: core.Col{Table: "excluded", Name: "payload"}},
-			{Col: "at", E: core.Col{Table: "excluded", Name: "at"}},
+		Sets: []pgb.SetClause{
+			{Col: "entity", E: pgb.Col{Table: "excluded", Name: "entity"}},
+			{Col: "entity_id", E: pgb.Col{Table: "excluded", Name: "entity_id"}},
+			{Col: "payload", E: pgb.Col{Table: "excluded", Name: "payload"}},
+			{Col: "at", E: pgb.Col{Table: "excluded", Name: "at"}},
 		},
-	}).Returning(core.Col{Table: "audit_log", Name: "id"}, core.Col{Table: "audit_log", Name: "entity"}, core.Col{Table: "audit_log", Name: "entity_id"}, core.Col{Table: "audit_log", Name: "payload"}, core.Col{Table: "audit_log", Name: "at"}).Run(ctx, exec)
+	}).Returning(pgb.Col{Table: "audit_log", Name: "id"}, pgb.Col{Table: "audit_log", Name: "entity"}, pgb.Col{Table: "audit_log", Name: "entity_id"}, pgb.Col{Table: "audit_log", Name: "payload"}, pgb.Col{Table: "audit_log", Name: "at"}).Run(ctx, exec)
 	if err != nil {
 		return AppAuditLog{}, err
 	}
@@ -360,22 +361,22 @@ func UpsertAppAuditLog(ctx context.Context, exec core.DBTX, id int64, p InsertAp
 		return AppAuditLog{}, err
 	}
 	if len(us) == 0 {
-		return AppAuditLog{}, core.ErrNotFound
+		return AppAuditLog{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // DeleteAppAuditLog removes one row by id.
-func DeleteAppAuditLog(ctx context.Context, exec core.DBTX, id int64) error {
+func DeleteAppAuditLog(ctx context.Context, exec pgb.DBTX, id int64) error {
 	_, err := AppAuditLogs.Delete().Where(AppAuditLogs.ID().Eq(id)).Exec(ctx, exec)
 	return err
 }
 
 // DeleteAppAuditLogs removes every row matching where and returns the
-// affected count; an empty where is refused with core.ErrNoWhere.
-func DeleteAppAuditLogs(ctx context.Context, exec core.DBTX, where []core.Expr) (int64, error) {
+// affected count; an empty where is refused with pgb.ErrNoWhere.
+func DeleteAppAuditLogs(ctx context.Context, exec pgb.DBTX, where []pgb.Expr) (int64, error) {
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	tag, err := AppAuditLogs.Delete().Where(where...).Exec(ctx, exec)
 	if err != nil {

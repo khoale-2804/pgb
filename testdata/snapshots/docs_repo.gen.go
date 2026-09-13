@@ -10,7 +10,7 @@ import (
 	"errors"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 )
 
 // DocFilter narrows ListDocs and CountDocs:
@@ -26,13 +26,13 @@ type DocFilter struct {
 	BodyIn     []string
 	BodyLike   *string
 	BodyILike  *string
-	Extra      []core.Expr
+	Extra      []pgb.Expr
 }
 
 // docsFilterWhere compiles f into the ANDed predicate list; an empty
 // filter yields an empty list (no WHERE).
-func docsFilterWhere(f DocFilter) []core.Expr {
-	var w []core.Expr
+func docsFilterWhere(f DocFilter) []pgb.Expr {
+	var w []pgb.Expr
 	if f.ID != nil {
 		w = append(w, Docs.ID().Eq(*f.ID))
 	}
@@ -93,15 +93,15 @@ func scanDoc(row pgx.CollectableRow) (Doc, error) {
 	return m, nil
 }
 
-// GetDoc returns one row by id; core.ErrNotFound when absent
+// GetDoc returns one row by id; pgb.ErrNotFound when absent
 // (pgx.ErrNoRows mapped — errors.Is keeps working for both).
-func GetDoc(ctx context.Context, exec core.DBTX, id uuid.UUID) (Doc, error) {
+func GetDoc(ctx context.Context, exec pgb.DBTX, id uuid.UUID) (Doc, error) {
 	sql, args := Docs.Select().Where(Docs.ID().Eq(id)).SQL()
 	var m Doc
 	err := exec.QueryRow(ctx, sql, args...).Scan(&m.ID, &m.Title, &m.Body)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Doc{}, core.ErrNotFound
+			return Doc{}, pgb.ErrNotFound
 		}
 		return Doc{}, err
 	}
@@ -109,8 +109,9 @@ func GetDoc(ctx context.Context, exec core.DBTX, id uuid.UUID) (Doc, error) {
 }
 
 // ListDocs returns the rows matching f; limit <= 0 means no LIMIT.
-func ListDocs(ctx context.Context, exec core.DBTX, f DocFilter, limit int) ([]Doc, error) {
-	rows, err := Docs.Select().Where(docsFilterWhere(f)...).Limit(limit).Run(ctx, exec)
+func ListDocs(ctx context.Context, exec pgb.DBTX, f DocFilter, opts ...pgb.ListOpt) ([]Doc, error) {
+	sel := Docs.Select().Where(docsFilterWhere(f)...).ApplyList(opts...)
+	rows, err := sel.Run(ctx, exec)
 	if err != nil {
 		return nil, err
 	}
@@ -118,8 +119,8 @@ func ListDocs(ctx context.Context, exec core.DBTX, f DocFilter, limit int) ([]Do
 }
 
 // CountDocs counts the rows matching f.
-func CountDocs(ctx context.Context, exec core.DBTX, f DocFilter) (int64, error) {
-	sql, args := core.NewSelect("public.docs", core.Raw{SQL: "count(*)"}).Where(docsFilterWhere(f)...).SQL()
+func CountDocs(ctx context.Context, exec pgb.DBTX, f DocFilter) (int64, error) {
+	sql, args := pgb.NewSelect("public.docs", pgb.Raw{SQL: "count(*)"}).Where(docsFilterWhere(f)...).SQL()
 	var n int64
 	if err := exec.QueryRow(ctx, sql, args...).Scan(&n); err != nil {
 		return 0, err
@@ -129,11 +130,11 @@ func CountDocs(ctx context.Context, exec core.DBTX, f DocFilter) (int64, error) 
 
 // InsertDoc inserts one row and returns it (RETURNING every
 // column, defaults included).
-func InsertDoc(ctx context.Context, exec core.DBTX, p InsertDocParams) (Doc, error) {
-	rows, err := core.NewInsert("public.docs",
+func InsertDoc(ctx context.Context, exec pgb.DBTX, p InsertDocParams) (Doc, error) {
+	rows, err := pgb.NewInsert("public.docs",
 		[]string{"id", "title", "body"},
-		[]core.Expr{core.Lit{V: p.ID}, core.Lit{V: p.Title}, core.Lit{V: p.Body}},
-	).Returning(core.Col{Table: "docs", Name: "id"}, core.Col{Table: "docs", Name: "title"}, core.Col{Table: "docs", Name: "body"}).Run(ctx, exec)
+		[]pgb.Expr{pgb.Lit{V: p.ID}, pgb.Lit{V: p.Title}, pgb.Lit{V: p.Body}},
+	).Returning(pgb.Col{Table: "docs", Name: "id"}, pgb.Col{Table: "docs", Name: "title"}, pgb.Col{Table: "docs", Name: "body"}).Run(ctx, exec)
 	if err != nil {
 		return Doc{}, err
 	}
@@ -142,7 +143,7 @@ func InsertDoc(ctx context.Context, exec core.DBTX, p InsertDocParams) (Doc, err
 		return Doc{}, err
 	}
 	if len(us) == 0 {
-		return Doc{}, core.ErrNotFound
+		return Doc{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
@@ -151,7 +152,7 @@ const insertDocsSQL = "INSERT INTO public.docs (id, title, body) SELECT * FROM u
 
 // InsertDocs inserts a whole batch in one round trip via
 // unnest and returns every inserted row.
-func InsertDocs(ctx context.Context, exec core.DBTX, ps []InsertDocParams) ([]Doc, error) {
+func InsertDocs(ctx context.Context, exec pgb.DBTX, ps []InsertDocParams) ([]Doc, error) {
 	if len(ps) == 0 {
 		return nil, nil
 	}
@@ -173,30 +174,30 @@ func InsertDocs(ctx context.Context, exec core.DBTX, ps []InsertDocParams) ([]Do
 }
 
 // UpdateDoc applies the non-zero fields of s to one row and
-// returns the updated row; core.ErrNotFound when absent.
-func UpdateDoc(ctx context.Context, exec core.DBTX, id uuid.UUID, s DocSet) (Doc, error) {
+// returns the updated row; pgb.ErrNotFound when absent.
+func UpdateDoc(ctx context.Context, exec pgb.DBTX, id uuid.UUID, s DocSet) (Doc, error) {
 	u := Docs.Update()
 	n := 0
 	if s.Title.Valid {
 		n++
 		if s.Title.Null {
-			u.Set("title", core.Lit{V: nil})
+			u.Set("title", pgb.Lit{V: nil})
 		} else {
-			u.Set("title", core.Lit{V: s.Title.V})
+			u.Set("title", pgb.Lit{V: s.Title.V})
 		}
 	}
 	if s.Body.Valid {
 		n++
 		if s.Body.Null {
-			u.Set("body", core.Lit{V: nil})
+			u.Set("body", pgb.Lit{V: nil})
 		} else {
-			u.Set("body", core.Lit{V: s.Body.V})
+			u.Set("body", pgb.Lit{V: s.Body.V})
 		}
 	}
 	if n == 0 {
 		return GetDoc(ctx, exec, id)
 	}
-	u.Where(Docs.ID().Eq(id)).Returning(core.Col{Table: "docs", Name: "id"}, core.Col{Table: "docs", Name: "title"}, core.Col{Table: "docs", Name: "body"})
+	u.Where(Docs.ID().Eq(id)).Returning(pgb.Col{Table: "docs", Name: "id"}, pgb.Col{Table: "docs", Name: "title"}, pgb.Col{Table: "docs", Name: "body"})
 	rows, err := u.Run(ctx, exec)
 	if err != nil {
 		return Doc{}, err
@@ -206,38 +207,38 @@ func UpdateDoc(ctx context.Context, exec core.DBTX, id uuid.UUID, s DocSet) (Doc
 		return Doc{}, err
 	}
 	if len(us) == 0 {
-		return Doc{}, core.ErrNotFound
+		return Doc{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // UpdateDocs applies s to every row matching where and
 // returns the affected count; an empty where is refused with
-// core.ErrNoWhere before any SQL is sent.
-func UpdateDocs(ctx context.Context, exec core.DBTX, where []core.Expr, s DocSet) (int64, error) {
+// pgb.ErrNoWhere before any SQL is sent.
+func UpdateDocs(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, s DocSet) (int64, error) {
 	u := Docs.Update()
 	n := 0
 	if s.Title.Valid {
 		n++
 		if s.Title.Null {
-			u.Set("title", core.Lit{V: nil})
+			u.Set("title", pgb.Lit{V: nil})
 		} else {
-			u.Set("title", core.Lit{V: s.Title.V})
+			u.Set("title", pgb.Lit{V: s.Title.V})
 		}
 	}
 	if s.Body.Valid {
 		n++
 		if s.Body.Null {
-			u.Set("body", core.Lit{V: nil})
+			u.Set("body", pgb.Lit{V: nil})
 		} else {
-			u.Set("body", core.Lit{V: s.Body.V})
+			u.Set("body", pgb.Lit{V: s.Body.V})
 		}
 	}
 	if n == 0 {
 		return 0, nil
 	}
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	u.Where(where...)
 	tag, err := u.Exec(ctx, exec)
@@ -249,18 +250,18 @@ func UpdateDocs(ctx context.Context, exec core.DBTX, where []core.Expr, s DocSet
 
 // UpsertDoc inserts p under id, or on conflict updates
 // every settable column from the proposed row (EXCLUDED.*) and returns
-// the resulting row; core.ErrNotFound when DO NOTHING matched.
-func UpsertDoc(ctx context.Context, exec core.DBTX, id uuid.UUID, p InsertDocParams) (Doc, error) {
-	rows, err := core.NewInsert("public.docs",
+// the resulting row; pgb.ErrNotFound when DO NOTHING matched.
+func UpsertDoc(ctx context.Context, exec pgb.DBTX, id uuid.UUID, p InsertDocParams) (Doc, error) {
+	rows, err := pgb.NewInsert("public.docs",
 		[]string{"id", "title", "body"},
-		[]core.Expr{core.Lit{V: id}, core.Lit{V: p.Title}, core.Lit{V: p.Body}},
-	).OnConflict(core.OnConflict{
+		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.Title}, pgb.Lit{V: p.Body}},
+	).OnConflict(pgb.OnConflict{
 		Target: []string{"id"},
-		Sets: []core.SetClause{
-			{Col: "title", E: core.Col{Table: "excluded", Name: "title"}},
-			{Col: "body", E: core.Col{Table: "excluded", Name: "body"}},
+		Sets: []pgb.SetClause{
+			{Col: "title", E: pgb.Col{Table: "excluded", Name: "title"}},
+			{Col: "body", E: pgb.Col{Table: "excluded", Name: "body"}},
 		},
-	}).Returning(core.Col{Table: "docs", Name: "id"}, core.Col{Table: "docs", Name: "title"}, core.Col{Table: "docs", Name: "body"}).Run(ctx, exec)
+	}).Returning(pgb.Col{Table: "docs", Name: "id"}, pgb.Col{Table: "docs", Name: "title"}, pgb.Col{Table: "docs", Name: "body"}).Run(ctx, exec)
 	if err != nil {
 		return Doc{}, err
 	}
@@ -269,22 +270,22 @@ func UpsertDoc(ctx context.Context, exec core.DBTX, id uuid.UUID, p InsertDocPar
 		return Doc{}, err
 	}
 	if len(us) == 0 {
-		return Doc{}, core.ErrNotFound
+		return Doc{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // DeleteDoc removes one row by id.
-func DeleteDoc(ctx context.Context, exec core.DBTX, id uuid.UUID) error {
+func DeleteDoc(ctx context.Context, exec pgb.DBTX, id uuid.UUID) error {
 	_, err := Docs.Delete().Where(Docs.ID().Eq(id)).Exec(ctx, exec)
 	return err
 }
 
 // DeleteDocs removes every row matching where and returns the
-// affected count; an empty where is refused with core.ErrNoWhere.
-func DeleteDocs(ctx context.Context, exec core.DBTX, where []core.Expr) (int64, error) {
+// affected count; an empty where is refused with pgb.ErrNoWhere.
+func DeleteDocs(ctx context.Context, exec pgb.DBTX, where []pgb.Expr) (int64, error) {
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	tag, err := Docs.Delete().Where(where...).Exec(ctx, exec)
 	if err != nil {

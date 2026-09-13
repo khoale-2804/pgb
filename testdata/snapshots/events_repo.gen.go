@@ -9,7 +9,7 @@ import (
 	"context"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 )
 
 // EventFilter narrows ListEvents and CountEvents:
@@ -38,13 +38,13 @@ type EventFilter struct {
 	OccurredAtLt  *pgtype.Timestamptz
 	OccurredAtGte *pgtype.Timestamptz
 	OccurredAtLte *pgtype.Timestamptz
-	Extra         []core.Expr
+	Extra         []pgb.Expr
 }
 
 // eventsFilterWhere compiles f into the ANDed predicate list; an empty
 // filter yields an empty list (no WHERE).
-func eventsFilterWhere(f EventFilter) []core.Expr {
-	var w []core.Expr
+func eventsFilterWhere(f EventFilter) []pgb.Expr {
+	var w []pgb.Expr
 	if f.ID != nil {
 		w = append(w, Events.ID().Eq(*f.ID))
 	}
@@ -148,8 +148,9 @@ func scanEvent(row pgx.CollectableRow) (Event, error) {
 }
 
 // ListEvents returns the rows matching f; limit <= 0 means no LIMIT.
-func ListEvents(ctx context.Context, exec core.DBTX, f EventFilter, limit int) ([]Event, error) {
-	rows, err := Events.Select().Where(eventsFilterWhere(f)...).Limit(limit).Run(ctx, exec)
+func ListEvents(ctx context.Context, exec pgb.DBTX, f EventFilter, opts ...pgb.ListOpt) ([]Event, error) {
+	sel := Events.Select().Where(eventsFilterWhere(f)...).ApplyList(opts...)
+	rows, err := sel.Run(ctx, exec)
 	if err != nil {
 		return nil, err
 	}
@@ -157,8 +158,8 @@ func ListEvents(ctx context.Context, exec core.DBTX, f EventFilter, limit int) (
 }
 
 // CountEvents counts the rows matching f.
-func CountEvents(ctx context.Context, exec core.DBTX, f EventFilter) (int64, error) {
-	sql, args := core.NewSelect("public.events", core.Raw{SQL: "count(*)"}).Where(eventsFilterWhere(f)...).SQL()
+func CountEvents(ctx context.Context, exec pgb.DBTX, f EventFilter) (int64, error) {
+	sql, args := pgb.NewSelect("public.events", pgb.Raw{SQL: "count(*)"}).Where(eventsFilterWhere(f)...).SQL()
 	var n int64
 	if err := exec.QueryRow(ctx, sql, args...).Scan(&n); err != nil {
 		return 0, err
@@ -168,11 +169,11 @@ func CountEvents(ctx context.Context, exec core.DBTX, f EventFilter) (int64, err
 
 // InsertEvent inserts one row and returns it (RETURNING every
 // column, defaults included).
-func InsertEvent(ctx context.Context, exec core.DBTX, p InsertEventParams) (Event, error) {
-	rows, err := core.NewInsert("public.events",
+func InsertEvent(ctx context.Context, exec pgb.DBTX, p InsertEventParams) (Event, error) {
+	rows, err := pgb.NewInsert("public.events",
 		[]string{"user_id", "kind", "payload", "occurred_at"},
-		[]core.Expr{core.Lit{V: p.UserID}, core.Lit{V: p.Kind}, core.Lit{V: p.Payload, Cast: "jsonb"}, core.Lit{V: p.OccurredAt}},
-	).Returning(core.Col{Table: "events", Name: "id"}, core.Col{Table: "events", Name: "user_id"}, core.Col{Table: "events", Name: "kind"}, core.Col{Table: "events", Name: "payload"}, core.Col{Table: "events", Name: "occurred_at"}).Run(ctx, exec)
+		[]pgb.Expr{pgb.Lit{V: p.UserID}, pgb.Lit{V: p.Kind}, pgb.Lit{V: p.Payload, Cast: "jsonb"}, pgb.Lit{V: p.OccurredAt}},
+	).Returning(pgb.Col{Table: "events", Name: "id"}, pgb.Col{Table: "events", Name: "user_id"}, pgb.Col{Table: "events", Name: "kind"}, pgb.Col{Table: "events", Name: "payload"}, pgb.Col{Table: "events", Name: "occurred_at"}).Run(ctx, exec)
 	if err != nil {
 		return Event{}, err
 	}
@@ -181,7 +182,7 @@ func InsertEvent(ctx context.Context, exec core.DBTX, p InsertEventParams) (Even
 		return Event{}, err
 	}
 	if len(us) == 0 {
-		return Event{}, core.ErrNotFound
+		return Event{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
@@ -190,7 +191,7 @@ const insertEventsSQL = "INSERT INTO public.events (user_id, kind, payload, occu
 
 // InsertEvents inserts a whole batch in one round trip via
 // unnest and returns every inserted row.
-func InsertEvents(ctx context.Context, exec core.DBTX, ps []InsertEventParams) ([]Event, error) {
+func InsertEvents(ctx context.Context, exec pgb.DBTX, ps []InsertEventParams) ([]Event, error) {
 	if len(ps) == 0 {
 		return nil, nil
 	}
@@ -215,47 +216,47 @@ func InsertEvents(ctx context.Context, exec core.DBTX, ps []InsertEventParams) (
 
 // UpdateEvents applies s to every row matching where and
 // returns the affected count; an empty where is refused with
-// core.ErrNoWhere before any SQL is sent.
-func UpdateEvents(ctx context.Context, exec core.DBTX, where []core.Expr, s EventSet) (int64, error) {
+// pgb.ErrNoWhere before any SQL is sent.
+func UpdateEvents(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, s EventSet) (int64, error) {
 	u := Events.Update()
 	n := 0
 	if s.UserID.Valid {
 		n++
 		if s.UserID.Null {
-			u.Set("user_id", core.Lit{V: nil})
+			u.Set("user_id", pgb.Lit{V: nil})
 		} else {
-			u.Set("user_id", core.Lit{V: s.UserID.V})
+			u.Set("user_id", pgb.Lit{V: s.UserID.V})
 		}
 	}
 	if s.Kind.Valid {
 		n++
 		if s.Kind.Null {
-			u.Set("kind", core.Lit{V: nil})
+			u.Set("kind", pgb.Lit{V: nil})
 		} else {
-			u.Set("kind", core.Lit{V: s.Kind.V})
+			u.Set("kind", pgb.Lit{V: s.Kind.V})
 		}
 	}
 	if s.Payload.Valid {
 		n++
 		if s.Payload.Null {
-			u.Set("payload", core.Lit{V: nil})
+			u.Set("payload", pgb.Lit{V: nil})
 		} else {
-			u.Set("payload", core.Lit{V: s.Payload.V, Cast: "jsonb"})
+			u.Set("payload", pgb.Lit{V: s.Payload.V, Cast: "jsonb"})
 		}
 	}
 	if s.OccurredAt.Valid {
 		n++
 		if s.OccurredAt.Null {
-			u.Set("occurred_at", core.Lit{V: nil})
+			u.Set("occurred_at", pgb.Lit{V: nil})
 		} else {
-			u.Set("occurred_at", core.Lit{V: s.OccurredAt.V})
+			u.Set("occurred_at", pgb.Lit{V: s.OccurredAt.V})
 		}
 	}
 	if n == 0 {
 		return 0, nil
 	}
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	u.Where(where...)
 	tag, err := u.Exec(ctx, exec)
@@ -266,10 +267,10 @@ func UpdateEvents(ctx context.Context, exec core.DBTX, where []core.Expr, s Even
 }
 
 // DeleteEvents removes every row matching where and returns the
-// affected count; an empty where is refused with core.ErrNoWhere.
-func DeleteEvents(ctx context.Context, exec core.DBTX, where []core.Expr) (int64, error) {
+// affected count; an empty where is refused with pgb.ErrNoWhere.
+func DeleteEvents(ctx context.Context, exec pgb.DBTX, where []pgb.Expr) (int64, error) {
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	tag, err := Events.Delete().Where(where...).Exec(ctx, exec)
 	if err != nil {

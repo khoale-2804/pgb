@@ -9,7 +9,7 @@ import (
 	"context"
 	"errors"
 	"github.com/jackc/pgx/v5"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 )
 
 // SkippablePartnerFilter narrows ListSkippablePartners and CountSkippablePartners:
@@ -25,13 +25,13 @@ type SkippablePartnerFilter struct {
 	LabelIn    []string
 	LabelLike  *string
 	LabelILike *string
-	Extra      []core.Expr
+	Extra      []pgb.Expr
 }
 
 // skippablePartnersFilterWhere compiles f into the ANDed predicate list; an empty
 // filter yields an empty list (no WHERE).
-func skippablePartnersFilterWhere(f SkippablePartnerFilter) []core.Expr {
-	var w []core.Expr
+func skippablePartnersFilterWhere(f SkippablePartnerFilter) []pgb.Expr {
+	var w []pgb.Expr
 	if f.ID != nil {
 		w = append(w, SkippablePartners.ID().Eq(*f.ID))
 	}
@@ -90,15 +90,15 @@ func scanSkippablePartner(row pgx.CollectableRow) (SkippablePartner, error) {
 	return m, nil
 }
 
-// GetSkippablePartner returns one row by id; core.ErrNotFound when absent
+// GetSkippablePartner returns one row by id; pgb.ErrNotFound when absent
 // (pgx.ErrNoRows mapped — errors.Is keeps working for both).
-func GetSkippablePartner(ctx context.Context, exec core.DBTX, id int64) (SkippablePartner, error) {
+func GetSkippablePartner(ctx context.Context, exec pgb.DBTX, id int64) (SkippablePartner, error) {
 	sql, args := SkippablePartners.Select().Where(SkippablePartners.ID().Eq(id)).SQL()
 	var m SkippablePartner
 	err := exec.QueryRow(ctx, sql, args...).Scan(&m.ID, &m.Label)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return SkippablePartner{}, core.ErrNotFound
+			return SkippablePartner{}, pgb.ErrNotFound
 		}
 		return SkippablePartner{}, err
 	}
@@ -106,8 +106,9 @@ func GetSkippablePartner(ctx context.Context, exec core.DBTX, id int64) (Skippab
 }
 
 // ListSkippablePartners returns the rows matching f; limit <= 0 means no LIMIT.
-func ListSkippablePartners(ctx context.Context, exec core.DBTX, f SkippablePartnerFilter, limit int) ([]SkippablePartner, error) {
-	rows, err := SkippablePartners.Select().Where(skippablePartnersFilterWhere(f)...).Limit(limit).Run(ctx, exec)
+func ListSkippablePartners(ctx context.Context, exec pgb.DBTX, f SkippablePartnerFilter, opts ...pgb.ListOpt) ([]SkippablePartner, error) {
+	sel := SkippablePartners.Select().Where(skippablePartnersFilterWhere(f)...).ApplyList(opts...)
+	rows, err := sel.Run(ctx, exec)
 	if err != nil {
 		return nil, err
 	}
@@ -115,8 +116,8 @@ func ListSkippablePartners(ctx context.Context, exec core.DBTX, f SkippablePartn
 }
 
 // CountSkippablePartners counts the rows matching f.
-func CountSkippablePartners(ctx context.Context, exec core.DBTX, f SkippablePartnerFilter) (int64, error) {
-	sql, args := core.NewSelect("public.skippable_partner", core.Raw{SQL: "count(*)"}).Where(skippablePartnersFilterWhere(f)...).SQL()
+func CountSkippablePartners(ctx context.Context, exec pgb.DBTX, f SkippablePartnerFilter) (int64, error) {
+	sql, args := pgb.NewSelect("public.skippable_partner", pgb.Raw{SQL: "count(*)"}).Where(skippablePartnersFilterWhere(f)...).SQL()
 	var n int64
 	if err := exec.QueryRow(ctx, sql, args...).Scan(&n); err != nil {
 		return 0, err
@@ -126,11 +127,11 @@ func CountSkippablePartners(ctx context.Context, exec core.DBTX, f SkippablePart
 
 // InsertSkippablePartner inserts one row and returns it (RETURNING every
 // column, defaults included).
-func InsertSkippablePartner(ctx context.Context, exec core.DBTX, p InsertSkippablePartnerParams) (SkippablePartner, error) {
-	rows, err := core.NewInsert("public.skippable_partner",
+func InsertSkippablePartner(ctx context.Context, exec pgb.DBTX, p InsertSkippablePartnerParams) (SkippablePartner, error) {
+	rows, err := pgb.NewInsert("public.skippable_partner",
 		[]string{"id", "label"},
-		[]core.Expr{core.Lit{V: p.ID}, core.Lit{V: p.Label}},
-	).Returning(core.Col{Table: "skippable_partner", Name: "id"}, core.Col{Table: "skippable_partner", Name: "label"}).Run(ctx, exec)
+		[]pgb.Expr{pgb.Lit{V: p.ID}, pgb.Lit{V: p.Label}},
+	).Returning(pgb.Col{Table: "skippable_partner", Name: "id"}, pgb.Col{Table: "skippable_partner", Name: "label"}).Run(ctx, exec)
 	if err != nil {
 		return SkippablePartner{}, err
 	}
@@ -139,7 +140,7 @@ func InsertSkippablePartner(ctx context.Context, exec core.DBTX, p InsertSkippab
 		return SkippablePartner{}, err
 	}
 	if len(us) == 0 {
-		return SkippablePartner{}, core.ErrNotFound
+		return SkippablePartner{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
@@ -148,7 +149,7 @@ const insertSkippablePartnersSQL = "INSERT INTO public.skippable_partner (id, la
 
 // InsertSkippablePartners inserts a whole batch in one round trip via
 // unnest and returns every inserted row.
-func InsertSkippablePartners(ctx context.Context, exec core.DBTX, ps []InsertSkippablePartnerParams) ([]SkippablePartner, error) {
+func InsertSkippablePartners(ctx context.Context, exec pgb.DBTX, ps []InsertSkippablePartnerParams) ([]SkippablePartner, error) {
 	if len(ps) == 0 {
 		return nil, nil
 	}
@@ -168,22 +169,22 @@ func InsertSkippablePartners(ctx context.Context, exec core.DBTX, ps []InsertSki
 }
 
 // UpdateSkippablePartner applies the non-zero fields of s to one row and
-// returns the updated row; core.ErrNotFound when absent.
-func UpdateSkippablePartner(ctx context.Context, exec core.DBTX, id int64, s SkippablePartnerSet) (SkippablePartner, error) {
+// returns the updated row; pgb.ErrNotFound when absent.
+func UpdateSkippablePartner(ctx context.Context, exec pgb.DBTX, id int64, s SkippablePartnerSet) (SkippablePartner, error) {
 	u := SkippablePartners.Update()
 	n := 0
 	if s.Label.Valid {
 		n++
 		if s.Label.Null {
-			u.Set("label", core.Lit{V: nil})
+			u.Set("label", pgb.Lit{V: nil})
 		} else {
-			u.Set("label", core.Lit{V: s.Label.V})
+			u.Set("label", pgb.Lit{V: s.Label.V})
 		}
 	}
 	if n == 0 {
 		return GetSkippablePartner(ctx, exec, id)
 	}
-	u.Where(SkippablePartners.ID().Eq(id)).Returning(core.Col{Table: "skippable_partner", Name: "id"}, core.Col{Table: "skippable_partner", Name: "label"})
+	u.Where(SkippablePartners.ID().Eq(id)).Returning(pgb.Col{Table: "skippable_partner", Name: "id"}, pgb.Col{Table: "skippable_partner", Name: "label"})
 	rows, err := u.Run(ctx, exec)
 	if err != nil {
 		return SkippablePartner{}, err
@@ -193,30 +194,30 @@ func UpdateSkippablePartner(ctx context.Context, exec core.DBTX, id int64, s Ski
 		return SkippablePartner{}, err
 	}
 	if len(us) == 0 {
-		return SkippablePartner{}, core.ErrNotFound
+		return SkippablePartner{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // UpdateSkippablePartners applies s to every row matching where and
 // returns the affected count; an empty where is refused with
-// core.ErrNoWhere before any SQL is sent.
-func UpdateSkippablePartners(ctx context.Context, exec core.DBTX, where []core.Expr, s SkippablePartnerSet) (int64, error) {
+// pgb.ErrNoWhere before any SQL is sent.
+func UpdateSkippablePartners(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, s SkippablePartnerSet) (int64, error) {
 	u := SkippablePartners.Update()
 	n := 0
 	if s.Label.Valid {
 		n++
 		if s.Label.Null {
-			u.Set("label", core.Lit{V: nil})
+			u.Set("label", pgb.Lit{V: nil})
 		} else {
-			u.Set("label", core.Lit{V: s.Label.V})
+			u.Set("label", pgb.Lit{V: s.Label.V})
 		}
 	}
 	if n == 0 {
 		return 0, nil
 	}
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	u.Where(where...)
 	tag, err := u.Exec(ctx, exec)
@@ -228,17 +229,17 @@ func UpdateSkippablePartners(ctx context.Context, exec core.DBTX, where []core.E
 
 // UpsertSkippablePartner inserts p under id, or on conflict updates
 // every settable column from the proposed row (EXCLUDED.*) and returns
-// the resulting row; core.ErrNotFound when DO NOTHING matched.
-func UpsertSkippablePartner(ctx context.Context, exec core.DBTX, id int64, p InsertSkippablePartnerParams) (SkippablePartner, error) {
-	rows, err := core.NewInsert("public.skippable_partner",
+// the resulting row; pgb.ErrNotFound when DO NOTHING matched.
+func UpsertSkippablePartner(ctx context.Context, exec pgb.DBTX, id int64, p InsertSkippablePartnerParams) (SkippablePartner, error) {
+	rows, err := pgb.NewInsert("public.skippable_partner",
 		[]string{"id", "label"},
-		[]core.Expr{core.Lit{V: id}, core.Lit{V: p.Label}},
-	).OnConflict(core.OnConflict{
+		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.Label}},
+	).OnConflict(pgb.OnConflict{
 		Target: []string{"id"},
-		Sets: []core.SetClause{
-			{Col: "label", E: core.Col{Table: "excluded", Name: "label"}},
+		Sets: []pgb.SetClause{
+			{Col: "label", E: pgb.Col{Table: "excluded", Name: "label"}},
 		},
-	}).Returning(core.Col{Table: "skippable_partner", Name: "id"}, core.Col{Table: "skippable_partner", Name: "label"}).Run(ctx, exec)
+	}).Returning(pgb.Col{Table: "skippable_partner", Name: "id"}, pgb.Col{Table: "skippable_partner", Name: "label"}).Run(ctx, exec)
 	if err != nil {
 		return SkippablePartner{}, err
 	}
@@ -247,22 +248,22 @@ func UpsertSkippablePartner(ctx context.Context, exec core.DBTX, id int64, p Ins
 		return SkippablePartner{}, err
 	}
 	if len(us) == 0 {
-		return SkippablePartner{}, core.ErrNotFound
+		return SkippablePartner{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // DeleteSkippablePartner removes one row by id.
-func DeleteSkippablePartner(ctx context.Context, exec core.DBTX, id int64) error {
+func DeleteSkippablePartner(ctx context.Context, exec pgb.DBTX, id int64) error {
 	_, err := SkippablePartners.Delete().Where(SkippablePartners.ID().Eq(id)).Exec(ctx, exec)
 	return err
 }
 
 // DeleteSkippablePartners removes every row matching where and returns the
-// affected count; an empty where is refused with core.ErrNoWhere.
-func DeleteSkippablePartners(ctx context.Context, exec core.DBTX, where []core.Expr) (int64, error) {
+// affected count; an empty where is refused with pgb.ErrNoWhere.
+func DeleteSkippablePartners(ctx context.Context, exec pgb.DBTX, where []pgb.Expr) (int64, error) {
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	tag, err := SkippablePartners.Delete().Where(where...).Exec(ctx, exec)
 	if err != nil {

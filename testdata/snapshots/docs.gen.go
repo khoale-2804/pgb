@@ -7,140 +7,140 @@ package db
 
 import (
 	"github.com/google/uuid"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 )
 
 // Docs is the table descriptor for public.docs; immutable, safe for
 // concurrent use.
-var Docs = DocTable{core.NewTableMeta("public", "docs")}
+var Docs = DocTable{pgb.NewTableMeta("public", "docs")}
 
 // DocTable provides typed column accessors and statement entry points.
-type DocTable struct{ core.TableMeta }
+type DocTable struct{ pgb.TableMeta }
 
 // ID returns the typed accessor for column id.
 func (t DocTable) ID() DocIDCol {
-	return DocIDCol{core.Col{Table: "docs", Name: "id"}}
+	return DocIDCol{pgb.Col{Table: "docs", Name: "id"}}
 }
 
 // DocIDCol is the typed column docs.id.
-type DocIDCol struct{ core.Col }
+type DocIDCol struct{ pgb.Col }
 
-func (c DocIDCol) Eq(v uuid.UUID) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c DocIDCol) Eq(v uuid.UUID) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c DocIDCol) Ne(v uuid.UUID) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c DocIDCol) Ne(v uuid.UUID) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c DocIDCol) In(vs ...uuid.UUID) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "uuid[]"}}
+func (c DocIDCol) In(vs ...uuid.UUID) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "uuid[]"}}
 }
 
-func (c DocIDCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c DocIDCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c DocIDCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c DocIDCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
 // Title returns the typed accessor for column title.
 func (t DocTable) Title() DocTitleCol {
-	return DocTitleCol{core.Col{Table: "docs", Name: "title"}}
+	return DocTitleCol{pgb.Col{Table: "docs", Name: "title"}}
 }
 
 // DocTitleCol is the typed column docs.title.
-type DocTitleCol struct{ core.Col }
+type DocTitleCol struct{ pgb.Col }
 
-func (c DocTitleCol) Eq(v string) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c DocTitleCol) Eq(v string) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c DocTitleCol) Ne(v string) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c DocTitleCol) Ne(v string) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c DocTitleCol) In(vs ...string) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c DocTitleCol) In(vs ...string) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c DocTitleCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c DocTitleCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c DocTitleCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c DocTitleCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c DocTitleCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c DocTitleCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c DocTitleCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c DocTitleCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c DocTitleCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c DocTitleCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c DocTitleCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c DocTitleCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // Body returns the typed accessor for column body.
 func (t DocTable) Body() DocBodyCol {
-	return DocBodyCol{core.Col{Table: "docs", Name: "body"}}
+	return DocBodyCol{pgb.Col{Table: "docs", Name: "body"}}
 }
 
 // DocBodyCol is the typed column docs.body.
-type DocBodyCol struct{ core.Col }
+type DocBodyCol struct{ pgb.Col }
 
-func (c DocBodyCol) Eq(v string) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c DocBodyCol) Eq(v string) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c DocBodyCol) Ne(v string) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c DocBodyCol) Ne(v string) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c DocBodyCol) In(vs ...string) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c DocBodyCol) In(vs ...string) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c DocBodyCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c DocBodyCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c DocBodyCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c DocBodyCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c DocBodyCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c DocBodyCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c DocBodyCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c DocBodyCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c DocBodyCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c DocBodyCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c DocBodyCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c DocBodyCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // Select starts a SELECT of every column; chain Where/OrderBy/Limit/...
 // and terminate with Run (or a static function).
-func (t DocTable) Select() *core.Select {
-	return core.NewSelect("public.docs", core.Col{Table: "docs", Name: "id"}, core.Col{Table: "docs", Name: "title"}, core.Col{Table: "docs", Name: "body"})
+func (t DocTable) Select() *pgb.Select {
+	return pgb.NewSelect("public.docs", pgb.Col{Table: "docs", Name: "id"}, pgb.Col{Table: "docs", Name: "title"}, pgb.Col{Table: "docs", Name: "body"})
 }
 
-// Update starts an UPDATE; an empty WHERE fails with core.ErrNoWhere.
-func (t DocTable) Update() *core.Update { return core.NewUpdate("public.docs") }
+// Update starts an UPDATE; an empty WHERE fails with pgb.ErrNoWhere.
+func (t DocTable) Update() *pgb.Update { return pgb.NewUpdate("public.docs") }
 
-// Delete starts a DELETE; an empty WHERE fails with core.ErrNoWhere.
-func (t DocTable) Delete() *core.Delete { return core.NewDelete("public.docs") }
+// Delete starts a DELETE; an empty WHERE fails with pgb.ErrNoWhere.
+func (t DocTable) Delete() *pgb.Delete { return pgb.NewDelete("public.docs") }

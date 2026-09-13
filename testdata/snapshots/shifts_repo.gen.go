@@ -10,7 +10,7 @@ import (
 	"errors"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 )
 
 // ShiftFilter narrows ListShifts and CountShifts:
@@ -29,13 +29,13 @@ type ShiftFilter struct {
 	EmployeeIDGte *int32
 	EmployeeIDLte *int32
 	During        *pgtype.Range[pgtype.Timestamptz]
-	Extra         []core.Expr
+	Extra         []pgb.Expr
 }
 
 // shiftsFilterWhere compiles f into the ANDed predicate list; an empty
 // filter yields an empty list (no WHERE).
-func shiftsFilterWhere(f ShiftFilter) []core.Expr {
-	var w []core.Expr
+func shiftsFilterWhere(f ShiftFilter) []pgb.Expr {
+	var w []pgb.Expr
 	if f.ID != nil {
 		w = append(w, Shifts.ID().Eq(*f.ID))
 	}
@@ -104,15 +104,15 @@ func scanShift(row pgx.CollectableRow) (Shift, error) {
 	return m, nil
 }
 
-// GetShift returns one row by id; core.ErrNotFound when absent
+// GetShift returns one row by id; pgb.ErrNotFound when absent
 // (pgx.ErrNoRows mapped — errors.Is keeps working for both).
-func GetShift(ctx context.Context, exec core.DBTX, id int64) (Shift, error) {
+func GetShift(ctx context.Context, exec pgb.DBTX, id int64) (Shift, error) {
 	sql, args := Shifts.Select().Where(Shifts.ID().Eq(id)).SQL()
 	var m Shift
 	err := exec.QueryRow(ctx, sql, args...).Scan(&m.ID, &m.EmployeeID, &m.During)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Shift{}, core.ErrNotFound
+			return Shift{}, pgb.ErrNotFound
 		}
 		return Shift{}, err
 	}
@@ -120,8 +120,9 @@ func GetShift(ctx context.Context, exec core.DBTX, id int64) (Shift, error) {
 }
 
 // ListShifts returns the rows matching f; limit <= 0 means no LIMIT.
-func ListShifts(ctx context.Context, exec core.DBTX, f ShiftFilter, limit int) ([]Shift, error) {
-	rows, err := Shifts.Select().Where(shiftsFilterWhere(f)...).Limit(limit).Run(ctx, exec)
+func ListShifts(ctx context.Context, exec pgb.DBTX, f ShiftFilter, opts ...pgb.ListOpt) ([]Shift, error) {
+	sel := Shifts.Select().Where(shiftsFilterWhere(f)...).ApplyList(opts...)
+	rows, err := sel.Run(ctx, exec)
 	if err != nil {
 		return nil, err
 	}
@@ -129,8 +130,8 @@ func ListShifts(ctx context.Context, exec core.DBTX, f ShiftFilter, limit int) (
 }
 
 // CountShifts counts the rows matching f.
-func CountShifts(ctx context.Context, exec core.DBTX, f ShiftFilter) (int64, error) {
-	sql, args := core.NewSelect("public.shifts", core.Raw{SQL: "count(*)"}).Where(shiftsFilterWhere(f)...).SQL()
+func CountShifts(ctx context.Context, exec pgb.DBTX, f ShiftFilter) (int64, error) {
+	sql, args := pgb.NewSelect("public.shifts", pgb.Raw{SQL: "count(*)"}).Where(shiftsFilterWhere(f)...).SQL()
 	var n int64
 	if err := exec.QueryRow(ctx, sql, args...).Scan(&n); err != nil {
 		return 0, err
@@ -140,11 +141,11 @@ func CountShifts(ctx context.Context, exec core.DBTX, f ShiftFilter) (int64, err
 
 // InsertShift inserts one row and returns it (RETURNING every
 // column, defaults included).
-func InsertShift(ctx context.Context, exec core.DBTX, p InsertShiftParams) (Shift, error) {
-	rows, err := core.NewInsert("public.shifts",
+func InsertShift(ctx context.Context, exec pgb.DBTX, p InsertShiftParams) (Shift, error) {
+	rows, err := pgb.NewInsert("public.shifts",
 		[]string{"employee_id", "during"},
-		[]core.Expr{core.Lit{V: p.EmployeeID}, core.Lit{V: p.During}},
-	).Returning(core.Col{Table: "shifts", Name: "id"}, core.Col{Table: "shifts", Name: "employee_id"}, core.Col{Table: "shifts", Name: "during"}).Run(ctx, exec)
+		[]pgb.Expr{pgb.Lit{V: p.EmployeeID}, pgb.Lit{V: p.During}},
+	).Returning(pgb.Col{Table: "shifts", Name: "id"}, pgb.Col{Table: "shifts", Name: "employee_id"}, pgb.Col{Table: "shifts", Name: "during"}).Run(ctx, exec)
 	if err != nil {
 		return Shift{}, err
 	}
@@ -153,7 +154,7 @@ func InsertShift(ctx context.Context, exec core.DBTX, p InsertShiftParams) (Shif
 		return Shift{}, err
 	}
 	if len(us) == 0 {
-		return Shift{}, core.ErrNotFound
+		return Shift{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
@@ -162,7 +163,7 @@ const insertShiftsSQL = "INSERT INTO public.shifts (employee_id, during) SELECT 
 
 // InsertShifts inserts a whole batch in one round trip via
 // unnest and returns every inserted row.
-func InsertShifts(ctx context.Context, exec core.DBTX, ps []InsertShiftParams) ([]Shift, error) {
+func InsertShifts(ctx context.Context, exec pgb.DBTX, ps []InsertShiftParams) ([]Shift, error) {
 	if len(ps) == 0 {
 		return nil, nil
 	}
@@ -182,30 +183,30 @@ func InsertShifts(ctx context.Context, exec core.DBTX, ps []InsertShiftParams) (
 }
 
 // UpdateShift applies the non-zero fields of s to one row and
-// returns the updated row; core.ErrNotFound when absent.
-func UpdateShift(ctx context.Context, exec core.DBTX, id int64, s ShiftSet) (Shift, error) {
+// returns the updated row; pgb.ErrNotFound when absent.
+func UpdateShift(ctx context.Context, exec pgb.DBTX, id int64, s ShiftSet) (Shift, error) {
 	u := Shifts.Update()
 	n := 0
 	if s.EmployeeID.Valid {
 		n++
 		if s.EmployeeID.Null {
-			u.Set("employee_id", core.Lit{V: nil})
+			u.Set("employee_id", pgb.Lit{V: nil})
 		} else {
-			u.Set("employee_id", core.Lit{V: s.EmployeeID.V})
+			u.Set("employee_id", pgb.Lit{V: s.EmployeeID.V})
 		}
 	}
 	if s.During.Valid {
 		n++
 		if s.During.Null {
-			u.Set("during", core.Lit{V: nil})
+			u.Set("during", pgb.Lit{V: nil})
 		} else {
-			u.Set("during", core.Lit{V: s.During.V})
+			u.Set("during", pgb.Lit{V: s.During.V})
 		}
 	}
 	if n == 0 {
 		return GetShift(ctx, exec, id)
 	}
-	u.Where(Shifts.ID().Eq(id)).Returning(core.Col{Table: "shifts", Name: "id"}, core.Col{Table: "shifts", Name: "employee_id"}, core.Col{Table: "shifts", Name: "during"})
+	u.Where(Shifts.ID().Eq(id)).Returning(pgb.Col{Table: "shifts", Name: "id"}, pgb.Col{Table: "shifts", Name: "employee_id"}, pgb.Col{Table: "shifts", Name: "during"})
 	rows, err := u.Run(ctx, exec)
 	if err != nil {
 		return Shift{}, err
@@ -215,38 +216,38 @@ func UpdateShift(ctx context.Context, exec core.DBTX, id int64, s ShiftSet) (Shi
 		return Shift{}, err
 	}
 	if len(us) == 0 {
-		return Shift{}, core.ErrNotFound
+		return Shift{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // UpdateShifts applies s to every row matching where and
 // returns the affected count; an empty where is refused with
-// core.ErrNoWhere before any SQL is sent.
-func UpdateShifts(ctx context.Context, exec core.DBTX, where []core.Expr, s ShiftSet) (int64, error) {
+// pgb.ErrNoWhere before any SQL is sent.
+func UpdateShifts(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, s ShiftSet) (int64, error) {
 	u := Shifts.Update()
 	n := 0
 	if s.EmployeeID.Valid {
 		n++
 		if s.EmployeeID.Null {
-			u.Set("employee_id", core.Lit{V: nil})
+			u.Set("employee_id", pgb.Lit{V: nil})
 		} else {
-			u.Set("employee_id", core.Lit{V: s.EmployeeID.V})
+			u.Set("employee_id", pgb.Lit{V: s.EmployeeID.V})
 		}
 	}
 	if s.During.Valid {
 		n++
 		if s.During.Null {
-			u.Set("during", core.Lit{V: nil})
+			u.Set("during", pgb.Lit{V: nil})
 		} else {
-			u.Set("during", core.Lit{V: s.During.V})
+			u.Set("during", pgb.Lit{V: s.During.V})
 		}
 	}
 	if n == 0 {
 		return 0, nil
 	}
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	u.Where(where...)
 	tag, err := u.Exec(ctx, exec)
@@ -258,18 +259,18 @@ func UpdateShifts(ctx context.Context, exec core.DBTX, where []core.Expr, s Shif
 
 // UpsertShift inserts p under id, or on conflict updates
 // every settable column from the proposed row (EXCLUDED.*) and returns
-// the resulting row; core.ErrNotFound when DO NOTHING matched.
-func UpsertShift(ctx context.Context, exec core.DBTX, id int64, p InsertShiftParams) (Shift, error) {
-	rows, err := core.NewInsert("public.shifts",
+// the resulting row; pgb.ErrNotFound when DO NOTHING matched.
+func UpsertShift(ctx context.Context, exec pgb.DBTX, id int64, p InsertShiftParams) (Shift, error) {
+	rows, err := pgb.NewInsert("public.shifts",
 		[]string{"id", "employee_id", "during"},
-		[]core.Expr{core.Lit{V: id}, core.Lit{V: p.EmployeeID}, core.Lit{V: p.During}},
-	).OnConflict(core.OnConflict{
+		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.EmployeeID}, pgb.Lit{V: p.During}},
+	).OnConflict(pgb.OnConflict{
 		Target: []string{"id"},
-		Sets: []core.SetClause{
-			{Col: "employee_id", E: core.Col{Table: "excluded", Name: "employee_id"}},
-			{Col: "during", E: core.Col{Table: "excluded", Name: "during"}},
+		Sets: []pgb.SetClause{
+			{Col: "employee_id", E: pgb.Col{Table: "excluded", Name: "employee_id"}},
+			{Col: "during", E: pgb.Col{Table: "excluded", Name: "during"}},
 		},
-	}).Returning(core.Col{Table: "shifts", Name: "id"}, core.Col{Table: "shifts", Name: "employee_id"}, core.Col{Table: "shifts", Name: "during"}).Run(ctx, exec)
+	}).Returning(pgb.Col{Table: "shifts", Name: "id"}, pgb.Col{Table: "shifts", Name: "employee_id"}, pgb.Col{Table: "shifts", Name: "during"}).Run(ctx, exec)
 	if err != nil {
 		return Shift{}, err
 	}
@@ -278,22 +279,22 @@ func UpsertShift(ctx context.Context, exec core.DBTX, id int64, p InsertShiftPar
 		return Shift{}, err
 	}
 	if len(us) == 0 {
-		return Shift{}, core.ErrNotFound
+		return Shift{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // DeleteShift removes one row by id.
-func DeleteShift(ctx context.Context, exec core.DBTX, id int64) error {
+func DeleteShift(ctx context.Context, exec pgb.DBTX, id int64) error {
 	_, err := Shifts.Delete().Where(Shifts.ID().Eq(id)).Exec(ctx, exec)
 	return err
 }
 
 // DeleteShifts removes every row matching where and returns the
-// affected count; an empty where is refused with core.ErrNoWhere.
-func DeleteShifts(ctx context.Context, exec core.DBTX, where []core.Expr) (int64, error) {
+// affected count; an empty where is refused with pgb.ErrNoWhere.
+func DeleteShifts(ctx context.Context, exec pgb.DBTX, where []pgb.Expr) (int64, error) {
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	tag, err := Shifts.Delete().Where(where...).Exec(ctx, exec)
 	if err != nil {

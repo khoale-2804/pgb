@@ -7,309 +7,309 @@ package db
 
 import (
 	"github.com/jackc/pgx/v5/pgtype"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 )
 
 // Tickets is the table descriptor for public.tickets; immutable, safe for
 // concurrent use.
-var Tickets = TicketTable{core.NewTableMeta("public", "tickets")}
+var Tickets = TicketTable{pgb.NewTableMeta("public", "tickets")}
 
 // TicketTable provides typed column accessors and statement entry points.
-type TicketTable struct{ core.TableMeta }
+type TicketTable struct{ pgb.TableMeta }
 
 // ID returns the typed accessor for column id.
 func (t TicketTable) ID() TicketIDCol {
-	return TicketIDCol{core.Col{Table: "tickets", Name: "id"}}
+	return TicketIDCol{pgb.Col{Table: "tickets", Name: "id"}}
 }
 
 // TicketIDCol is the typed column tickets.id.
-type TicketIDCol struct{ core.Col }
+type TicketIDCol struct{ pgb.Col }
 
-func (c TicketIDCol) Eq(v int64) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c TicketIDCol) Eq(v int64) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c TicketIDCol) Ne(v int64) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c TicketIDCol) Ne(v int64) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c TicketIDCol) In(vs ...int64) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "bigserial[]"}}
+func (c TicketIDCol) In(vs ...int64) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "bigserial[]"}}
 }
 
-func (c TicketIDCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c TicketIDCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c TicketIDCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c TicketIDCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c TicketIDCol) Gt(v int64) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c TicketIDCol) Gt(v int64) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c TicketIDCol) Lt(v int64) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c TicketIDCol) Lt(v int64) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c TicketIDCol) Gte(v int64) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c TicketIDCol) Gte(v int64) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c TicketIDCol) Lte(v int64) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c TicketIDCol) Lte(v int64) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c TicketIDCol) Between(a, b int64) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c TicketIDCol) Between(a, b int64) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // Number returns the typed accessor for column number.
 func (t TicketTable) Number() TicketNumberCol {
-	return TicketNumberCol{core.Col{Table: "tickets", Name: "number"}}
+	return TicketNumberCol{pgb.Col{Table: "tickets", Name: "number"}}
 }
 
 // TicketNumberCol is the typed column tickets.number.
-type TicketNumberCol struct{ core.Col }
+type TicketNumberCol struct{ pgb.Col }
 
-func (c TicketNumberCol) Eq(v int64) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c TicketNumberCol) Eq(v int64) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c TicketNumberCol) Ne(v int64) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c TicketNumberCol) Ne(v int64) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c TicketNumberCol) In(vs ...int64) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "int8[]"}}
+func (c TicketNumberCol) In(vs ...int64) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int8[]"}}
 }
 
-func (c TicketNumberCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c TicketNumberCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c TicketNumberCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c TicketNumberCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c TicketNumberCol) Gt(v int64) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c TicketNumberCol) Gt(v int64) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c TicketNumberCol) Lt(v int64) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c TicketNumberCol) Lt(v int64) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c TicketNumberCol) Gte(v int64) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c TicketNumberCol) Gte(v int64) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c TicketNumberCol) Lte(v int64) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c TicketNumberCol) Lte(v int64) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c TicketNumberCol) Between(a, b int64) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c TicketNumberCol) Between(a, b int64) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // Subject returns the typed accessor for column subject.
 func (t TicketTable) Subject() TicketSubjectCol {
-	return TicketSubjectCol{core.Col{Table: "tickets", Name: "subject"}}
+	return TicketSubjectCol{pgb.Col{Table: "tickets", Name: "subject"}}
 }
 
 // TicketSubjectCol is the typed column tickets.subject.
-type TicketSubjectCol struct{ core.Col }
+type TicketSubjectCol struct{ pgb.Col }
 
-func (c TicketSubjectCol) Eq(v string) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c TicketSubjectCol) Eq(v string) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c TicketSubjectCol) Ne(v string) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c TicketSubjectCol) Ne(v string) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c TicketSubjectCol) In(vs ...string) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c TicketSubjectCol) In(vs ...string) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c TicketSubjectCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c TicketSubjectCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c TicketSubjectCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c TicketSubjectCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c TicketSubjectCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c TicketSubjectCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c TicketSubjectCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c TicketSubjectCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c TicketSubjectCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c TicketSubjectCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c TicketSubjectCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c TicketSubjectCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // Priority returns the typed accessor for column priority.
 func (t TicketTable) Priority() TicketPriorityCol {
-	return TicketPriorityCol{core.Col{Table: "tickets", Name: "priority"}}
+	return TicketPriorityCol{pgb.Col{Table: "tickets", Name: "priority"}}
 }
 
 // TicketPriorityCol is the typed column tickets.priority.
-type TicketPriorityCol struct{ core.Col }
+type TicketPriorityCol struct{ pgb.Col }
 
-func (c TicketPriorityCol) Eq(v string) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c TicketPriorityCol) Eq(v string) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c TicketPriorityCol) Ne(v string) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c TicketPriorityCol) Ne(v string) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c TicketPriorityCol) In(vs ...string) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c TicketPriorityCol) In(vs ...string) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c TicketPriorityCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c TicketPriorityCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c TicketPriorityCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c TicketPriorityCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c TicketPriorityCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c TicketPriorityCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c TicketPriorityCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c TicketPriorityCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c TicketPriorityCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c TicketPriorityCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c TicketPriorityCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c TicketPriorityCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // Status returns the typed accessor for column status.
 func (t TicketTable) Status() TicketStatusCol {
-	return TicketStatusCol{core.Col{Table: "tickets", Name: "status"}}
+	return TicketStatusCol{pgb.Col{Table: "tickets", Name: "status"}}
 }
 
 // TicketStatusCol is the typed column tickets.status.
-type TicketStatusCol struct{ core.Col }
+type TicketStatusCol struct{ pgb.Col }
 
-func (c TicketStatusCol) Eq(v string) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c TicketStatusCol) Eq(v string) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c TicketStatusCol) Ne(v string) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c TicketStatusCol) Ne(v string) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c TicketStatusCol) In(vs ...string) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c TicketStatusCol) In(vs ...string) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c TicketStatusCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c TicketStatusCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c TicketStatusCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c TicketStatusCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c TicketStatusCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c TicketStatusCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c TicketStatusCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c TicketStatusCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c TicketStatusCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c TicketStatusCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c TicketStatusCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c TicketStatusCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // CreatedAt returns the typed accessor for column created_at.
 func (t TicketTable) CreatedAt() TicketCreatedAtCol {
-	return TicketCreatedAtCol{core.Col{Table: "tickets", Name: "created_at"}}
+	return TicketCreatedAtCol{pgb.Col{Table: "tickets", Name: "created_at"}}
 }
 
 // TicketCreatedAtCol is the typed column tickets.created_at.
-type TicketCreatedAtCol struct{ core.Col }
+type TicketCreatedAtCol struct{ pgb.Col }
 
-func (c TicketCreatedAtCol) Eq(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c TicketCreatedAtCol) Eq(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c TicketCreatedAtCol) Ne(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c TicketCreatedAtCol) Ne(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c TicketCreatedAtCol) In(vs ...pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "timestamptz[]"}}
+func (c TicketCreatedAtCol) In(vs ...pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "timestamptz[]"}}
 }
 
-func (c TicketCreatedAtCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c TicketCreatedAtCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c TicketCreatedAtCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c TicketCreatedAtCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c TicketCreatedAtCol) Gt(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c TicketCreatedAtCol) Gt(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c TicketCreatedAtCol) Lt(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c TicketCreatedAtCol) Lt(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c TicketCreatedAtCol) Gte(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c TicketCreatedAtCol) Gte(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c TicketCreatedAtCol) Lte(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c TicketCreatedAtCol) Lte(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c TicketCreatedAtCol) Between(a, b pgtype.Timestamptz) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c TicketCreatedAtCol) Between(a, b pgtype.Timestamptz) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // Select starts a SELECT of every column; chain Where/OrderBy/Limit/...
 // and terminate with Run (or a static function).
-func (t TicketTable) Select() *core.Select {
-	return core.NewSelect("public.tickets", core.Col{Table: "tickets", Name: "id"}, core.Col{Table: "tickets", Name: "number"}, core.Col{Table: "tickets", Name: "subject"}, core.Col{Table: "tickets", Name: "priority"}, core.Col{Table: "tickets", Name: "status"}, core.Col{Table: "tickets", Name: "created_at"})
+func (t TicketTable) Select() *pgb.Select {
+	return pgb.NewSelect("public.tickets", pgb.Col{Table: "tickets", Name: "id"}, pgb.Col{Table: "tickets", Name: "number"}, pgb.Col{Table: "tickets", Name: "subject"}, pgb.Col{Table: "tickets", Name: "priority"}, pgb.Col{Table: "tickets", Name: "status"}, pgb.Col{Table: "tickets", Name: "created_at"})
 }
 
-// Update starts an UPDATE; an empty WHERE fails with core.ErrNoWhere.
-func (t TicketTable) Update() *core.Update { return core.NewUpdate("public.tickets") }
+// Update starts an UPDATE; an empty WHERE fails with pgb.ErrNoWhere.
+func (t TicketTable) Update() *pgb.Update { return pgb.NewUpdate("public.tickets") }
 
-// Delete starts a DELETE; an empty WHERE fails with core.ErrNoWhere.
-func (t TicketTable) Delete() *core.Delete { return core.NewDelete("public.tickets") }
+// Delete starts a DELETE; an empty WHERE fails with pgb.ErrNoWhere.
+func (t TicketTable) Delete() *pgb.Delete { return pgb.NewDelete("public.tickets") }

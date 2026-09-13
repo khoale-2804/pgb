@@ -17,13 +17,13 @@ import (
 // layer — plus one shared "pgb_helpers.gen.go" with the three-state Set[T]
 // helper. Statics compile their filters down to the same core expression
 // tree as the builders (no private SQL path); single-row lookups map
-// pgx.ErrNoRows to core.ErrNotFound, and bulk mutations refuse an empty
-// where slice with core.ErrNoWhere.
+// pgx.ErrNoRows to pgb.ErrNotFound, and bulk mutations refuse an empty
+// where slice with pgb.ErrNoWhere.
 //
 // Frozen-scope deviations from docs/generated-code/{statics,pagination}:
 //   - core ships no Set/ListOpt types, so Set[T]/SetOf/SetNull/Opt are
 //     emitted into the shared helpers file instead of core;
-//   - ListUsers takes limit int (limit <= 0 = no LIMIT) — no pgb.ListOpt;
+//   - ListUsers takes opts ...pgb.ListOpt (Limit/Offset, zero = no clause);
 //   - keyset Page functions are not generated yet (M1);
 //   - UpsertUser is generated only for a single-column key (primary key or
 //     unique, resolved by heuristicPK from the DDL extraction pass) and
@@ -256,7 +256,7 @@ func staticsFile(sch ir.Schema, t ir.Table, opts Options, dir DirectiveSet) ([]b
 	b.WriteString("// nil / zero fields are ignored; Extra composes raw predicates.\n")
 	b.WriteString("type " + model + "Filter struct {\n")
 	var w strings.Builder
-	w.WriteString("\tvar w []core.Expr\n")
+	w.WriteString("\tvar w []pgb.Expr\n")
 	seenF := map[string]int{}
 	uniqF := func(base string) string {
 		n := base
@@ -306,12 +306,12 @@ func staticsFile(sch ir.Schema, t ir.Table, opts Options, dir DirectiveSet) ([]b
 		}
 	}
 	extra := uniqF("Extra")
-	b.WriteString("\t" + extra + " []core.Expr\n}\n\n")
+	b.WriteString("\t" + extra + " []pgb.Expr\n}\n\n")
 	fmt.Fprintf(&w, "\tw = append(w, f.%s...)\n\treturn w\n}\n\n", extra)
 
 	lw := lowerFirst(tableVar) + "FilterWhere"
 	b.WriteString("// " + lw + " compiles f into the ANDed predicate list; an empty\n// filter yields an empty list (no WHERE).\n")
-	b.WriteString("func " + lw + "(f " + model + "Filter) []core.Expr {\n")
+	b.WriteString("func " + lw + "(f " + model + "Filter) []pgb.Expr {\n")
 	b.WriteString(w.String())
 
 	// ---- set struct + SET-clause lines ----
@@ -333,7 +333,7 @@ func staticsFile(sch ir.Schema, t ir.Table, opts Options, dir DirectiveSet) ([]b
 			typ, _ := resolveColType(t, t.Columns[i], opts, dir)
 			f := uniqS(names[i])
 			b.WriteString("\t" + f + " Set[" + typ + "]\n")
-			fmt.Fprintf(&setLines, "\tif s.%s.Valid {\n\t\tn++\n\t\tif s.%s.Null {\n\t\t\tu.Set(%s, core.Lit{V: nil})\n\t\t} else {\n\t\t\tu.Set(%s, %s)\n\t\t}\n\t}\n",
+			fmt.Fprintf(&setLines, "\tif s.%s.Valid {\n\t\tn++\n\t\tif s.%s.Null {\n\t\t\tu.Set(%s, pgb.Lit{V: nil})\n\t\t} else {\n\t\t\tu.Set(%s, %s)\n\t\t}\n\t}\n",
 				f, f, strconv.Quote(t.Columns[i].Name), strconv.Quote(t.Columns[i].Name),
 				litExpr(t.Columns[i], "s."+f+".V", opts))
 		}
@@ -380,33 +380,34 @@ func staticsFile(sch ir.Schema, t ir.Table, opts Options, dir DirectiveSet) ([]b
 	collect := func() {
 		b.WriteString("\tus, err := pgx.CollectRows(rows, scan" + singular + ")\n")
 		b.WriteString("\tif err != nil {\n\t\treturn " + model + "{}, err\n\t}\n")
-		b.WriteString("\tif len(us) == 0 {\n\t\treturn " + model + "{}, core.ErrNotFound\n\t}\n")
+		b.WriteString("\tif len(us) == 0 {\n\t\treturn " + model + "{}, pgb.ErrNotFound\n\t}\n")
 		b.WriteString("\treturn us[0], nil\n}\n\n")
 	}
 
 	// ---- Get (single-column PK/unique only) ----
 	if pkIdx >= 0 {
-		b.WriteString("// Get" + singular + " returns one row by " + pkName + "; core.ErrNotFound when absent\n// (pgx.ErrNoRows mapped — errors.Is keeps working for both).\n")
-		b.WriteString("func Get" + singular + "(ctx context.Context, exec core.DBTX, " + pkParam + " " + pkType + ") (" + model + ", error) {\n")
+		b.WriteString("// Get" + singular + " returns one row by " + pkName + "; pgb.ErrNotFound when absent\n// (pgx.ErrNoRows mapped — errors.Is keeps working for both).\n")
+		b.WriteString("func Get" + singular + "(ctx context.Context, exec pgb.DBTX, " + pkParam + " " + pkType + ") (" + model + ", error) {\n")
 		fmt.Fprintf(&b, "\tsql, args := %s.Select().Where(%s.%s().Eq(%s)).SQL()\n", tableVar, tableVar, accessorName(names[pkIdx]), pkParam)
 		b.WriteString("\tvar m " + model + "\n")
 		fmt.Fprintf(&b, "\terr := exec.QueryRow(ctx, sql, args...).Scan(%s)\n", scanList)
 		b.WriteString("\tif err != nil {\n")
-		b.WriteString("\t\tif errors.Is(err, pgx.ErrNoRows) {\n\t\t\treturn " + model + "{}, core.ErrNotFound\n\t\t}\n")
+		b.WriteString("\t\tif errors.Is(err, pgx.ErrNoRows) {\n\t\t\treturn " + model + "{}, pgb.ErrNotFound\n\t\t}\n")
 		b.WriteString("\t\treturn " + model + "{}, err\n\t}\n")
 		b.WriteString("\treturn m, nil\n}\n\n")
 	}
 
 	// ---- List / Count ----
 	b.WriteString("// List" + tableVar + " returns the rows matching f; limit <= 0 means no LIMIT.\n")
-	b.WriteString("func List" + tableVar + "(ctx context.Context, exec core.DBTX, f " + model + "Filter, limit int) ([]" + model + ", error) {\n")
-	fmt.Fprintf(&b, "\trows, err := %s.Select().Where(%s(f)...).Limit(limit).Run(ctx, exec)\n", tableVar, lw)
+	b.WriteString("func List" + tableVar + "(ctx context.Context, exec pgb.DBTX, f " + model + "Filter, opts ...pgb.ListOpt) ([]" + model + ", error) {\n")
+	b.WriteString("\tsel := " + tableVar + ".Select().Where(" + lw + "(f)...).ApplyList(opts...)\n")
+	b.WriteString("\trows, err := sel.Run(ctx, exec)\n")
 	b.WriteString("\tif err != nil {\n\t\treturn nil, err\n\t}\n")
 	b.WriteString("\treturn pgx.CollectRows(rows, scan" + singular + ")\n}\n\n")
 
 	b.WriteString("// Count" + tableVar + " counts the rows matching f.\n")
-	b.WriteString("func Count" + tableVar + "(ctx context.Context, exec core.DBTX, f " + model + "Filter) (int64, error) {\n")
-	fmt.Fprintf(&b, "\tsql, args := core.NewSelect(%s, core.Raw{SQL: \"count(*)\"}).Where(%s(f)...).SQL()\n", strconv.Quote(qname), lw)
+	b.WriteString("func Count" + tableVar + "(ctx context.Context, exec pgb.DBTX, f " + model + "Filter) (int64, error) {\n")
+	fmt.Fprintf(&b, "\tsql, args := pgb.NewSelect(%s, pgb.Raw{SQL: \"count(*)\"}).Where(%s(f)...).SQL()\n", strconv.Quote(qname), lw)
 	b.WriteString("\tvar n int64\n")
 	b.WriteString("\tif err := exec.QueryRow(ctx, sql, args...).Scan(&n); err != nil {\n\t\treturn 0, err\n\t}\n")
 	b.WriteString("\treturn n, nil\n}\n\n")
@@ -414,7 +415,7 @@ func staticsFile(sch ir.Schema, t ir.Table, opts Options, dir DirectiveSet) ([]b
 	if writable {
 		// ---- InsertUser ----
 		b.WriteString("// Insert" + singular + " inserts one row and returns it (RETURNING every\n// column, defaults included).\n")
-		b.WriteString("func Insert" + singular + "(ctx context.Context, exec core.DBTX, p Insert" + singular + "Params) (" + model + ", error) {\n")
+		b.WriteString("func Insert" + singular + "(ctx context.Context, exec pgb.DBTX, p Insert" + singular + "Params) (" + model + ", error) {\n")
 		if len(params) > 0 {
 			cols := make([]string, len(params))
 			vals := make([]string, len(params))
@@ -422,10 +423,10 @@ func staticsFile(sch ir.Schema, t ir.Table, opts Options, dir DirectiveSet) ([]b
 				cols[k] = strconv.Quote(t.Columns[pc.idx].Name)
 				vals[k] = litExpr(t.Columns[pc.idx], "p."+pc.field, opts)
 			}
-			fmt.Fprintf(&b, "\trows, err := core.NewInsert(%s,\n\t\t[]string{%s},\n\t\t[]core.Expr{%s},\n\t).Returning(%s).Run(ctx, exec)\n",
+			fmt.Fprintf(&b, "\trows, err := pgb.NewInsert(%s,\n\t\t[]string{%s},\n\t\t[]pgb.Expr{%s},\n\t).Returning(%s).Run(ctx, exec)\n",
 				strconv.Quote(qname), strings.Join(cols, ", "), strings.Join(vals, ", "), retArgs)
 		} else {
-			fmt.Fprintf(&b, "\trows, err := core.NewInsert(%s).Returning(%s).Run(ctx, exec)\n", strconv.Quote(qname), retArgs)
+			fmt.Fprintf(&b, "\trows, err := pgb.NewInsert(%s).Returning(%s).Run(ctx, exec)\n", strconv.Quote(qname), retArgs)
 		}
 		b.WriteString("\tif err != nil {\n\t\treturn " + model + "{}, err\n\t}\n")
 		collect()
@@ -453,7 +454,7 @@ func staticsFile(sch ir.Schema, t ir.Table, opts Options, dir DirectiveSet) ([]b
 				strings.Join(casts, ", ") + ") RETURNING " + retCols
 			fmt.Fprintf(&b, "const insert%[1]s%[2]sSQL = %[3]s\n\n", tableVar, bulk, strconv.Quote(sql))
 			b.WriteString("// Insert" + tableVar + bulk + " inserts a whole batch in one round trip via\n// unnest and returns every inserted row.\n")
-			b.WriteString("func Insert" + tableVar + bulk + "(ctx context.Context, exec core.DBTX, ps []Insert" + singular + "Params) ([]" + model + ", error) {\n")
+			b.WriteString("func Insert" + tableVar + bulk + "(ctx context.Context, exec pgb.DBTX, ps []Insert" + singular + "Params) ([]" + model + ", error) {\n")
 			b.WriteString("\tif len(ps) == 0 {\n\t\treturn nil, nil\n\t}\n")
 			var arrVars []string
 			for _, pc := range params {
@@ -475,8 +476,8 @@ func staticsFile(sch ir.Schema, t ir.Table, opts Options, dir DirectiveSet) ([]b
 
 		// ---- UpdateUser (three-state set, single-column key) ----
 		if pkIdx >= 0 && len(setIdx) > 0 {
-			b.WriteString("// Update" + singular + " applies the non-zero fields of s to one row and\n// returns the updated row; core.ErrNotFound when absent.\n")
-			b.WriteString("func Update" + singular + "(ctx context.Context, exec core.DBTX, " + pkParam + " " + pkType + ", s " + model + "Set) (" + model + ", error) {\n")
+			b.WriteString("// Update" + singular + " applies the non-zero fields of s to one row and\n// returns the updated row; pgb.ErrNotFound when absent.\n")
+			b.WriteString("func Update" + singular + "(ctx context.Context, exec pgb.DBTX, " + pkParam + " " + pkType + ", s " + model + "Set) (" + model + ", error) {\n")
 			b.WriteString("\tu := " + tableVar + ".Update()\n\tn := 0\n")
 			b.WriteString(setLines.String())
 			fmt.Fprintf(&b, "\tif n == 0 {\n\t\treturn Get%s(ctx, exec, %s)\n\t}\n", singular, pkParam)
@@ -488,12 +489,12 @@ func staticsFile(sch ir.Schema, t ir.Table, opts Options, dir DirectiveSet) ([]b
 
 		// ---- UpdateUsers ----
 		if len(setIdx) > 0 {
-			b.WriteString("// Update" + tableVar + bulk + " applies s to every row matching where and\n// returns the affected count; an empty where is refused with\n// core.ErrNoWhere before any SQL is sent.\n")
-			b.WriteString("func Update" + tableVar + bulk + "(ctx context.Context, exec core.DBTX, where []core.Expr, s " + model + "Set) (int64, error) {\n")
+			b.WriteString("// Update" + tableVar + bulk + " applies s to every row matching where and\n// returns the affected count; an empty where is refused with\n// pgb.ErrNoWhere before any SQL is sent.\n")
+			b.WriteString("func Update" + tableVar + bulk + "(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, s " + model + "Set) (int64, error) {\n")
 			b.WriteString("\tu := " + tableVar + ".Update()\n\tn := 0\n")
 			b.WriteString(setLines.String())
 			b.WriteString("\tif n == 0 {\n\t\treturn 0, nil\n\t}\n")
-			b.WriteString("\tif len(where) == 0 {\n\t\treturn 0, core.ErrNoWhere\n\t}\n")
+			b.WriteString("\tif len(where) == 0 {\n\t\treturn 0, pgb.ErrNoWhere\n\t}\n")
 			b.WriteString("\tu.Where(where...)\n")
 			b.WriteString("\ttag, err := u.Exec(ctx, exec)\n")
 			b.WriteString("\tif err != nil {\n\t\treturn 0, err\n\t}\n")
@@ -503,7 +504,7 @@ func staticsFile(sch ir.Schema, t ir.Table, opts Options, dir DirectiveSet) ([]b
 		// ---- UpsertUser (single-column PK/unique target only) ----
 		if pkIdx >= 0 && len(params) > 0 {
 			ucols := []string{strconv.Quote(pkName)}
-			uvals := []string{"core.Lit{V: " + pkParam + "}"}
+			uvals := []string{"pgb.Lit{V: " + pkParam + "}"}
 			for _, pc := range params {
 				if t.Columns[pc.idx].Name == pkName {
 					continue // the key comes from the explicit argument
@@ -511,15 +512,15 @@ func staticsFile(sch ir.Schema, t ir.Table, opts Options, dir DirectiveSet) ([]b
 				ucols = append(ucols, strconv.Quote(t.Columns[pc.idx].Name))
 				uvals = append(uvals, litExpr(t.Columns[pc.idx], "p."+pc.field, opts))
 			}
-			b.WriteString("// Upsert" + singular + " inserts p under " + pkName + ", or on conflict updates\n// every settable column from the proposed row (EXCLUDED.*) and returns\n// the resulting row; core.ErrNotFound when DO NOTHING matched.\n")
-			b.WriteString("func Upsert" + singular + "(ctx context.Context, exec core.DBTX, " + pkParam + " " + pkType + ", p Insert" + singular + "Params) (" + model + ", error) {\n")
-			fmt.Fprintf(&b, "\trows, err := core.NewInsert(%s,\n\t\t[]string{%s},\n\t\t[]core.Expr{%s},\n\t).OnConflict(core.OnConflict{\n",
+			b.WriteString("// Upsert" + singular + " inserts p under " + pkName + ", or on conflict updates\n// every settable column from the proposed row (EXCLUDED.*) and returns\n// the resulting row; pgb.ErrNotFound when DO NOTHING matched.\n")
+			b.WriteString("func Upsert" + singular + "(ctx context.Context, exec pgb.DBTX, " + pkParam + " " + pkType + ", p Insert" + singular + "Params) (" + model + ", error) {\n")
+			fmt.Fprintf(&b, "\trows, err := pgb.NewInsert(%s,\n\t\t[]string{%s},\n\t\t[]pgb.Expr{%s},\n\t).OnConflict(pgb.OnConflict{\n",
 				strconv.Quote(qname), strings.Join(ucols, ", "), strings.Join(uvals, ", "))
 			fmt.Fprintf(&b, "\t\tTarget: []string{%s},\n", strconv.Quote(pkName))
 			if len(setIdx) > 0 {
-				b.WriteString("\t\tSets: []core.SetClause{\n")
+				b.WriteString("\t\tSets: []pgb.SetClause{\n")
 				for _, i := range setIdx {
-					fmt.Fprintf(&b, "\t\t\t{Col: %s, E: core.Col{Table: \"excluded\", Name: %s}},\n",
+					fmt.Fprintf(&b, "\t\t\t{Col: %s, E: pgb.Col{Table: \"excluded\", Name: %s}},\n",
 						strconv.Quote(t.Columns[i].Name), strconv.Quote(t.Columns[i].Name))
 				}
 				b.WriteString("\t\t},\n")
@@ -534,12 +535,12 @@ func staticsFile(sch ir.Schema, t ir.Table, opts Options, dir DirectiveSet) ([]b
 		// ---- DeleteUser / DeleteUsers ----
 		if pkIdx >= 0 {
 			b.WriteString("// Delete" + singular + " removes one row by " + pkName + ".\n")
-			b.WriteString("func Delete" + singular + "(ctx context.Context, exec core.DBTX, " + pkParam + " " + pkType + ") error {\n")
+			b.WriteString("func Delete" + singular + "(ctx context.Context, exec pgb.DBTX, " + pkParam + " " + pkType + ") error {\n")
 			fmt.Fprintf(&b, "\t_, err := %s.Delete().Where(%s.%s().Eq(%s)).Exec(ctx, exec)\n\treturn err\n}\n\n", tableVar, tableVar, accessorName(names[pkIdx]), pkParam)
 		}
-		b.WriteString("// Delete" + tableVar + bulk + " removes every row matching where and returns the\n// affected count; an empty where is refused with core.ErrNoWhere.\n")
-		b.WriteString("func Delete" + tableVar + bulk + "(ctx context.Context, exec core.DBTX, where []core.Expr) (int64, error) {\n")
-		b.WriteString("\tif len(where) == 0 {\n\t\treturn 0, core.ErrNoWhere\n\t}\n")
+		b.WriteString("// Delete" + tableVar + bulk + " removes every row matching where and returns the\n// affected count; an empty where is refused with pgb.ErrNoWhere.\n")
+		b.WriteString("func Delete" + tableVar + bulk + "(ctx context.Context, exec pgb.DBTX, where []pgb.Expr) (int64, error) {\n")
+		b.WriteString("\tif len(where) == 0 {\n\t\treturn 0, pgb.ErrNoWhere\n\t}\n")
 		fmt.Fprintf(&b, "\ttag, err := %s.Delete().Where(where...).Exec(ctx, exec)\n", tableVar)
 		b.WriteString("\tif err != nil {\n\t\treturn 0, err\n\t}\n")
 		b.WriteString("\treturn tag.RowsAffected(), nil\n}\n")

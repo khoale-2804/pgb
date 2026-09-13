@@ -7,258 +7,258 @@ package db
 
 import (
 	"github.com/jackc/pgx/v5/pgtype"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 )
 
 // CaseCols is the table descriptor for public.case_cols; immutable, safe for
 // concurrent use.
-var CaseCols = CaseColTable{core.NewTableMeta("public", "case_cols")}
+var CaseCols = CaseColTable{pgb.NewTableMeta("public", "case_cols")}
 
 // CaseColTable provides typed column accessors and statement entry points.
-type CaseColTable struct{ core.TableMeta }
+type CaseColTable struct{ pgb.TableMeta }
 
 // ID returns the typed accessor for column id.
 func (t CaseColTable) ID() CaseColIDCol {
-	return CaseColIDCol{core.Col{Table: "case_cols", Name: "id"}}
+	return CaseColIDCol{pgb.Col{Table: "case_cols", Name: "id"}}
 }
 
 // CaseColIDCol is the typed column case_cols.id.
-type CaseColIDCol struct{ core.Col }
+type CaseColIDCol struct{ pgb.Col }
 
-func (c CaseColIDCol) Eq(v int64) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c CaseColIDCol) Eq(v int64) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CaseColIDCol) Ne(v int64) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c CaseColIDCol) Ne(v int64) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CaseColIDCol) In(vs ...int64) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "bigserial[]"}}
+func (c CaseColIDCol) In(vs ...int64) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "bigserial[]"}}
 }
 
-func (c CaseColIDCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c CaseColIDCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c CaseColIDCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c CaseColIDCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c CaseColIDCol) Gt(v int64) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c CaseColIDCol) Gt(v int64) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CaseColIDCol) Lt(v int64) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c CaseColIDCol) Lt(v int64) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CaseColIDCol) Gte(v int64) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c CaseColIDCol) Gte(v int64) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CaseColIDCol) Lte(v int64) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c CaseColIDCol) Lte(v int64) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CaseColIDCol) Between(a, b int64) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c CaseColIDCol) Between(a, b int64) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // Email returns the typed accessor for column Email.
 func (t CaseColTable) Email() CaseColEmailCol {
-	return CaseColEmailCol{core.Col{Table: "case_cols", Name: "Email"}}
+	return CaseColEmailCol{pgb.Col{Table: "case_cols", Name: "Email"}}
 }
 
 // CaseColEmailCol is the typed column case_cols.Email.
-type CaseColEmailCol struct{ core.Col }
+type CaseColEmailCol struct{ pgb.Col }
 
-func (c CaseColEmailCol) Eq(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c CaseColEmailCol) Eq(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CaseColEmailCol) Ne(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c CaseColEmailCol) Ne(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CaseColEmailCol) In(vs ...pgtype.Text) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c CaseColEmailCol) In(vs ...pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c CaseColEmailCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c CaseColEmailCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c CaseColEmailCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c CaseColEmailCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c CaseColEmailCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c CaseColEmailCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c CaseColEmailCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c CaseColEmailCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c CaseColEmailCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c CaseColEmailCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c CaseColEmailCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c CaseColEmailCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // Mixedcase returns the typed accessor for column mixedcase.
 func (t CaseColTable) Mixedcase() CaseColMixedcaseCol {
-	return CaseColMixedcaseCol{core.Col{Table: "case_cols", Name: "mixedcase"}}
+	return CaseColMixedcaseCol{pgb.Col{Table: "case_cols", Name: "mixedcase"}}
 }
 
 // CaseColMixedcaseCol is the typed column case_cols.mixedcase.
-type CaseColMixedcaseCol struct{ core.Col }
+type CaseColMixedcaseCol struct{ pgb.Col }
 
-func (c CaseColMixedcaseCol) Eq(v pgtype.Int4) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c CaseColMixedcaseCol) Eq(v pgtype.Int4) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CaseColMixedcaseCol) Ne(v pgtype.Int4) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c CaseColMixedcaseCol) Ne(v pgtype.Int4) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CaseColMixedcaseCol) In(vs ...pgtype.Int4) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "int4[]"}}
+func (c CaseColMixedcaseCol) In(vs ...pgtype.Int4) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int4[]"}}
 }
 
-func (c CaseColMixedcaseCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c CaseColMixedcaseCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c CaseColMixedcaseCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c CaseColMixedcaseCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c CaseColMixedcaseCol) Gt(v pgtype.Int4) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c CaseColMixedcaseCol) Gt(v pgtype.Int4) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CaseColMixedcaseCol) Lt(v pgtype.Int4) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c CaseColMixedcaseCol) Lt(v pgtype.Int4) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CaseColMixedcaseCol) Gte(v pgtype.Int4) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c CaseColMixedcaseCol) Gte(v pgtype.Int4) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CaseColMixedcaseCol) Lte(v pgtype.Int4) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c CaseColMixedcaseCol) Lte(v pgtype.Int4) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CaseColMixedcaseCol) Between(a, b pgtype.Int4) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c CaseColMixedcaseCol) Between(a, b pgtype.Int4) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // Caf returns the typed accessor for column café.
 func (t CaseColTable) Caf() CaseColCafCol {
-	return CaseColCafCol{core.Col{Table: "case_cols", Name: "café"}}
+	return CaseColCafCol{pgb.Col{Table: "case_cols", Name: "café"}}
 }
 
 // CaseColCafCol is the typed column case_cols.café.
-type CaseColCafCol struct{ core.Col }
+type CaseColCafCol struct{ pgb.Col }
 
-func (c CaseColCafCol) Eq(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c CaseColCafCol) Eq(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CaseColCafCol) Ne(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c CaseColCafCol) Ne(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CaseColCafCol) In(vs ...pgtype.Text) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c CaseColCafCol) In(vs ...pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c CaseColCafCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c CaseColCafCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c CaseColCafCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c CaseColCafCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c CaseColCafCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c CaseColCafCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c CaseColCafCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c CaseColCafCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c CaseColCafCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c CaseColCafCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c CaseColCafCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c CaseColCafCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // PlainCol returns the typed accessor for column plain_col.
 func (t CaseColTable) PlainCol() CaseColPlainColCol {
-	return CaseColPlainColCol{core.Col{Table: "case_cols", Name: "plain_col"}}
+	return CaseColPlainColCol{pgb.Col{Table: "case_cols", Name: "plain_col"}}
 }
 
 // CaseColPlainColCol is the typed column case_cols.plain_col.
-type CaseColPlainColCol struct{ core.Col }
+type CaseColPlainColCol struct{ pgb.Col }
 
-func (c CaseColPlainColCol) Eq(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c CaseColPlainColCol) Eq(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CaseColPlainColCol) Ne(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c CaseColPlainColCol) Ne(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CaseColPlainColCol) In(vs ...pgtype.Text) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c CaseColPlainColCol) In(vs ...pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c CaseColPlainColCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c CaseColPlainColCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c CaseColPlainColCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c CaseColPlainColCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c CaseColPlainColCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c CaseColPlainColCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c CaseColPlainColCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c CaseColPlainColCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c CaseColPlainColCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c CaseColPlainColCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c CaseColPlainColCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c CaseColPlainColCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // Select starts a SELECT of every column; chain Where/OrderBy/Limit/...
 // and terminate with Run (or a static function).
-func (t CaseColTable) Select() *core.Select {
-	return core.NewSelect("public.case_cols", core.Col{Table: "case_cols", Name: "id"}, core.Col{Table: "case_cols", Name: "Email"}, core.Col{Table: "case_cols", Name: "mixedcase"}, core.Col{Table: "case_cols", Name: "café"}, core.Col{Table: "case_cols", Name: "plain_col"})
+func (t CaseColTable) Select() *pgb.Select {
+	return pgb.NewSelect("public.case_cols", pgb.Col{Table: "case_cols", Name: "id"}, pgb.Col{Table: "case_cols", Name: "Email"}, pgb.Col{Table: "case_cols", Name: "mixedcase"}, pgb.Col{Table: "case_cols", Name: "café"}, pgb.Col{Table: "case_cols", Name: "plain_col"})
 }
 
-// Update starts an UPDATE; an empty WHERE fails with core.ErrNoWhere.
-func (t CaseColTable) Update() *core.Update { return core.NewUpdate("public.case_cols") }
+// Update starts an UPDATE; an empty WHERE fails with pgb.ErrNoWhere.
+func (t CaseColTable) Update() *pgb.Update { return pgb.NewUpdate("public.case_cols") }
 
-// Delete starts a DELETE; an empty WHERE fails with core.ErrNoWhere.
-func (t CaseColTable) Delete() *core.Delete { return core.NewDelete("public.case_cols") }
+// Delete starts a DELETE; an empty WHERE fails with pgb.ErrNoWhere.
+func (t CaseColTable) Delete() *pgb.Delete { return pgb.NewDelete("public.case_cols") }

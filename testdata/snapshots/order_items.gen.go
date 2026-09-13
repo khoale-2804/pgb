@@ -7,307 +7,307 @@ package db
 
 import (
 	"github.com/jackc/pgx/v5/pgtype"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 )
 
 // OrderItems is the table descriptor for public.order_items; immutable, safe for
 // concurrent use.
-var OrderItems = OrderItemTable{core.NewTableMeta("public", "order_items")}
+var OrderItems = OrderItemTable{pgb.NewTableMeta("public", "order_items")}
 
 // OrderItemTable provides typed column accessors and statement entry points.
-type OrderItemTable struct{ core.TableMeta }
+type OrderItemTable struct{ pgb.TableMeta }
 
 // OrderShopID returns the typed accessor for column order_shop_id.
 func (t OrderItemTable) OrderShopID() OrderItemOrderShopIDCol {
-	return OrderItemOrderShopIDCol{core.Col{Table: "order_items", Name: "order_shop_id"}}
+	return OrderItemOrderShopIDCol{pgb.Col{Table: "order_items", Name: "order_shop_id"}}
 }
 
 // OrderItemOrderShopIDCol is the typed column order_items.order_shop_id.
-type OrderItemOrderShopIDCol struct{ core.Col }
+type OrderItemOrderShopIDCol struct{ pgb.Col }
 
-func (c OrderItemOrderShopIDCol) Eq(v int32) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemOrderShopIDCol) Eq(v int32) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemOrderShopIDCol) Ne(v int32) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemOrderShopIDCol) Ne(v int32) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemOrderShopIDCol) In(vs ...int32) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "int4[]"}}
+func (c OrderItemOrderShopIDCol) In(vs ...int32) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int4[]"}}
 }
 
-func (c OrderItemOrderShopIDCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c OrderItemOrderShopIDCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c OrderItemOrderShopIDCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c OrderItemOrderShopIDCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c OrderItemOrderShopIDCol) Gt(v int32) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemOrderShopIDCol) Gt(v int32) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemOrderShopIDCol) Lt(v int32) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemOrderShopIDCol) Lt(v int32) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemOrderShopIDCol) Gte(v int32) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemOrderShopIDCol) Gte(v int32) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemOrderShopIDCol) Lte(v int32) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemOrderShopIDCol) Lte(v int32) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemOrderShopIDCol) Between(a, b int32) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c OrderItemOrderShopIDCol) Between(a, b int32) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // OrderID returns the typed accessor for column order_id.
 func (t OrderItemTable) OrderID() OrderItemOrderIDCol {
-	return OrderItemOrderIDCol{core.Col{Table: "order_items", Name: "order_id"}}
+	return OrderItemOrderIDCol{pgb.Col{Table: "order_items", Name: "order_id"}}
 }
 
 // OrderItemOrderIDCol is the typed column order_items.order_id.
-type OrderItemOrderIDCol struct{ core.Col }
+type OrderItemOrderIDCol struct{ pgb.Col }
 
-func (c OrderItemOrderIDCol) Eq(v int64) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemOrderIDCol) Eq(v int64) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemOrderIDCol) Ne(v int64) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemOrderIDCol) Ne(v int64) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemOrderIDCol) In(vs ...int64) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "int8[]"}}
+func (c OrderItemOrderIDCol) In(vs ...int64) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int8[]"}}
 }
 
-func (c OrderItemOrderIDCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c OrderItemOrderIDCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c OrderItemOrderIDCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c OrderItemOrderIDCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c OrderItemOrderIDCol) Gt(v int64) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemOrderIDCol) Gt(v int64) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemOrderIDCol) Lt(v int64) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemOrderIDCol) Lt(v int64) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemOrderIDCol) Gte(v int64) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemOrderIDCol) Gte(v int64) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemOrderIDCol) Lte(v int64) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemOrderIDCol) Lte(v int64) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemOrderIDCol) Between(a, b int64) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c OrderItemOrderIDCol) Between(a, b int64) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // ProductID returns the typed accessor for column product_id.
 func (t OrderItemTable) ProductID() OrderItemProductIDCol {
-	return OrderItemProductIDCol{core.Col{Table: "order_items", Name: "product_id"}}
+	return OrderItemProductIDCol{pgb.Col{Table: "order_items", Name: "product_id"}}
 }
 
 // OrderItemProductIDCol is the typed column order_items.product_id.
-type OrderItemProductIDCol struct{ core.Col }
+type OrderItemProductIDCol struct{ pgb.Col }
 
-func (c OrderItemProductIDCol) Eq(v int64) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemProductIDCol) Eq(v int64) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemProductIDCol) Ne(v int64) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemProductIDCol) Ne(v int64) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemProductIDCol) In(vs ...int64) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "int8[]"}}
+func (c OrderItemProductIDCol) In(vs ...int64) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int8[]"}}
 }
 
-func (c OrderItemProductIDCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c OrderItemProductIDCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c OrderItemProductIDCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c OrderItemProductIDCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c OrderItemProductIDCol) Gt(v int64) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemProductIDCol) Gt(v int64) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemProductIDCol) Lt(v int64) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemProductIDCol) Lt(v int64) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemProductIDCol) Gte(v int64) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemProductIDCol) Gte(v int64) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemProductIDCol) Lte(v int64) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemProductIDCol) Lte(v int64) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemProductIDCol) Between(a, b int64) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c OrderItemProductIDCol) Between(a, b int64) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // Quantity returns the typed accessor for column quantity.
 func (t OrderItemTable) Quantity() OrderItemQuantityCol {
-	return OrderItemQuantityCol{core.Col{Table: "order_items", Name: "quantity"}}
+	return OrderItemQuantityCol{pgb.Col{Table: "order_items", Name: "quantity"}}
 }
 
 // OrderItemQuantityCol is the typed column order_items.quantity.
-type OrderItemQuantityCol struct{ core.Col }
+type OrderItemQuantityCol struct{ pgb.Col }
 
-func (c OrderItemQuantityCol) Eq(v int32) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemQuantityCol) Eq(v int32) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemQuantityCol) Ne(v int32) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemQuantityCol) Ne(v int32) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemQuantityCol) In(vs ...int32) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "int4[]"}}
+func (c OrderItemQuantityCol) In(vs ...int32) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int4[]"}}
 }
 
-func (c OrderItemQuantityCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c OrderItemQuantityCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c OrderItemQuantityCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c OrderItemQuantityCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c OrderItemQuantityCol) Gt(v int32) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemQuantityCol) Gt(v int32) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemQuantityCol) Lt(v int32) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemQuantityCol) Lt(v int32) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemQuantityCol) Gte(v int32) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemQuantityCol) Gte(v int32) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemQuantityCol) Lte(v int32) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemQuantityCol) Lte(v int32) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemQuantityCol) Between(a, b int32) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c OrderItemQuantityCol) Between(a, b int32) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // UnitPrice returns the typed accessor for column unit_price.
 func (t OrderItemTable) UnitPrice() OrderItemUnitPriceCol {
-	return OrderItemUnitPriceCol{core.Col{Table: "order_items", Name: "unit_price"}}
+	return OrderItemUnitPriceCol{pgb.Col{Table: "order_items", Name: "unit_price"}}
 }
 
 // OrderItemUnitPriceCol is the typed column order_items.unit_price.
-type OrderItemUnitPriceCol struct{ core.Col }
+type OrderItemUnitPriceCol struct{ pgb.Col }
 
-func (c OrderItemUnitPriceCol) Eq(v pgtype.Numeric) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemUnitPriceCol) Eq(v pgtype.Numeric) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemUnitPriceCol) Ne(v pgtype.Numeric) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemUnitPriceCol) Ne(v pgtype.Numeric) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemUnitPriceCol) In(vs ...pgtype.Numeric) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "numeric[]"}}
+func (c OrderItemUnitPriceCol) In(vs ...pgtype.Numeric) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "numeric[]"}}
 }
 
-func (c OrderItemUnitPriceCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c OrderItemUnitPriceCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c OrderItemUnitPriceCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c OrderItemUnitPriceCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c OrderItemUnitPriceCol) Gt(v pgtype.Numeric) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemUnitPriceCol) Gt(v pgtype.Numeric) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemUnitPriceCol) Lt(v pgtype.Numeric) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemUnitPriceCol) Lt(v pgtype.Numeric) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemUnitPriceCol) Gte(v pgtype.Numeric) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemUnitPriceCol) Gte(v pgtype.Numeric) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemUnitPriceCol) Lte(v pgtype.Numeric) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemUnitPriceCol) Lte(v pgtype.Numeric) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemUnitPriceCol) Between(a, b pgtype.Numeric) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c OrderItemUnitPriceCol) Between(a, b pgtype.Numeric) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // GiftWrap returns the typed accessor for column gift_wrap.
 func (t OrderItemTable) GiftWrap() OrderItemGiftWrapCol {
-	return OrderItemGiftWrapCol{core.Col{Table: "order_items", Name: "gift_wrap"}}
+	return OrderItemGiftWrapCol{pgb.Col{Table: "order_items", Name: "gift_wrap"}}
 }
 
 // OrderItemGiftWrapCol is the typed column order_items.gift_wrap.
-type OrderItemGiftWrapCol struct{ core.Col }
+type OrderItemGiftWrapCol struct{ pgb.Col }
 
-func (c OrderItemGiftWrapCol) Eq(v bool) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemGiftWrapCol) Eq(v bool) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemGiftWrapCol) Ne(v bool) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c OrderItemGiftWrapCol) Ne(v bool) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c OrderItemGiftWrapCol) In(vs ...bool) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "bool[]"}}
+func (c OrderItemGiftWrapCol) In(vs ...bool) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "bool[]"}}
 }
 
-func (c OrderItemGiftWrapCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c OrderItemGiftWrapCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c OrderItemGiftWrapCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c OrderItemGiftWrapCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
 // Select starts a SELECT of every column; chain Where/OrderBy/Limit/...
 // and terminate with Run (or a static function).
-func (t OrderItemTable) Select() *core.Select {
-	return core.NewSelect("public.order_items", core.Col{Table: "order_items", Name: "order_shop_id"}, core.Col{Table: "order_items", Name: "order_id"}, core.Col{Table: "order_items", Name: "product_id"}, core.Col{Table: "order_items", Name: "quantity"}, core.Col{Table: "order_items", Name: "unit_price"}, core.Col{Table: "order_items", Name: "gift_wrap"})
+func (t OrderItemTable) Select() *pgb.Select {
+	return pgb.NewSelect("public.order_items", pgb.Col{Table: "order_items", Name: "order_shop_id"}, pgb.Col{Table: "order_items", Name: "order_id"}, pgb.Col{Table: "order_items", Name: "product_id"}, pgb.Col{Table: "order_items", Name: "quantity"}, pgb.Col{Table: "order_items", Name: "unit_price"}, pgb.Col{Table: "order_items", Name: "gift_wrap"})
 }
 
-// Update starts an UPDATE; an empty WHERE fails with core.ErrNoWhere.
-func (t OrderItemTable) Update() *core.Update { return core.NewUpdate("public.order_items") }
+// Update starts an UPDATE; an empty WHERE fails with pgb.ErrNoWhere.
+func (t OrderItemTable) Update() *pgb.Update { return pgb.NewUpdate("public.order_items") }
 
-// Delete starts a DELETE; an empty WHERE fails with core.ErrNoWhere.
-func (t OrderItemTable) Delete() *core.Delete { return core.NewDelete("public.order_items") }
+// Delete starts a DELETE; an empty WHERE fails with pgb.ErrNoWhere.
+func (t OrderItemTable) Delete() *pgb.Delete { return pgb.NewDelete("public.order_items") }

@@ -10,7 +10,7 @@ import (
 	"errors"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 )
 
 // EventsV2026H2Filter narrows ListEventsV2026H2s and CountEventsV2026H2s:
@@ -39,13 +39,13 @@ type EventsV2026H2Filter struct {
 	OccurredAtLt  *pgtype.Timestamptz
 	OccurredAtGte *pgtype.Timestamptz
 	OccurredAtLte *pgtype.Timestamptz
-	Extra         []core.Expr
+	Extra         []pgb.Expr
 }
 
 // eventsV2026H2sFilterWhere compiles f into the ANDed predicate list; an empty
 // filter yields an empty list (no WHERE).
-func eventsV2026H2sFilterWhere(f EventsV2026H2Filter) []core.Expr {
-	var w []core.Expr
+func eventsV2026H2sFilterWhere(f EventsV2026H2Filter) []pgb.Expr {
+	var w []pgb.Expr
 	if f.ID != nil {
 		w = append(w, EventsV2026H2s.ID().Eq(*f.ID))
 	}
@@ -148,15 +148,15 @@ func scanEventsV2026H2(row pgx.CollectableRow) (EventsV2026H2, error) {
 	return m, nil
 }
 
-// GetEventsV2026H2 returns one row by id; core.ErrNotFound when absent
+// GetEventsV2026H2 returns one row by id; pgb.ErrNotFound when absent
 // (pgx.ErrNoRows mapped — errors.Is keeps working for both).
-func GetEventsV2026H2(ctx context.Context, exec core.DBTX, id int64) (EventsV2026H2, error) {
+func GetEventsV2026H2(ctx context.Context, exec pgb.DBTX, id int64) (EventsV2026H2, error) {
 	sql, args := EventsV2026H2s.Select().Where(EventsV2026H2s.ID().Eq(id)).SQL()
 	var m EventsV2026H2
 	err := exec.QueryRow(ctx, sql, args...).Scan(&m.ID, &m.UserID, &m.Kind, &m.Payload, &m.OccurredAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return EventsV2026H2{}, core.ErrNotFound
+			return EventsV2026H2{}, pgb.ErrNotFound
 		}
 		return EventsV2026H2{}, err
 	}
@@ -164,8 +164,9 @@ func GetEventsV2026H2(ctx context.Context, exec core.DBTX, id int64) (EventsV202
 }
 
 // ListEventsV2026H2s returns the rows matching f; limit <= 0 means no LIMIT.
-func ListEventsV2026H2s(ctx context.Context, exec core.DBTX, f EventsV2026H2Filter, limit int) ([]EventsV2026H2, error) {
-	rows, err := EventsV2026H2s.Select().Where(eventsV2026H2sFilterWhere(f)...).Limit(limit).Run(ctx, exec)
+func ListEventsV2026H2s(ctx context.Context, exec pgb.DBTX, f EventsV2026H2Filter, opts ...pgb.ListOpt) ([]EventsV2026H2, error) {
+	sel := EventsV2026H2s.Select().Where(eventsV2026H2sFilterWhere(f)...).ApplyList(opts...)
+	rows, err := sel.Run(ctx, exec)
 	if err != nil {
 		return nil, err
 	}
@@ -173,8 +174,8 @@ func ListEventsV2026H2s(ctx context.Context, exec core.DBTX, f EventsV2026H2Filt
 }
 
 // CountEventsV2026H2s counts the rows matching f.
-func CountEventsV2026H2s(ctx context.Context, exec core.DBTX, f EventsV2026H2Filter) (int64, error) {
-	sql, args := core.NewSelect("public.events_2026h2", core.Raw{SQL: "count(*)"}).Where(eventsV2026H2sFilterWhere(f)...).SQL()
+func CountEventsV2026H2s(ctx context.Context, exec pgb.DBTX, f EventsV2026H2Filter) (int64, error) {
+	sql, args := pgb.NewSelect("public.events_2026h2", pgb.Raw{SQL: "count(*)"}).Where(eventsV2026H2sFilterWhere(f)...).SQL()
 	var n int64
 	if err := exec.QueryRow(ctx, sql, args...).Scan(&n); err != nil {
 		return 0, err
@@ -184,11 +185,11 @@ func CountEventsV2026H2s(ctx context.Context, exec core.DBTX, f EventsV2026H2Fil
 
 // InsertEventsV2026H2 inserts one row and returns it (RETURNING every
 // column, defaults included).
-func InsertEventsV2026H2(ctx context.Context, exec core.DBTX, p InsertEventsV2026H2Params) (EventsV2026H2, error) {
-	rows, err := core.NewInsert("public.events_2026h2",
+func InsertEventsV2026H2(ctx context.Context, exec pgb.DBTX, p InsertEventsV2026H2Params) (EventsV2026H2, error) {
+	rows, err := pgb.NewInsert("public.events_2026h2",
 		[]string{"user_id", "kind", "payload", "occurred_at"},
-		[]core.Expr{core.Lit{V: p.UserID}, core.Lit{V: p.Kind}, core.Lit{V: p.Payload, Cast: "jsonb"}, core.Lit{V: p.OccurredAt}},
-	).Returning(core.Col{Table: "events_2026h2", Name: "id"}, core.Col{Table: "events_2026h2", Name: "user_id"}, core.Col{Table: "events_2026h2", Name: "kind"}, core.Col{Table: "events_2026h2", Name: "payload"}, core.Col{Table: "events_2026h2", Name: "occurred_at"}).Run(ctx, exec)
+		[]pgb.Expr{pgb.Lit{V: p.UserID}, pgb.Lit{V: p.Kind}, pgb.Lit{V: p.Payload, Cast: "jsonb"}, pgb.Lit{V: p.OccurredAt}},
+	).Returning(pgb.Col{Table: "events_2026h2", Name: "id"}, pgb.Col{Table: "events_2026h2", Name: "user_id"}, pgb.Col{Table: "events_2026h2", Name: "kind"}, pgb.Col{Table: "events_2026h2", Name: "payload"}, pgb.Col{Table: "events_2026h2", Name: "occurred_at"}).Run(ctx, exec)
 	if err != nil {
 		return EventsV2026H2{}, err
 	}
@@ -197,7 +198,7 @@ func InsertEventsV2026H2(ctx context.Context, exec core.DBTX, p InsertEventsV202
 		return EventsV2026H2{}, err
 	}
 	if len(us) == 0 {
-		return EventsV2026H2{}, core.ErrNotFound
+		return EventsV2026H2{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
@@ -206,7 +207,7 @@ const insertEventsV2026H2sSQL = "INSERT INTO public.events_2026h2 (user_id, kind
 
 // InsertEventsV2026H2s inserts a whole batch in one round trip via
 // unnest and returns every inserted row.
-func InsertEventsV2026H2s(ctx context.Context, exec core.DBTX, ps []InsertEventsV2026H2Params) ([]EventsV2026H2, error) {
+func InsertEventsV2026H2s(ctx context.Context, exec pgb.DBTX, ps []InsertEventsV2026H2Params) ([]EventsV2026H2, error) {
 	if len(ps) == 0 {
 		return nil, nil
 	}
@@ -230,46 +231,46 @@ func InsertEventsV2026H2s(ctx context.Context, exec core.DBTX, ps []InsertEvents
 }
 
 // UpdateEventsV2026H2 applies the non-zero fields of s to one row and
-// returns the updated row; core.ErrNotFound when absent.
-func UpdateEventsV2026H2(ctx context.Context, exec core.DBTX, id int64, s EventsV2026H2Set) (EventsV2026H2, error) {
+// returns the updated row; pgb.ErrNotFound when absent.
+func UpdateEventsV2026H2(ctx context.Context, exec pgb.DBTX, id int64, s EventsV2026H2Set) (EventsV2026H2, error) {
 	u := EventsV2026H2s.Update()
 	n := 0
 	if s.UserID.Valid {
 		n++
 		if s.UserID.Null {
-			u.Set("user_id", core.Lit{V: nil})
+			u.Set("user_id", pgb.Lit{V: nil})
 		} else {
-			u.Set("user_id", core.Lit{V: s.UserID.V})
+			u.Set("user_id", pgb.Lit{V: s.UserID.V})
 		}
 	}
 	if s.Kind.Valid {
 		n++
 		if s.Kind.Null {
-			u.Set("kind", core.Lit{V: nil})
+			u.Set("kind", pgb.Lit{V: nil})
 		} else {
-			u.Set("kind", core.Lit{V: s.Kind.V})
+			u.Set("kind", pgb.Lit{V: s.Kind.V})
 		}
 	}
 	if s.Payload.Valid {
 		n++
 		if s.Payload.Null {
-			u.Set("payload", core.Lit{V: nil})
+			u.Set("payload", pgb.Lit{V: nil})
 		} else {
-			u.Set("payload", core.Lit{V: s.Payload.V, Cast: "jsonb"})
+			u.Set("payload", pgb.Lit{V: s.Payload.V, Cast: "jsonb"})
 		}
 	}
 	if s.OccurredAt.Valid {
 		n++
 		if s.OccurredAt.Null {
-			u.Set("occurred_at", core.Lit{V: nil})
+			u.Set("occurred_at", pgb.Lit{V: nil})
 		} else {
-			u.Set("occurred_at", core.Lit{V: s.OccurredAt.V})
+			u.Set("occurred_at", pgb.Lit{V: s.OccurredAt.V})
 		}
 	}
 	if n == 0 {
 		return GetEventsV2026H2(ctx, exec, id)
 	}
-	u.Where(EventsV2026H2s.ID().Eq(id)).Returning(core.Col{Table: "events_2026h2", Name: "id"}, core.Col{Table: "events_2026h2", Name: "user_id"}, core.Col{Table: "events_2026h2", Name: "kind"}, core.Col{Table: "events_2026h2", Name: "payload"}, core.Col{Table: "events_2026h2", Name: "occurred_at"})
+	u.Where(EventsV2026H2s.ID().Eq(id)).Returning(pgb.Col{Table: "events_2026h2", Name: "id"}, pgb.Col{Table: "events_2026h2", Name: "user_id"}, pgb.Col{Table: "events_2026h2", Name: "kind"}, pgb.Col{Table: "events_2026h2", Name: "payload"}, pgb.Col{Table: "events_2026h2", Name: "occurred_at"})
 	rows, err := u.Run(ctx, exec)
 	if err != nil {
 		return EventsV2026H2{}, err
@@ -279,54 +280,54 @@ func UpdateEventsV2026H2(ctx context.Context, exec core.DBTX, id int64, s Events
 		return EventsV2026H2{}, err
 	}
 	if len(us) == 0 {
-		return EventsV2026H2{}, core.ErrNotFound
+		return EventsV2026H2{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // UpdateEventsV2026H2s applies s to every row matching where and
 // returns the affected count; an empty where is refused with
-// core.ErrNoWhere before any SQL is sent.
-func UpdateEventsV2026H2s(ctx context.Context, exec core.DBTX, where []core.Expr, s EventsV2026H2Set) (int64, error) {
+// pgb.ErrNoWhere before any SQL is sent.
+func UpdateEventsV2026H2s(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, s EventsV2026H2Set) (int64, error) {
 	u := EventsV2026H2s.Update()
 	n := 0
 	if s.UserID.Valid {
 		n++
 		if s.UserID.Null {
-			u.Set("user_id", core.Lit{V: nil})
+			u.Set("user_id", pgb.Lit{V: nil})
 		} else {
-			u.Set("user_id", core.Lit{V: s.UserID.V})
+			u.Set("user_id", pgb.Lit{V: s.UserID.V})
 		}
 	}
 	if s.Kind.Valid {
 		n++
 		if s.Kind.Null {
-			u.Set("kind", core.Lit{V: nil})
+			u.Set("kind", pgb.Lit{V: nil})
 		} else {
-			u.Set("kind", core.Lit{V: s.Kind.V})
+			u.Set("kind", pgb.Lit{V: s.Kind.V})
 		}
 	}
 	if s.Payload.Valid {
 		n++
 		if s.Payload.Null {
-			u.Set("payload", core.Lit{V: nil})
+			u.Set("payload", pgb.Lit{V: nil})
 		} else {
-			u.Set("payload", core.Lit{V: s.Payload.V, Cast: "jsonb"})
+			u.Set("payload", pgb.Lit{V: s.Payload.V, Cast: "jsonb"})
 		}
 	}
 	if s.OccurredAt.Valid {
 		n++
 		if s.OccurredAt.Null {
-			u.Set("occurred_at", core.Lit{V: nil})
+			u.Set("occurred_at", pgb.Lit{V: nil})
 		} else {
-			u.Set("occurred_at", core.Lit{V: s.OccurredAt.V})
+			u.Set("occurred_at", pgb.Lit{V: s.OccurredAt.V})
 		}
 	}
 	if n == 0 {
 		return 0, nil
 	}
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	u.Where(where...)
 	tag, err := u.Exec(ctx, exec)
@@ -338,20 +339,20 @@ func UpdateEventsV2026H2s(ctx context.Context, exec core.DBTX, where []core.Expr
 
 // UpsertEventsV2026H2 inserts p under id, or on conflict updates
 // every settable column from the proposed row (EXCLUDED.*) and returns
-// the resulting row; core.ErrNotFound when DO NOTHING matched.
-func UpsertEventsV2026H2(ctx context.Context, exec core.DBTX, id int64, p InsertEventsV2026H2Params) (EventsV2026H2, error) {
-	rows, err := core.NewInsert("public.events_2026h2",
+// the resulting row; pgb.ErrNotFound when DO NOTHING matched.
+func UpsertEventsV2026H2(ctx context.Context, exec pgb.DBTX, id int64, p InsertEventsV2026H2Params) (EventsV2026H2, error) {
+	rows, err := pgb.NewInsert("public.events_2026h2",
 		[]string{"id", "user_id", "kind", "payload", "occurred_at"},
-		[]core.Expr{core.Lit{V: id}, core.Lit{V: p.UserID}, core.Lit{V: p.Kind}, core.Lit{V: p.Payload, Cast: "jsonb"}, core.Lit{V: p.OccurredAt}},
-	).OnConflict(core.OnConflict{
+		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.UserID}, pgb.Lit{V: p.Kind}, pgb.Lit{V: p.Payload, Cast: "jsonb"}, pgb.Lit{V: p.OccurredAt}},
+	).OnConflict(pgb.OnConflict{
 		Target: []string{"id"},
-		Sets: []core.SetClause{
-			{Col: "user_id", E: core.Col{Table: "excluded", Name: "user_id"}},
-			{Col: "kind", E: core.Col{Table: "excluded", Name: "kind"}},
-			{Col: "payload", E: core.Col{Table: "excluded", Name: "payload"}},
-			{Col: "occurred_at", E: core.Col{Table: "excluded", Name: "occurred_at"}},
+		Sets: []pgb.SetClause{
+			{Col: "user_id", E: pgb.Col{Table: "excluded", Name: "user_id"}},
+			{Col: "kind", E: pgb.Col{Table: "excluded", Name: "kind"}},
+			{Col: "payload", E: pgb.Col{Table: "excluded", Name: "payload"}},
+			{Col: "occurred_at", E: pgb.Col{Table: "excluded", Name: "occurred_at"}},
 		},
-	}).Returning(core.Col{Table: "events_2026h2", Name: "id"}, core.Col{Table: "events_2026h2", Name: "user_id"}, core.Col{Table: "events_2026h2", Name: "kind"}, core.Col{Table: "events_2026h2", Name: "payload"}, core.Col{Table: "events_2026h2", Name: "occurred_at"}).Run(ctx, exec)
+	}).Returning(pgb.Col{Table: "events_2026h2", Name: "id"}, pgb.Col{Table: "events_2026h2", Name: "user_id"}, pgb.Col{Table: "events_2026h2", Name: "kind"}, pgb.Col{Table: "events_2026h2", Name: "payload"}, pgb.Col{Table: "events_2026h2", Name: "occurred_at"}).Run(ctx, exec)
 	if err != nil {
 		return EventsV2026H2{}, err
 	}
@@ -360,22 +361,22 @@ func UpsertEventsV2026H2(ctx context.Context, exec core.DBTX, id int64, p Insert
 		return EventsV2026H2{}, err
 	}
 	if len(us) == 0 {
-		return EventsV2026H2{}, core.ErrNotFound
+		return EventsV2026H2{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // DeleteEventsV2026H2 removes one row by id.
-func DeleteEventsV2026H2(ctx context.Context, exec core.DBTX, id int64) error {
+func DeleteEventsV2026H2(ctx context.Context, exec pgb.DBTX, id int64) error {
 	_, err := EventsV2026H2s.Delete().Where(EventsV2026H2s.ID().Eq(id)).Exec(ctx, exec)
 	return err
 }
 
 // DeleteEventsV2026H2s removes every row matching where and returns the
-// affected count; an empty where is refused with core.ErrNoWhere.
-func DeleteEventsV2026H2s(ctx context.Context, exec core.DBTX, where []core.Expr) (int64, error) {
+// affected count; an empty where is refused with pgb.ErrNoWhere.
+func DeleteEventsV2026H2s(ctx context.Context, exec pgb.DBTX, where []pgb.Expr) (int64, error) {
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	tag, err := EventsV2026H2s.Delete().Where(where...).Exec(ctx, exec)
 	if err != nil {

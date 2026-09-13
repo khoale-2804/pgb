@@ -6,123 +6,119 @@
 package db
 
 import (
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 )
 
 // SkippablePartners is the table descriptor for public.skippable_partner; immutable, safe for
 // concurrent use.
-var SkippablePartners = SkippablePartnerTable{core.NewTableMeta("public", "skippable_partner")}
+var SkippablePartners = SkippablePartnerTable{pgb.NewTableMeta("public", "skippable_partner")}
 
 // SkippablePartnerTable provides typed column accessors and statement entry points.
-type SkippablePartnerTable struct{ core.TableMeta }
+type SkippablePartnerTable struct{ pgb.TableMeta }
 
 // ID returns the typed accessor for column id.
 func (t SkippablePartnerTable) ID() SkippablePartnerIDCol {
-	return SkippablePartnerIDCol{core.Col{Table: "skippable_partner", Name: "id"}}
+	return SkippablePartnerIDCol{pgb.Col{Table: "skippable_partner", Name: "id"}}
 }
 
 // SkippablePartnerIDCol is the typed column skippable_partner.id.
-type SkippablePartnerIDCol struct{ core.Col }
+type SkippablePartnerIDCol struct{ pgb.Col }
 
-func (c SkippablePartnerIDCol) Eq(v int64) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c SkippablePartnerIDCol) Eq(v int64) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c SkippablePartnerIDCol) Ne(v int64) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c SkippablePartnerIDCol) Ne(v int64) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c SkippablePartnerIDCol) In(vs ...int64) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "int8[]"}}
+func (c SkippablePartnerIDCol) In(vs ...int64) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int8[]"}}
 }
 
-func (c SkippablePartnerIDCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c SkippablePartnerIDCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c SkippablePartnerIDCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c SkippablePartnerIDCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c SkippablePartnerIDCol) Gt(v int64) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c SkippablePartnerIDCol) Gt(v int64) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c SkippablePartnerIDCol) Lt(v int64) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c SkippablePartnerIDCol) Lt(v int64) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c SkippablePartnerIDCol) Gte(v int64) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c SkippablePartnerIDCol) Gte(v int64) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c SkippablePartnerIDCol) Lte(v int64) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c SkippablePartnerIDCol) Lte(v int64) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c SkippablePartnerIDCol) Between(a, b int64) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c SkippablePartnerIDCol) Between(a, b int64) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // Label returns the typed accessor for column label.
 func (t SkippablePartnerTable) Label() SkippablePartnerLabelCol {
-	return SkippablePartnerLabelCol{core.Col{Table: "skippable_partner", Name: "label"}}
+	return SkippablePartnerLabelCol{pgb.Col{Table: "skippable_partner", Name: "label"}}
 }
 
 // SkippablePartnerLabelCol is the typed column skippable_partner.label.
-type SkippablePartnerLabelCol struct{ core.Col }
+type SkippablePartnerLabelCol struct{ pgb.Col }
 
-func (c SkippablePartnerLabelCol) Eq(v string) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c SkippablePartnerLabelCol) Eq(v string) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c SkippablePartnerLabelCol) Ne(v string) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c SkippablePartnerLabelCol) Ne(v string) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c SkippablePartnerLabelCol) In(vs ...string) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c SkippablePartnerLabelCol) In(vs ...string) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c SkippablePartnerLabelCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c SkippablePartnerLabelCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c SkippablePartnerLabelCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c SkippablePartnerLabelCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c SkippablePartnerLabelCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c SkippablePartnerLabelCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c SkippablePartnerLabelCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c SkippablePartnerLabelCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c SkippablePartnerLabelCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c SkippablePartnerLabelCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c SkippablePartnerLabelCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c SkippablePartnerLabelCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // Select starts a SELECT of every column; chain Where/OrderBy/Limit/...
 // and terminate with Run (or a static function).
-func (t SkippablePartnerTable) Select() *core.Select {
-	return core.NewSelect("public.skippable_partner", core.Col{Table: "skippable_partner", Name: "id"}, core.Col{Table: "skippable_partner", Name: "label"})
+func (t SkippablePartnerTable) Select() *pgb.Select {
+	return pgb.NewSelect("public.skippable_partner", pgb.Col{Table: "skippable_partner", Name: "id"}, pgb.Col{Table: "skippable_partner", Name: "label"})
 }
 
-// Update starts an UPDATE; an empty WHERE fails with core.ErrNoWhere.
-func (t SkippablePartnerTable) Update() *core.Update {
-	return core.NewUpdate("public.skippable_partner")
-}
+// Update starts an UPDATE; an empty WHERE fails with pgb.ErrNoWhere.
+func (t SkippablePartnerTable) Update() *pgb.Update { return pgb.NewUpdate("public.skippable_partner") }
 
-// Delete starts a DELETE; an empty WHERE fails with core.ErrNoWhere.
-func (t SkippablePartnerTable) Delete() *core.Delete {
-	return core.NewDelete("public.skippable_partner")
-}
+// Delete starts a DELETE; an empty WHERE fails with pgb.ErrNoWhere.
+func (t SkippablePartnerTable) Delete() *pgb.Delete { return pgb.NewDelete("public.skippable_partner") }

@@ -10,7 +10,7 @@ import (
 	"errors"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 )
 
 // KeywordColFilter narrows ListKeywordCols and CountKeywordCols:
@@ -60,13 +60,13 @@ type KeywordColFilter struct {
 	ChanIn         []pgtype.Text
 	ChanLike       *string
 	ChanILike      *string
-	Extra          []core.Expr
+	Extra          []pgb.Expr
 }
 
 // keywordColsFilterWhere compiles f into the ANDed predicate list; an empty
 // filter yields an empty list (no WHERE).
-func keywordColsFilterWhere(f KeywordColFilter) []core.Expr {
-	var w []core.Expr
+func keywordColsFilterWhere(f KeywordColFilter) []pgb.Expr {
+	var w []pgb.Expr
 	if f.ID != nil {
 		w = append(w, KeywordCols.ID().Eq(*f.ID))
 	}
@@ -242,15 +242,15 @@ func scanKeywordCol(row pgx.CollectableRow) (KeywordCol, error) {
 	return m, nil
 }
 
-// GetKeywordCol returns one row by id; core.ErrNotFound when absent
+// GetKeywordCol returns one row by id; pgb.ErrNotFound when absent
 // (pgx.ErrNoRows mapped — errors.Is keeps working for both).
-func GetKeywordCol(ctx context.Context, exec core.DBTX, id int64) (KeywordCol, error) {
+func GetKeywordCol(ctx context.Context, exec pgb.DBTX, id int64) (KeywordCol, error) {
 	sql, args := KeywordCols.Select().Where(KeywordCols.ID().Eq(id)).SQL()
 	var m KeywordCol
 	err := exec.QueryRow(ctx, sql, args...).Scan(&m.ID, &m.Type, &m.Range, &m.Select, &m.Class, &m.Interface, &m.Map, &m.Func, &m.Return, &m.Chan)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return KeywordCol{}, core.ErrNotFound
+			return KeywordCol{}, pgb.ErrNotFound
 		}
 		return KeywordCol{}, err
 	}
@@ -258,8 +258,9 @@ func GetKeywordCol(ctx context.Context, exec core.DBTX, id int64) (KeywordCol, e
 }
 
 // ListKeywordCols returns the rows matching f; limit <= 0 means no LIMIT.
-func ListKeywordCols(ctx context.Context, exec core.DBTX, f KeywordColFilter, limit int) ([]KeywordCol, error) {
-	rows, err := KeywordCols.Select().Where(keywordColsFilterWhere(f)...).Limit(limit).Run(ctx, exec)
+func ListKeywordCols(ctx context.Context, exec pgb.DBTX, f KeywordColFilter, opts ...pgb.ListOpt) ([]KeywordCol, error) {
+	sel := KeywordCols.Select().Where(keywordColsFilterWhere(f)...).ApplyList(opts...)
+	rows, err := sel.Run(ctx, exec)
 	if err != nil {
 		return nil, err
 	}
@@ -267,8 +268,8 @@ func ListKeywordCols(ctx context.Context, exec core.DBTX, f KeywordColFilter, li
 }
 
 // CountKeywordCols counts the rows matching f.
-func CountKeywordCols(ctx context.Context, exec core.DBTX, f KeywordColFilter) (int64, error) {
-	sql, args := core.NewSelect("public.keyword_cols", core.Raw{SQL: "count(*)"}).Where(keywordColsFilterWhere(f)...).SQL()
+func CountKeywordCols(ctx context.Context, exec pgb.DBTX, f KeywordColFilter) (int64, error) {
+	sql, args := pgb.NewSelect("public.keyword_cols", pgb.Raw{SQL: "count(*)"}).Where(keywordColsFilterWhere(f)...).SQL()
 	var n int64
 	if err := exec.QueryRow(ctx, sql, args...).Scan(&n); err != nil {
 		return 0, err
@@ -278,11 +279,11 @@ func CountKeywordCols(ctx context.Context, exec core.DBTX, f KeywordColFilter) (
 
 // InsertKeywordCol inserts one row and returns it (RETURNING every
 // column, defaults included).
-func InsertKeywordCol(ctx context.Context, exec core.DBTX, p InsertKeywordColParams) (KeywordCol, error) {
-	rows, err := core.NewInsert("public.keyword_cols",
+func InsertKeywordCol(ctx context.Context, exec pgb.DBTX, p InsertKeywordColParams) (KeywordCol, error) {
+	rows, err := pgb.NewInsert("public.keyword_cols",
 		[]string{"type", "range", "select", "class", "interface", "map", "func", "return", "chan"},
-		[]core.Expr{core.Lit{V: p.Type}, core.Lit{V: p.Range}, core.Lit{V: p.Select}, core.Lit{V: p.Class}, core.Lit{V: p.Interface}, core.Lit{V: p.Map}, core.Lit{V: p.Func}, core.Lit{V: p.Return}, core.Lit{V: p.Chan}},
-	).Returning(core.Col{Table: "keyword_cols", Name: "id"}, core.Col{Table: "keyword_cols", Name: "type"}, core.Col{Table: "keyword_cols", Name: "range"}, core.Col{Table: "keyword_cols", Name: "select"}, core.Col{Table: "keyword_cols", Name: "class"}, core.Col{Table: "keyword_cols", Name: "interface"}, core.Col{Table: "keyword_cols", Name: "map"}, core.Col{Table: "keyword_cols", Name: "func"}, core.Col{Table: "keyword_cols", Name: "return"}, core.Col{Table: "keyword_cols", Name: "chan"}).Run(ctx, exec)
+		[]pgb.Expr{pgb.Lit{V: p.Type}, pgb.Lit{V: p.Range}, pgb.Lit{V: p.Select}, pgb.Lit{V: p.Class}, pgb.Lit{V: p.Interface}, pgb.Lit{V: p.Map}, pgb.Lit{V: p.Func}, pgb.Lit{V: p.Return}, pgb.Lit{V: p.Chan}},
+	).Returning(pgb.Col{Table: "keyword_cols", Name: "id"}, pgb.Col{Table: "keyword_cols", Name: "type"}, pgb.Col{Table: "keyword_cols", Name: "range"}, pgb.Col{Table: "keyword_cols", Name: "select"}, pgb.Col{Table: "keyword_cols", Name: "class"}, pgb.Col{Table: "keyword_cols", Name: "interface"}, pgb.Col{Table: "keyword_cols", Name: "map"}, pgb.Col{Table: "keyword_cols", Name: "func"}, pgb.Col{Table: "keyword_cols", Name: "return"}, pgb.Col{Table: "keyword_cols", Name: "chan"}).Run(ctx, exec)
 	if err != nil {
 		return KeywordCol{}, err
 	}
@@ -291,7 +292,7 @@ func InsertKeywordCol(ctx context.Context, exec core.DBTX, p InsertKeywordColPar
 		return KeywordCol{}, err
 	}
 	if len(us) == 0 {
-		return KeywordCol{}, core.ErrNotFound
+		return KeywordCol{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
@@ -300,7 +301,7 @@ const insertKeywordColsSQL = "INSERT INTO public.keyword_cols (\"type\", \"range
 
 // InsertKeywordCols inserts a whole batch in one round trip via
 // unnest and returns every inserted row.
-func InsertKeywordCols(ctx context.Context, exec core.DBTX, ps []InsertKeywordColParams) ([]KeywordCol, error) {
+func InsertKeywordCols(ctx context.Context, exec pgb.DBTX, ps []InsertKeywordColParams) ([]KeywordCol, error) {
 	if len(ps) == 0 {
 		return nil, nil
 	}
@@ -334,86 +335,86 @@ func InsertKeywordCols(ctx context.Context, exec core.DBTX, ps []InsertKeywordCo
 }
 
 // UpdateKeywordCol applies the non-zero fields of s to one row and
-// returns the updated row; core.ErrNotFound when absent.
-func UpdateKeywordCol(ctx context.Context, exec core.DBTX, id int64, s KeywordColSet) (KeywordCol, error) {
+// returns the updated row; pgb.ErrNotFound when absent.
+func UpdateKeywordCol(ctx context.Context, exec pgb.DBTX, id int64, s KeywordColSet) (KeywordCol, error) {
 	u := KeywordCols.Update()
 	n := 0
 	if s.Type.Valid {
 		n++
 		if s.Type.Null {
-			u.Set("type", core.Lit{V: nil})
+			u.Set("type", pgb.Lit{V: nil})
 		} else {
-			u.Set("type", core.Lit{V: s.Type.V})
+			u.Set("type", pgb.Lit{V: s.Type.V})
 		}
 	}
 	if s.Range.Valid {
 		n++
 		if s.Range.Null {
-			u.Set("range", core.Lit{V: nil})
+			u.Set("range", pgb.Lit{V: nil})
 		} else {
-			u.Set("range", core.Lit{V: s.Range.V})
+			u.Set("range", pgb.Lit{V: s.Range.V})
 		}
 	}
 	if s.Select.Valid {
 		n++
 		if s.Select.Null {
-			u.Set("select", core.Lit{V: nil})
+			u.Set("select", pgb.Lit{V: nil})
 		} else {
-			u.Set("select", core.Lit{V: s.Select.V})
+			u.Set("select", pgb.Lit{V: s.Select.V})
 		}
 	}
 	if s.Class.Valid {
 		n++
 		if s.Class.Null {
-			u.Set("class", core.Lit{V: nil})
+			u.Set("class", pgb.Lit{V: nil})
 		} else {
-			u.Set("class", core.Lit{V: s.Class.V})
+			u.Set("class", pgb.Lit{V: s.Class.V})
 		}
 	}
 	if s.Interface.Valid {
 		n++
 		if s.Interface.Null {
-			u.Set("interface", core.Lit{V: nil})
+			u.Set("interface", pgb.Lit{V: nil})
 		} else {
-			u.Set("interface", core.Lit{V: s.Interface.V})
+			u.Set("interface", pgb.Lit{V: s.Interface.V})
 		}
 	}
 	if s.Map.Valid {
 		n++
 		if s.Map.Null {
-			u.Set("map", core.Lit{V: nil})
+			u.Set("map", pgb.Lit{V: nil})
 		} else {
-			u.Set("map", core.Lit{V: s.Map.V})
+			u.Set("map", pgb.Lit{V: s.Map.V})
 		}
 	}
 	if s.Func.Valid {
 		n++
 		if s.Func.Null {
-			u.Set("func", core.Lit{V: nil})
+			u.Set("func", pgb.Lit{V: nil})
 		} else {
-			u.Set("func", core.Lit{V: s.Func.V})
+			u.Set("func", pgb.Lit{V: s.Func.V})
 		}
 	}
 	if s.Return.Valid {
 		n++
 		if s.Return.Null {
-			u.Set("return", core.Lit{V: nil})
+			u.Set("return", pgb.Lit{V: nil})
 		} else {
-			u.Set("return", core.Lit{V: s.Return.V})
+			u.Set("return", pgb.Lit{V: s.Return.V})
 		}
 	}
 	if s.Chan.Valid {
 		n++
 		if s.Chan.Null {
-			u.Set("chan", core.Lit{V: nil})
+			u.Set("chan", pgb.Lit{V: nil})
 		} else {
-			u.Set("chan", core.Lit{V: s.Chan.V})
+			u.Set("chan", pgb.Lit{V: s.Chan.V})
 		}
 	}
 	if n == 0 {
 		return GetKeywordCol(ctx, exec, id)
 	}
-	u.Where(KeywordCols.ID().Eq(id)).Returning(core.Col{Table: "keyword_cols", Name: "id"}, core.Col{Table: "keyword_cols", Name: "type"}, core.Col{Table: "keyword_cols", Name: "range"}, core.Col{Table: "keyword_cols", Name: "select"}, core.Col{Table: "keyword_cols", Name: "class"}, core.Col{Table: "keyword_cols", Name: "interface"}, core.Col{Table: "keyword_cols", Name: "map"}, core.Col{Table: "keyword_cols", Name: "func"}, core.Col{Table: "keyword_cols", Name: "return"}, core.Col{Table: "keyword_cols", Name: "chan"})
+	u.Where(KeywordCols.ID().Eq(id)).Returning(pgb.Col{Table: "keyword_cols", Name: "id"}, pgb.Col{Table: "keyword_cols", Name: "type"}, pgb.Col{Table: "keyword_cols", Name: "range"}, pgb.Col{Table: "keyword_cols", Name: "select"}, pgb.Col{Table: "keyword_cols", Name: "class"}, pgb.Col{Table: "keyword_cols", Name: "interface"}, pgb.Col{Table: "keyword_cols", Name: "map"}, pgb.Col{Table: "keyword_cols", Name: "func"}, pgb.Col{Table: "keyword_cols", Name: "return"}, pgb.Col{Table: "keyword_cols", Name: "chan"})
 	rows, err := u.Run(ctx, exec)
 	if err != nil {
 		return KeywordCol{}, err
@@ -423,94 +424,94 @@ func UpdateKeywordCol(ctx context.Context, exec core.DBTX, id int64, s KeywordCo
 		return KeywordCol{}, err
 	}
 	if len(us) == 0 {
-		return KeywordCol{}, core.ErrNotFound
+		return KeywordCol{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // UpdateKeywordCols applies s to every row matching where and
 // returns the affected count; an empty where is refused with
-// core.ErrNoWhere before any SQL is sent.
-func UpdateKeywordCols(ctx context.Context, exec core.DBTX, where []core.Expr, s KeywordColSet) (int64, error) {
+// pgb.ErrNoWhere before any SQL is sent.
+func UpdateKeywordCols(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, s KeywordColSet) (int64, error) {
 	u := KeywordCols.Update()
 	n := 0
 	if s.Type.Valid {
 		n++
 		if s.Type.Null {
-			u.Set("type", core.Lit{V: nil})
+			u.Set("type", pgb.Lit{V: nil})
 		} else {
-			u.Set("type", core.Lit{V: s.Type.V})
+			u.Set("type", pgb.Lit{V: s.Type.V})
 		}
 	}
 	if s.Range.Valid {
 		n++
 		if s.Range.Null {
-			u.Set("range", core.Lit{V: nil})
+			u.Set("range", pgb.Lit{V: nil})
 		} else {
-			u.Set("range", core.Lit{V: s.Range.V})
+			u.Set("range", pgb.Lit{V: s.Range.V})
 		}
 	}
 	if s.Select.Valid {
 		n++
 		if s.Select.Null {
-			u.Set("select", core.Lit{V: nil})
+			u.Set("select", pgb.Lit{V: nil})
 		} else {
-			u.Set("select", core.Lit{V: s.Select.V})
+			u.Set("select", pgb.Lit{V: s.Select.V})
 		}
 	}
 	if s.Class.Valid {
 		n++
 		if s.Class.Null {
-			u.Set("class", core.Lit{V: nil})
+			u.Set("class", pgb.Lit{V: nil})
 		} else {
-			u.Set("class", core.Lit{V: s.Class.V})
+			u.Set("class", pgb.Lit{V: s.Class.V})
 		}
 	}
 	if s.Interface.Valid {
 		n++
 		if s.Interface.Null {
-			u.Set("interface", core.Lit{V: nil})
+			u.Set("interface", pgb.Lit{V: nil})
 		} else {
-			u.Set("interface", core.Lit{V: s.Interface.V})
+			u.Set("interface", pgb.Lit{V: s.Interface.V})
 		}
 	}
 	if s.Map.Valid {
 		n++
 		if s.Map.Null {
-			u.Set("map", core.Lit{V: nil})
+			u.Set("map", pgb.Lit{V: nil})
 		} else {
-			u.Set("map", core.Lit{V: s.Map.V})
+			u.Set("map", pgb.Lit{V: s.Map.V})
 		}
 	}
 	if s.Func.Valid {
 		n++
 		if s.Func.Null {
-			u.Set("func", core.Lit{V: nil})
+			u.Set("func", pgb.Lit{V: nil})
 		} else {
-			u.Set("func", core.Lit{V: s.Func.V})
+			u.Set("func", pgb.Lit{V: s.Func.V})
 		}
 	}
 	if s.Return.Valid {
 		n++
 		if s.Return.Null {
-			u.Set("return", core.Lit{V: nil})
+			u.Set("return", pgb.Lit{V: nil})
 		} else {
-			u.Set("return", core.Lit{V: s.Return.V})
+			u.Set("return", pgb.Lit{V: s.Return.V})
 		}
 	}
 	if s.Chan.Valid {
 		n++
 		if s.Chan.Null {
-			u.Set("chan", core.Lit{V: nil})
+			u.Set("chan", pgb.Lit{V: nil})
 		} else {
-			u.Set("chan", core.Lit{V: s.Chan.V})
+			u.Set("chan", pgb.Lit{V: s.Chan.V})
 		}
 	}
 	if n == 0 {
 		return 0, nil
 	}
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	u.Where(where...)
 	tag, err := u.Exec(ctx, exec)
@@ -522,25 +523,25 @@ func UpdateKeywordCols(ctx context.Context, exec core.DBTX, where []core.Expr, s
 
 // UpsertKeywordCol inserts p under id, or on conflict updates
 // every settable column from the proposed row (EXCLUDED.*) and returns
-// the resulting row; core.ErrNotFound when DO NOTHING matched.
-func UpsertKeywordCol(ctx context.Context, exec core.DBTX, id int64, p InsertKeywordColParams) (KeywordCol, error) {
-	rows, err := core.NewInsert("public.keyword_cols",
+// the resulting row; pgb.ErrNotFound when DO NOTHING matched.
+func UpsertKeywordCol(ctx context.Context, exec pgb.DBTX, id int64, p InsertKeywordColParams) (KeywordCol, error) {
+	rows, err := pgb.NewInsert("public.keyword_cols",
 		[]string{"id", "type", "range", "select", "class", "interface", "map", "func", "return", "chan"},
-		[]core.Expr{core.Lit{V: id}, core.Lit{V: p.Type}, core.Lit{V: p.Range}, core.Lit{V: p.Select}, core.Lit{V: p.Class}, core.Lit{V: p.Interface}, core.Lit{V: p.Map}, core.Lit{V: p.Func}, core.Lit{V: p.Return}, core.Lit{V: p.Chan}},
-	).OnConflict(core.OnConflict{
+		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.Type}, pgb.Lit{V: p.Range}, pgb.Lit{V: p.Select}, pgb.Lit{V: p.Class}, pgb.Lit{V: p.Interface}, pgb.Lit{V: p.Map}, pgb.Lit{V: p.Func}, pgb.Lit{V: p.Return}, pgb.Lit{V: p.Chan}},
+	).OnConflict(pgb.OnConflict{
 		Target: []string{"id"},
-		Sets: []core.SetClause{
-			{Col: "type", E: core.Col{Table: "excluded", Name: "type"}},
-			{Col: "range", E: core.Col{Table: "excluded", Name: "range"}},
-			{Col: "select", E: core.Col{Table: "excluded", Name: "select"}},
-			{Col: "class", E: core.Col{Table: "excluded", Name: "class"}},
-			{Col: "interface", E: core.Col{Table: "excluded", Name: "interface"}},
-			{Col: "map", E: core.Col{Table: "excluded", Name: "map"}},
-			{Col: "func", E: core.Col{Table: "excluded", Name: "func"}},
-			{Col: "return", E: core.Col{Table: "excluded", Name: "return"}},
-			{Col: "chan", E: core.Col{Table: "excluded", Name: "chan"}},
+		Sets: []pgb.SetClause{
+			{Col: "type", E: pgb.Col{Table: "excluded", Name: "type"}},
+			{Col: "range", E: pgb.Col{Table: "excluded", Name: "range"}},
+			{Col: "select", E: pgb.Col{Table: "excluded", Name: "select"}},
+			{Col: "class", E: pgb.Col{Table: "excluded", Name: "class"}},
+			{Col: "interface", E: pgb.Col{Table: "excluded", Name: "interface"}},
+			{Col: "map", E: pgb.Col{Table: "excluded", Name: "map"}},
+			{Col: "func", E: pgb.Col{Table: "excluded", Name: "func"}},
+			{Col: "return", E: pgb.Col{Table: "excluded", Name: "return"}},
+			{Col: "chan", E: pgb.Col{Table: "excluded", Name: "chan"}},
 		},
-	}).Returning(core.Col{Table: "keyword_cols", Name: "id"}, core.Col{Table: "keyword_cols", Name: "type"}, core.Col{Table: "keyword_cols", Name: "range"}, core.Col{Table: "keyword_cols", Name: "select"}, core.Col{Table: "keyword_cols", Name: "class"}, core.Col{Table: "keyword_cols", Name: "interface"}, core.Col{Table: "keyword_cols", Name: "map"}, core.Col{Table: "keyword_cols", Name: "func"}, core.Col{Table: "keyword_cols", Name: "return"}, core.Col{Table: "keyword_cols", Name: "chan"}).Run(ctx, exec)
+	}).Returning(pgb.Col{Table: "keyword_cols", Name: "id"}, pgb.Col{Table: "keyword_cols", Name: "type"}, pgb.Col{Table: "keyword_cols", Name: "range"}, pgb.Col{Table: "keyword_cols", Name: "select"}, pgb.Col{Table: "keyword_cols", Name: "class"}, pgb.Col{Table: "keyword_cols", Name: "interface"}, pgb.Col{Table: "keyword_cols", Name: "map"}, pgb.Col{Table: "keyword_cols", Name: "func"}, pgb.Col{Table: "keyword_cols", Name: "return"}, pgb.Col{Table: "keyword_cols", Name: "chan"}).Run(ctx, exec)
 	if err != nil {
 		return KeywordCol{}, err
 	}
@@ -549,22 +550,22 @@ func UpsertKeywordCol(ctx context.Context, exec core.DBTX, id int64, p InsertKey
 		return KeywordCol{}, err
 	}
 	if len(us) == 0 {
-		return KeywordCol{}, core.ErrNotFound
+		return KeywordCol{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // DeleteKeywordCol removes one row by id.
-func DeleteKeywordCol(ctx context.Context, exec core.DBTX, id int64) error {
+func DeleteKeywordCol(ctx context.Context, exec pgb.DBTX, id int64) error {
 	_, err := KeywordCols.Delete().Where(KeywordCols.ID().Eq(id)).Exec(ctx, exec)
 	return err
 }
 
 // DeleteKeywordCols removes every row matching where and returns the
-// affected count; an empty where is refused with core.ErrNoWhere.
-func DeleteKeywordCols(ctx context.Context, exec core.DBTX, where []core.Expr) (int64, error) {
+// affected count; an empty where is refused with pgb.ErrNoWhere.
+func DeleteKeywordCols(ctx context.Context, exec pgb.DBTX, where []pgb.Expr) (int64, error) {
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	tag, err := KeywordCols.Delete().Where(where...).Exec(ctx, exec)
 	if err != nil {

@@ -10,7 +10,7 @@ import (
 	"errors"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 )
 
 // ActiveUserFilter narrows ListActiveUsers and CountActiveUsers:
@@ -36,13 +36,13 @@ type ActiveUserFilter struct {
 	CreatedAtLt  *pgtype.Timestamptz
 	CreatedAtGte *pgtype.Timestamptz
 	CreatedAtLte *pgtype.Timestamptz
-	Extra        []core.Expr
+	Extra        []pgb.Expr
 }
 
 // activeUsersFilterWhere compiles f into the ANDed predicate list; an empty
 // filter yields an empty list (no WHERE).
-func activeUsersFilterWhere(f ActiveUserFilter) []core.Expr {
-	var w []core.Expr
+func activeUsersFilterWhere(f ActiveUserFilter) []pgb.Expr {
+	var w []pgb.Expr
 	if f.ID != nil {
 		w = append(w, ActiveUsers.ID().Eq(*f.ID))
 	}
@@ -123,15 +123,15 @@ func scanActiveUser(row pgx.CollectableRow) (ActiveUser, error) {
 	return m, nil
 }
 
-// GetActiveUser returns one row by id; core.ErrNotFound when absent
+// GetActiveUser returns one row by id; pgb.ErrNotFound when absent
 // (pgx.ErrNoRows mapped — errors.Is keeps working for both).
-func GetActiveUser(ctx context.Context, exec core.DBTX, id int64) (ActiveUser, error) {
+func GetActiveUser(ctx context.Context, exec pgb.DBTX, id int64) (ActiveUser, error) {
 	sql, args := ActiveUsers.Select().Where(ActiveUsers.ID().Eq(id)).SQL()
 	var m ActiveUser
 	err := exec.QueryRow(ctx, sql, args...).Scan(&m.ID, &m.Email, &m.Name, &m.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return ActiveUser{}, core.ErrNotFound
+			return ActiveUser{}, pgb.ErrNotFound
 		}
 		return ActiveUser{}, err
 	}
@@ -139,8 +139,9 @@ func GetActiveUser(ctx context.Context, exec core.DBTX, id int64) (ActiveUser, e
 }
 
 // ListActiveUsers returns the rows matching f; limit <= 0 means no LIMIT.
-func ListActiveUsers(ctx context.Context, exec core.DBTX, f ActiveUserFilter, limit int) ([]ActiveUser, error) {
-	rows, err := ActiveUsers.Select().Where(activeUsersFilterWhere(f)...).Limit(limit).Run(ctx, exec)
+func ListActiveUsers(ctx context.Context, exec pgb.DBTX, f ActiveUserFilter, opts ...pgb.ListOpt) ([]ActiveUser, error) {
+	sel := ActiveUsers.Select().Where(activeUsersFilterWhere(f)...).ApplyList(opts...)
+	rows, err := sel.Run(ctx, exec)
 	if err != nil {
 		return nil, err
 	}
@@ -148,8 +149,8 @@ func ListActiveUsers(ctx context.Context, exec core.DBTX, f ActiveUserFilter, li
 }
 
 // CountActiveUsers counts the rows matching f.
-func CountActiveUsers(ctx context.Context, exec core.DBTX, f ActiveUserFilter) (int64, error) {
-	sql, args := core.NewSelect("public.active_users", core.Raw{SQL: "count(*)"}).Where(activeUsersFilterWhere(f)...).SQL()
+func CountActiveUsers(ctx context.Context, exec pgb.DBTX, f ActiveUserFilter) (int64, error) {
+	sql, args := pgb.NewSelect("public.active_users", pgb.Raw{SQL: "count(*)"}).Where(activeUsersFilterWhere(f)...).SQL()
 	var n int64
 	if err := exec.QueryRow(ctx, sql, args...).Scan(&n); err != nil {
 		return 0, err

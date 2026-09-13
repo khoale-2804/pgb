@@ -7,170 +7,170 @@ package db
 
 import (
 	"github.com/jackc/pgx/v5/pgtype"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 )
 
 // Categories is the table descriptor for public.categories; immutable, safe for
 // concurrent use.
-var Categories = CategoryTable{core.NewTableMeta("public", "categories")}
+var Categories = CategoryTable{pgb.NewTableMeta("public", "categories")}
 
 // CategoryTable provides typed column accessors and statement entry points.
-type CategoryTable struct{ core.TableMeta }
+type CategoryTable struct{ pgb.TableMeta }
 
 // ID returns the typed accessor for column id.
 func (t CategoryTable) ID() CategoryIDCol {
-	return CategoryIDCol{core.Col{Table: "categories", Name: "id"}}
+	return CategoryIDCol{pgb.Col{Table: "categories", Name: "id"}}
 }
 
 // CategoryIDCol is the typed column categories.id.
-type CategoryIDCol struct{ core.Col }
+type CategoryIDCol struct{ pgb.Col }
 
-func (c CategoryIDCol) Eq(v int64) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c CategoryIDCol) Eq(v int64) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CategoryIDCol) Ne(v int64) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c CategoryIDCol) Ne(v int64) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CategoryIDCol) In(vs ...int64) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "bigserial[]"}}
+func (c CategoryIDCol) In(vs ...int64) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "bigserial[]"}}
 }
 
-func (c CategoryIDCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c CategoryIDCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c CategoryIDCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c CategoryIDCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c CategoryIDCol) Gt(v int64) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c CategoryIDCol) Gt(v int64) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CategoryIDCol) Lt(v int64) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c CategoryIDCol) Lt(v int64) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CategoryIDCol) Gte(v int64) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c CategoryIDCol) Gte(v int64) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CategoryIDCol) Lte(v int64) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c CategoryIDCol) Lte(v int64) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CategoryIDCol) Between(a, b int64) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c CategoryIDCol) Between(a, b int64) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // Name returns the typed accessor for column name.
 func (t CategoryTable) Name() CategoryNameCol {
-	return CategoryNameCol{core.Col{Table: "categories", Name: "name"}}
+	return CategoryNameCol{pgb.Col{Table: "categories", Name: "name"}}
 }
 
 // CategoryNameCol is the typed column categories.name.
-type CategoryNameCol struct{ core.Col }
+type CategoryNameCol struct{ pgb.Col }
 
-func (c CategoryNameCol) Eq(v string) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c CategoryNameCol) Eq(v string) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CategoryNameCol) Ne(v string) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c CategoryNameCol) Ne(v string) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CategoryNameCol) In(vs ...string) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c CategoryNameCol) In(vs ...string) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c CategoryNameCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c CategoryNameCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c CategoryNameCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c CategoryNameCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c CategoryNameCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c CategoryNameCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c CategoryNameCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c CategoryNameCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c CategoryNameCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c CategoryNameCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c CategoryNameCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c CategoryNameCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // ParentID returns the typed accessor for column parent_id.
 func (t CategoryTable) ParentID() CategoryParentIDCol {
-	return CategoryParentIDCol{core.Col{Table: "categories", Name: "parent_id"}}
+	return CategoryParentIDCol{pgb.Col{Table: "categories", Name: "parent_id"}}
 }
 
 // CategoryParentIDCol is the typed column categories.parent_id.
-type CategoryParentIDCol struct{ core.Col }
+type CategoryParentIDCol struct{ pgb.Col }
 
-func (c CategoryParentIDCol) Eq(v pgtype.Int8) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c CategoryParentIDCol) Eq(v pgtype.Int8) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CategoryParentIDCol) Ne(v pgtype.Int8) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c CategoryParentIDCol) Ne(v pgtype.Int8) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CategoryParentIDCol) In(vs ...pgtype.Int8) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "int8[]"}}
+func (c CategoryParentIDCol) In(vs ...pgtype.Int8) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int8[]"}}
 }
 
-func (c CategoryParentIDCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c CategoryParentIDCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c CategoryParentIDCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c CategoryParentIDCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c CategoryParentIDCol) Gt(v pgtype.Int8) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c CategoryParentIDCol) Gt(v pgtype.Int8) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CategoryParentIDCol) Lt(v pgtype.Int8) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c CategoryParentIDCol) Lt(v pgtype.Int8) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CategoryParentIDCol) Gte(v pgtype.Int8) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c CategoryParentIDCol) Gte(v pgtype.Int8) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CategoryParentIDCol) Lte(v pgtype.Int8) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c CategoryParentIDCol) Lte(v pgtype.Int8) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CategoryParentIDCol) Between(a, b pgtype.Int8) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c CategoryParentIDCol) Between(a, b pgtype.Int8) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // Select starts a SELECT of every column; chain Where/OrderBy/Limit/...
 // and terminate with Run (or a static function).
-func (t CategoryTable) Select() *core.Select {
-	return core.NewSelect("public.categories", core.Col{Table: "categories", Name: "id"}, core.Col{Table: "categories", Name: "name"}, core.Col{Table: "categories", Name: "parent_id"})
+func (t CategoryTable) Select() *pgb.Select {
+	return pgb.NewSelect("public.categories", pgb.Col{Table: "categories", Name: "id"}, pgb.Col{Table: "categories", Name: "name"}, pgb.Col{Table: "categories", Name: "parent_id"})
 }
 
-// Update starts an UPDATE; an empty WHERE fails with core.ErrNoWhere.
-func (t CategoryTable) Update() *core.Update { return core.NewUpdate("public.categories") }
+// Update starts an UPDATE; an empty WHERE fails with pgb.ErrNoWhere.
+func (t CategoryTable) Update() *pgb.Update { return pgb.NewUpdate("public.categories") }
 
-// Delete starts a DELETE; an empty WHERE fails with core.ErrNoWhere.
-func (t CategoryTable) Delete() *core.Delete { return core.NewDelete("public.categories") }
+// Delete starts a DELETE; an empty WHERE fails with pgb.ErrNoWhere.
+func (t CategoryTable) Delete() *pgb.Delete { return pgb.NewDelete("public.categories") }

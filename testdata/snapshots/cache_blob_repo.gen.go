@@ -10,7 +10,7 @@ import (
 	"errors"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 )
 
 // CacheBlobFilter narrows ListCacheBlobs and CountCacheBlobs:
@@ -28,13 +28,13 @@ type CacheBlobFilter struct {
 	ExpiresAtLt  *pgtype.Timestamptz
 	ExpiresAtGte *pgtype.Timestamptz
 	ExpiresAtLte *pgtype.Timestamptz
-	Extra        []core.Expr
+	Extra        []pgb.Expr
 }
 
 // cacheBlobsFilterWhere compiles f into the ANDed predicate list; an empty
 // filter yields an empty list (no WHERE).
-func cacheBlobsFilterWhere(f CacheBlobFilter) []core.Expr {
-	var w []core.Expr
+func cacheBlobsFilterWhere(f CacheBlobFilter) []pgb.Expr {
+	var w []pgb.Expr
 	if f.Key != nil {
 		w = append(w, CacheBlobs.Key().Eq(*f.Key))
 	}
@@ -101,15 +101,15 @@ func scanCacheBlob(row pgx.CollectableRow) (CacheBlob, error) {
 	return m, nil
 }
 
-// GetCacheBlob returns one row by key; core.ErrNotFound when absent
+// GetCacheBlob returns one row by key; pgb.ErrNotFound when absent
 // (pgx.ErrNoRows mapped — errors.Is keeps working for both).
-func GetCacheBlob(ctx context.Context, exec core.DBTX, key string) (CacheBlob, error) {
+func GetCacheBlob(ctx context.Context, exec pgb.DBTX, key string) (CacheBlob, error) {
 	sql, args := CacheBlobs.Select().Where(CacheBlobs.Key().Eq(key)).SQL()
 	var m CacheBlob
 	err := exec.QueryRow(ctx, sql, args...).Scan(&m.Key, &m.Value, &m.ExpiresAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return CacheBlob{}, core.ErrNotFound
+			return CacheBlob{}, pgb.ErrNotFound
 		}
 		return CacheBlob{}, err
 	}
@@ -117,8 +117,9 @@ func GetCacheBlob(ctx context.Context, exec core.DBTX, key string) (CacheBlob, e
 }
 
 // ListCacheBlobs returns the rows matching f; limit <= 0 means no LIMIT.
-func ListCacheBlobs(ctx context.Context, exec core.DBTX, f CacheBlobFilter, limit int) ([]CacheBlob, error) {
-	rows, err := CacheBlobs.Select().Where(cacheBlobsFilterWhere(f)...).Limit(limit).Run(ctx, exec)
+func ListCacheBlobs(ctx context.Context, exec pgb.DBTX, f CacheBlobFilter, opts ...pgb.ListOpt) ([]CacheBlob, error) {
+	sel := CacheBlobs.Select().Where(cacheBlobsFilterWhere(f)...).ApplyList(opts...)
+	rows, err := sel.Run(ctx, exec)
 	if err != nil {
 		return nil, err
 	}
@@ -126,8 +127,8 @@ func ListCacheBlobs(ctx context.Context, exec core.DBTX, f CacheBlobFilter, limi
 }
 
 // CountCacheBlobs counts the rows matching f.
-func CountCacheBlobs(ctx context.Context, exec core.DBTX, f CacheBlobFilter) (int64, error) {
-	sql, args := core.NewSelect("public.cache_blob", core.Raw{SQL: "count(*)"}).Where(cacheBlobsFilterWhere(f)...).SQL()
+func CountCacheBlobs(ctx context.Context, exec pgb.DBTX, f CacheBlobFilter) (int64, error) {
+	sql, args := pgb.NewSelect("public.cache_blob", pgb.Raw{SQL: "count(*)"}).Where(cacheBlobsFilterWhere(f)...).SQL()
 	var n int64
 	if err := exec.QueryRow(ctx, sql, args...).Scan(&n); err != nil {
 		return 0, err
@@ -137,11 +138,11 @@ func CountCacheBlobs(ctx context.Context, exec core.DBTX, f CacheBlobFilter) (in
 
 // InsertCacheBlob inserts one row and returns it (RETURNING every
 // column, defaults included).
-func InsertCacheBlob(ctx context.Context, exec core.DBTX, p InsertCacheBlobParams) (CacheBlob, error) {
-	rows, err := core.NewInsert("public.cache_blob",
+func InsertCacheBlob(ctx context.Context, exec pgb.DBTX, p InsertCacheBlobParams) (CacheBlob, error) {
+	rows, err := pgb.NewInsert("public.cache_blob",
 		[]string{"key", "value", "expires_at"},
-		[]core.Expr{core.Lit{V: p.Key}, core.Lit{V: p.Value}, core.Lit{V: p.ExpiresAt}},
-	).Returning(core.Col{Table: "cache_blob", Name: "key"}, core.Col{Table: "cache_blob", Name: "value"}, core.Col{Table: "cache_blob", Name: "expires_at"}).Run(ctx, exec)
+		[]pgb.Expr{pgb.Lit{V: p.Key}, pgb.Lit{V: p.Value}, pgb.Lit{V: p.ExpiresAt}},
+	).Returning(pgb.Col{Table: "cache_blob", Name: "key"}, pgb.Col{Table: "cache_blob", Name: "value"}, pgb.Col{Table: "cache_blob", Name: "expires_at"}).Run(ctx, exec)
 	if err != nil {
 		return CacheBlob{}, err
 	}
@@ -150,7 +151,7 @@ func InsertCacheBlob(ctx context.Context, exec core.DBTX, p InsertCacheBlobParam
 		return CacheBlob{}, err
 	}
 	if len(us) == 0 {
-		return CacheBlob{}, core.ErrNotFound
+		return CacheBlob{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
@@ -159,7 +160,7 @@ const insertCacheBlobsSQL = "INSERT INTO public.cache_blob (key, value, expires_
 
 // InsertCacheBlobs inserts a whole batch in one round trip via
 // unnest and returns every inserted row.
-func InsertCacheBlobs(ctx context.Context, exec core.DBTX, ps []InsertCacheBlobParams) ([]CacheBlob, error) {
+func InsertCacheBlobs(ctx context.Context, exec pgb.DBTX, ps []InsertCacheBlobParams) ([]CacheBlob, error) {
 	if len(ps) == 0 {
 		return nil, nil
 	}
@@ -181,30 +182,30 @@ func InsertCacheBlobs(ctx context.Context, exec core.DBTX, ps []InsertCacheBlobP
 }
 
 // UpdateCacheBlob applies the non-zero fields of s to one row and
-// returns the updated row; core.ErrNotFound when absent.
-func UpdateCacheBlob(ctx context.Context, exec core.DBTX, key string, s CacheBlobSet) (CacheBlob, error) {
+// returns the updated row; pgb.ErrNotFound when absent.
+func UpdateCacheBlob(ctx context.Context, exec pgb.DBTX, key string, s CacheBlobSet) (CacheBlob, error) {
 	u := CacheBlobs.Update()
 	n := 0
 	if s.Value.Valid {
 		n++
 		if s.Value.Null {
-			u.Set("value", core.Lit{V: nil})
+			u.Set("value", pgb.Lit{V: nil})
 		} else {
-			u.Set("value", core.Lit{V: s.Value.V})
+			u.Set("value", pgb.Lit{V: s.Value.V})
 		}
 	}
 	if s.ExpiresAt.Valid {
 		n++
 		if s.ExpiresAt.Null {
-			u.Set("expires_at", core.Lit{V: nil})
+			u.Set("expires_at", pgb.Lit{V: nil})
 		} else {
-			u.Set("expires_at", core.Lit{V: s.ExpiresAt.V})
+			u.Set("expires_at", pgb.Lit{V: s.ExpiresAt.V})
 		}
 	}
 	if n == 0 {
 		return GetCacheBlob(ctx, exec, key)
 	}
-	u.Where(CacheBlobs.Key().Eq(key)).Returning(core.Col{Table: "cache_blob", Name: "key"}, core.Col{Table: "cache_blob", Name: "value"}, core.Col{Table: "cache_blob", Name: "expires_at"})
+	u.Where(CacheBlobs.Key().Eq(key)).Returning(pgb.Col{Table: "cache_blob", Name: "key"}, pgb.Col{Table: "cache_blob", Name: "value"}, pgb.Col{Table: "cache_blob", Name: "expires_at"})
 	rows, err := u.Run(ctx, exec)
 	if err != nil {
 		return CacheBlob{}, err
@@ -214,38 +215,38 @@ func UpdateCacheBlob(ctx context.Context, exec core.DBTX, key string, s CacheBlo
 		return CacheBlob{}, err
 	}
 	if len(us) == 0 {
-		return CacheBlob{}, core.ErrNotFound
+		return CacheBlob{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // UpdateCacheBlobs applies s to every row matching where and
 // returns the affected count; an empty where is refused with
-// core.ErrNoWhere before any SQL is sent.
-func UpdateCacheBlobs(ctx context.Context, exec core.DBTX, where []core.Expr, s CacheBlobSet) (int64, error) {
+// pgb.ErrNoWhere before any SQL is sent.
+func UpdateCacheBlobs(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, s CacheBlobSet) (int64, error) {
 	u := CacheBlobs.Update()
 	n := 0
 	if s.Value.Valid {
 		n++
 		if s.Value.Null {
-			u.Set("value", core.Lit{V: nil})
+			u.Set("value", pgb.Lit{V: nil})
 		} else {
-			u.Set("value", core.Lit{V: s.Value.V})
+			u.Set("value", pgb.Lit{V: s.Value.V})
 		}
 	}
 	if s.ExpiresAt.Valid {
 		n++
 		if s.ExpiresAt.Null {
-			u.Set("expires_at", core.Lit{V: nil})
+			u.Set("expires_at", pgb.Lit{V: nil})
 		} else {
-			u.Set("expires_at", core.Lit{V: s.ExpiresAt.V})
+			u.Set("expires_at", pgb.Lit{V: s.ExpiresAt.V})
 		}
 	}
 	if n == 0 {
 		return 0, nil
 	}
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	u.Where(where...)
 	tag, err := u.Exec(ctx, exec)
@@ -257,18 +258,18 @@ func UpdateCacheBlobs(ctx context.Context, exec core.DBTX, where []core.Expr, s 
 
 // UpsertCacheBlob inserts p under key, or on conflict updates
 // every settable column from the proposed row (EXCLUDED.*) and returns
-// the resulting row; core.ErrNotFound when DO NOTHING matched.
-func UpsertCacheBlob(ctx context.Context, exec core.DBTX, key string, p InsertCacheBlobParams) (CacheBlob, error) {
-	rows, err := core.NewInsert("public.cache_blob",
+// the resulting row; pgb.ErrNotFound when DO NOTHING matched.
+func UpsertCacheBlob(ctx context.Context, exec pgb.DBTX, key string, p InsertCacheBlobParams) (CacheBlob, error) {
+	rows, err := pgb.NewInsert("public.cache_blob",
 		[]string{"key", "value", "expires_at"},
-		[]core.Expr{core.Lit{V: key}, core.Lit{V: p.Value}, core.Lit{V: p.ExpiresAt}},
-	).OnConflict(core.OnConflict{
+		[]pgb.Expr{pgb.Lit{V: key}, pgb.Lit{V: p.Value}, pgb.Lit{V: p.ExpiresAt}},
+	).OnConflict(pgb.OnConflict{
 		Target: []string{"key"},
-		Sets: []core.SetClause{
-			{Col: "value", E: core.Col{Table: "excluded", Name: "value"}},
-			{Col: "expires_at", E: core.Col{Table: "excluded", Name: "expires_at"}},
+		Sets: []pgb.SetClause{
+			{Col: "value", E: pgb.Col{Table: "excluded", Name: "value"}},
+			{Col: "expires_at", E: pgb.Col{Table: "excluded", Name: "expires_at"}},
 		},
-	}).Returning(core.Col{Table: "cache_blob", Name: "key"}, core.Col{Table: "cache_blob", Name: "value"}, core.Col{Table: "cache_blob", Name: "expires_at"}).Run(ctx, exec)
+	}).Returning(pgb.Col{Table: "cache_blob", Name: "key"}, pgb.Col{Table: "cache_blob", Name: "value"}, pgb.Col{Table: "cache_blob", Name: "expires_at"}).Run(ctx, exec)
 	if err != nil {
 		return CacheBlob{}, err
 	}
@@ -277,22 +278,22 @@ func UpsertCacheBlob(ctx context.Context, exec core.DBTX, key string, p InsertCa
 		return CacheBlob{}, err
 	}
 	if len(us) == 0 {
-		return CacheBlob{}, core.ErrNotFound
+		return CacheBlob{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // DeleteCacheBlob removes one row by key.
-func DeleteCacheBlob(ctx context.Context, exec core.DBTX, key string) error {
+func DeleteCacheBlob(ctx context.Context, exec pgb.DBTX, key string) error {
 	_, err := CacheBlobs.Delete().Where(CacheBlobs.Key().Eq(key)).Exec(ctx, exec)
 	return err
 }
 
 // DeleteCacheBlobs removes every row matching where and returns the
-// affected count; an empty where is refused with core.ErrNoWhere.
-func DeleteCacheBlobs(ctx context.Context, exec core.DBTX, where []core.Expr) (int64, error) {
+// affected count; an empty where is refused with pgb.ErrNoWhere.
+func DeleteCacheBlobs(ctx context.Context, exec pgb.DBTX, where []pgb.Expr) (int64, error) {
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	tag, err := CacheBlobs.Delete().Where(where...).Exec(ctx, exec)
 	if err != nil {

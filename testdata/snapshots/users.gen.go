@@ -8,1759 +8,1759 @@ package db
 import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 	"net"
 	"net/netip"
 )
 
 // Users is the table descriptor for public.users; immutable, safe for
 // concurrent use.
-var Users = UserTable{core.NewTableMeta("public", "users")}
+var Users = UserTable{pgb.NewTableMeta("public", "users")}
 
 // UserTable provides typed column accessors and statement entry points.
-type UserTable struct{ core.TableMeta }
+type UserTable struct{ pgb.TableMeta }
 
 // ID returns the typed accessor for column id.
 func (t UserTable) ID() UserIDCol {
-	return UserIDCol{core.Col{Table: "users", Name: "id"}}
+	return UserIDCol{pgb.Col{Table: "users", Name: "id"}}
 }
 
 // UserIDCol is the typed column users.id.
-type UserIDCol struct{ core.Col }
+type UserIDCol struct{ pgb.Col }
 
-func (c UserIDCol) Eq(v int64) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserIDCol) Eq(v int64) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserIDCol) Ne(v int64) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserIDCol) Ne(v int64) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserIDCol) In(vs ...int64) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "bigserial[]"}}
+func (c UserIDCol) In(vs ...int64) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "bigserial[]"}}
 }
 
-func (c UserIDCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserIDCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserIDCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserIDCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c UserIDCol) Gt(v int64) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c UserIDCol) Gt(v int64) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserIDCol) Lt(v int64) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c UserIDCol) Lt(v int64) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserIDCol) Gte(v int64) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c UserIDCol) Gte(v int64) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserIDCol) Lte(v int64) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c UserIDCol) Lte(v int64) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserIDCol) Between(a, b int64) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c UserIDCol) Between(a, b int64) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // Email returns the typed accessor for column email.
 func (t UserTable) Email() UserEmailCol {
-	return UserEmailCol{core.Col{Table: "users", Name: "email"}}
+	return UserEmailCol{pgb.Col{Table: "users", Name: "email"}}
 }
 
 // UserEmailCol is the typed column users.email.
-type UserEmailCol struct{ core.Col }
+type UserEmailCol struct{ pgb.Col }
 
-func (c UserEmailCol) Eq(v string) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserEmailCol) Eq(v string) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserEmailCol) Ne(v string) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserEmailCol) Ne(v string) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserEmailCol) In(vs ...string) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c UserEmailCol) In(vs ...string) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c UserEmailCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserEmailCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserEmailCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserEmailCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c UserEmailCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserEmailCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c UserEmailCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserEmailCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c UserEmailCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserEmailCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c UserEmailCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserEmailCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // Password returns the typed accessor for column password.
 func (t UserTable) Password() UserPasswordCol {
-	return UserPasswordCol{core.Col{Table: "users", Name: "password"}}
+	return UserPasswordCol{pgb.Col{Table: "users", Name: "password"}}
 }
 
 // UserPasswordCol is the typed column users.password.
-type UserPasswordCol struct{ core.Col }
+type UserPasswordCol struct{ pgb.Col }
 
 // Name returns the typed accessor for column name.
 func (t UserTable) Name() UserNameCol {
-	return UserNameCol{core.Col{Table: "users", Name: "name"}}
+	return UserNameCol{pgb.Col{Table: "users", Name: "name"}}
 }
 
 // UserNameCol is the typed column users.name.
-type UserNameCol struct{ core.Col }
+type UserNameCol struct{ pgb.Col }
 
-func (c UserNameCol) Eq(v string) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserNameCol) Eq(v string) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserNameCol) Ne(v string) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserNameCol) Ne(v string) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserNameCol) In(vs ...string) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c UserNameCol) In(vs ...string) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c UserNameCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserNameCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserNameCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserNameCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c UserNameCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserNameCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c UserNameCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserNameCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c UserNameCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserNameCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c UserNameCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserNameCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // Bio returns the typed accessor for column bio.
 func (t UserTable) Bio() UserBioCol {
-	return UserBioCol{core.Col{Table: "users", Name: "bio"}}
+	return UserBioCol{pgb.Col{Table: "users", Name: "bio"}}
 }
 
 // UserBioCol is the typed column users.bio.
-type UserBioCol struct{ core.Col }
+type UserBioCol struct{ pgb.Col }
 
-func (c UserBioCol) Eq(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserBioCol) Eq(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserBioCol) Ne(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserBioCol) Ne(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserBioCol) In(vs ...pgtype.Text) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c UserBioCol) In(vs ...pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c UserBioCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserBioCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserBioCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserBioCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c UserBioCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserBioCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c UserBioCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserBioCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c UserBioCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserBioCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c UserBioCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserBioCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // Age returns the typed accessor for column age.
 func (t UserTable) Age() UserAgeCol {
-	return UserAgeCol{core.Col{Table: "users", Name: "age"}}
+	return UserAgeCol{pgb.Col{Table: "users", Name: "age"}}
 }
 
 // UserAgeCol is the typed column users.age.
-type UserAgeCol struct{ core.Col }
+type UserAgeCol struct{ pgb.Col }
 
-func (c UserAgeCol) Eq(v pgtype.Int2) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserAgeCol) Eq(v pgtype.Int2) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserAgeCol) Ne(v pgtype.Int2) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserAgeCol) Ne(v pgtype.Int2) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserAgeCol) In(vs ...pgtype.Int2) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "int2[]"}}
+func (c UserAgeCol) In(vs ...pgtype.Int2) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int2[]"}}
 }
 
-func (c UserAgeCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserAgeCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserAgeCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserAgeCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c UserAgeCol) Gt(v pgtype.Int2) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c UserAgeCol) Gt(v pgtype.Int2) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserAgeCol) Lt(v pgtype.Int2) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c UserAgeCol) Lt(v pgtype.Int2) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserAgeCol) Gte(v pgtype.Int2) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c UserAgeCol) Gte(v pgtype.Int2) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserAgeCol) Lte(v pgtype.Int2) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c UserAgeCol) Lte(v pgtype.Int2) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserAgeCol) Between(a, b pgtype.Int2) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c UserAgeCol) Between(a, b pgtype.Int2) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // Balance returns the typed accessor for column balance.
 func (t UserTable) Balance() UserBalanceCol {
-	return UserBalanceCol{core.Col{Table: "users", Name: "balance"}}
+	return UserBalanceCol{pgb.Col{Table: "users", Name: "balance"}}
 }
 
 // UserBalanceCol is the typed column users.balance.
-type UserBalanceCol struct{ core.Col }
+type UserBalanceCol struct{ pgb.Col }
 
-func (c UserBalanceCol) Eq(v pgtype.Numeric) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserBalanceCol) Eq(v pgtype.Numeric) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserBalanceCol) Ne(v pgtype.Numeric) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserBalanceCol) Ne(v pgtype.Numeric) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserBalanceCol) In(vs ...pgtype.Numeric) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "numeric[]"}}
+func (c UserBalanceCol) In(vs ...pgtype.Numeric) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "numeric[]"}}
 }
 
-func (c UserBalanceCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserBalanceCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserBalanceCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserBalanceCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c UserBalanceCol) Gt(v pgtype.Numeric) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c UserBalanceCol) Gt(v pgtype.Numeric) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserBalanceCol) Lt(v pgtype.Numeric) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c UserBalanceCol) Lt(v pgtype.Numeric) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserBalanceCol) Gte(v pgtype.Numeric) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c UserBalanceCol) Gte(v pgtype.Numeric) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserBalanceCol) Lte(v pgtype.Numeric) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c UserBalanceCol) Lte(v pgtype.Numeric) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserBalanceCol) Between(a, b pgtype.Numeric) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c UserBalanceCol) Between(a, b pgtype.Numeric) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // Rating returns the typed accessor for column rating.
 func (t UserTable) Rating() UserRatingCol {
-	return UserRatingCol{core.Col{Table: "users", Name: "rating"}}
+	return UserRatingCol{pgb.Col{Table: "users", Name: "rating"}}
 }
 
 // UserRatingCol is the typed column users.rating.
-type UserRatingCol struct{ core.Col }
+type UserRatingCol struct{ pgb.Col }
 
-func (c UserRatingCol) Eq(v pgtype.Float4) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserRatingCol) Eq(v pgtype.Float4) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserRatingCol) Ne(v pgtype.Float4) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserRatingCol) Ne(v pgtype.Float4) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserRatingCol) In(vs ...pgtype.Float4) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "float4[]"}}
+func (c UserRatingCol) In(vs ...pgtype.Float4) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "float4[]"}}
 }
 
-func (c UserRatingCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserRatingCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserRatingCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserRatingCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c UserRatingCol) Gt(v pgtype.Float4) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c UserRatingCol) Gt(v pgtype.Float4) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserRatingCol) Lt(v pgtype.Float4) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c UserRatingCol) Lt(v pgtype.Float4) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserRatingCol) Gte(v pgtype.Float4) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c UserRatingCol) Gte(v pgtype.Float4) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserRatingCol) Lte(v pgtype.Float4) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c UserRatingCol) Lte(v pgtype.Float4) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserRatingCol) Between(a, b pgtype.Float4) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c UserRatingCol) Between(a, b pgtype.Float4) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // Score returns the typed accessor for column score.
 func (t UserTable) Score() UserScoreCol {
-	return UserScoreCol{core.Col{Table: "users", Name: "score"}}
+	return UserScoreCol{pgb.Col{Table: "users", Name: "score"}}
 }
 
 // UserScoreCol is the typed column users.score.
-type UserScoreCol struct{ core.Col }
+type UserScoreCol struct{ pgb.Col }
 
-func (c UserScoreCol) Eq(v float64) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserScoreCol) Eq(v float64) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserScoreCol) Ne(v float64) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserScoreCol) Ne(v float64) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserScoreCol) In(vs ...float64) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "float8[]"}}
+func (c UserScoreCol) In(vs ...float64) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "float8[]"}}
 }
 
-func (c UserScoreCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserScoreCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserScoreCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserScoreCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c UserScoreCol) Gt(v float64) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c UserScoreCol) Gt(v float64) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserScoreCol) Lt(v float64) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c UserScoreCol) Lt(v float64) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserScoreCol) Gte(v float64) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c UserScoreCol) Gte(v float64) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserScoreCol) Lte(v float64) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c UserScoreCol) Lte(v float64) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserScoreCol) Between(a, b float64) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c UserScoreCol) Between(a, b float64) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // IsActive returns the typed accessor for column is_active.
 func (t UserTable) IsActive() UserIsActiveCol {
-	return UserIsActiveCol{core.Col{Table: "users", Name: "is_active"}}
+	return UserIsActiveCol{pgb.Col{Table: "users", Name: "is_active"}}
 }
 
 // UserIsActiveCol is the typed column users.is_active.
-type UserIsActiveCol struct{ core.Col }
+type UserIsActiveCol struct{ pgb.Col }
 
-func (c UserIsActiveCol) Eq(v bool) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserIsActiveCol) Eq(v bool) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserIsActiveCol) Ne(v bool) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserIsActiveCol) Ne(v bool) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserIsActiveCol) In(vs ...bool) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "bool[]"}}
+func (c UserIsActiveCol) In(vs ...bool) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "bool[]"}}
 }
 
-func (c UserIsActiveCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserIsActiveCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserIsActiveCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserIsActiveCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
 // CreatedAt returns the typed accessor for column created_at.
 func (t UserTable) CreatedAt() UserCreatedAtCol {
-	return UserCreatedAtCol{core.Col{Table: "users", Name: "created_at"}}
+	return UserCreatedAtCol{pgb.Col{Table: "users", Name: "created_at"}}
 }
 
 // UserCreatedAtCol is the typed column users.created_at.
-type UserCreatedAtCol struct{ core.Col }
+type UserCreatedAtCol struct{ pgb.Col }
 
-func (c UserCreatedAtCol) Eq(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserCreatedAtCol) Eq(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserCreatedAtCol) Ne(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserCreatedAtCol) Ne(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserCreatedAtCol) In(vs ...pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "timestamptz[]"}}
+func (c UserCreatedAtCol) In(vs ...pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "timestamptz[]"}}
 }
 
-func (c UserCreatedAtCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserCreatedAtCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserCreatedAtCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserCreatedAtCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c UserCreatedAtCol) Gt(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c UserCreatedAtCol) Gt(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserCreatedAtCol) Lt(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c UserCreatedAtCol) Lt(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserCreatedAtCol) Gte(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c UserCreatedAtCol) Gte(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserCreatedAtCol) Lte(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c UserCreatedAtCol) Lte(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserCreatedAtCol) Between(a, b pgtype.Timestamptz) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c UserCreatedAtCol) Between(a, b pgtype.Timestamptz) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // UpdatedAt returns the typed accessor for column updated_at.
 func (t UserTable) UpdatedAt() UserUpdatedAtCol {
-	return UserUpdatedAtCol{core.Col{Table: "users", Name: "updated_at"}}
+	return UserUpdatedAtCol{pgb.Col{Table: "users", Name: "updated_at"}}
 }
 
 // UserUpdatedAtCol is the typed column users.updated_at.
-type UserUpdatedAtCol struct{ core.Col }
+type UserUpdatedAtCol struct{ pgb.Col }
 
-func (c UserUpdatedAtCol) Eq(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserUpdatedAtCol) Eq(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserUpdatedAtCol) Ne(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserUpdatedAtCol) Ne(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserUpdatedAtCol) In(vs ...pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "timestamptz[]"}}
+func (c UserUpdatedAtCol) In(vs ...pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "timestamptz[]"}}
 }
 
-func (c UserUpdatedAtCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserUpdatedAtCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserUpdatedAtCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserUpdatedAtCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c UserUpdatedAtCol) Gt(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c UserUpdatedAtCol) Gt(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserUpdatedAtCol) Lt(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c UserUpdatedAtCol) Lt(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserUpdatedAtCol) Gte(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c UserUpdatedAtCol) Gte(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserUpdatedAtCol) Lte(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c UserUpdatedAtCol) Lte(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserUpdatedAtCol) Between(a, b pgtype.Timestamptz) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c UserUpdatedAtCol) Between(a, b pgtype.Timestamptz) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // BirthDate returns the typed accessor for column birth_date.
 func (t UserTable) BirthDate() UserBirthDateCol {
-	return UserBirthDateCol{core.Col{Table: "users", Name: "birth_date"}}
+	return UserBirthDateCol{pgb.Col{Table: "users", Name: "birth_date"}}
 }
 
 // UserBirthDateCol is the typed column users.birth_date.
-type UserBirthDateCol struct{ core.Col }
+type UserBirthDateCol struct{ pgb.Col }
 
-func (c UserBirthDateCol) Eq(v pgtype.Date) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserBirthDateCol) Eq(v pgtype.Date) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserBirthDateCol) Ne(v pgtype.Date) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserBirthDateCol) Ne(v pgtype.Date) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserBirthDateCol) In(vs ...pgtype.Date) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "date[]"}}
+func (c UserBirthDateCol) In(vs ...pgtype.Date) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "date[]"}}
 }
 
-func (c UserBirthDateCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserBirthDateCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserBirthDateCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserBirthDateCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c UserBirthDateCol) Gt(v pgtype.Date) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c UserBirthDateCol) Gt(v pgtype.Date) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserBirthDateCol) Lt(v pgtype.Date) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c UserBirthDateCol) Lt(v pgtype.Date) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserBirthDateCol) Gte(v pgtype.Date) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c UserBirthDateCol) Gte(v pgtype.Date) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserBirthDateCol) Lte(v pgtype.Date) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c UserBirthDateCol) Lte(v pgtype.Date) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserBirthDateCol) Between(a, b pgtype.Date) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c UserBirthDateCol) Between(a, b pgtype.Date) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // LastSeen returns the typed accessor for column last_seen.
 func (t UserTable) LastSeen() UserLastSeenCol {
-	return UserLastSeenCol{core.Col{Table: "users", Name: "last_seen"}}
+	return UserLastSeenCol{pgb.Col{Table: "users", Name: "last_seen"}}
 }
 
 // UserLastSeenCol is the typed column users.last_seen.
-type UserLastSeenCol struct{ core.Col }
+type UserLastSeenCol struct{ pgb.Col }
 
-func (c UserLastSeenCol) Eq(v pgtype.Time) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserLastSeenCol) Eq(v pgtype.Time) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserLastSeenCol) Ne(v pgtype.Time) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserLastSeenCol) Ne(v pgtype.Time) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserLastSeenCol) In(vs ...pgtype.Time) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "timetz[]"}}
+func (c UserLastSeenCol) In(vs ...pgtype.Time) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "timetz[]"}}
 }
 
-func (c UserLastSeenCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserLastSeenCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserLastSeenCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserLastSeenCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c UserLastSeenCol) Gt(v pgtype.Time) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c UserLastSeenCol) Gt(v pgtype.Time) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserLastSeenCol) Lt(v pgtype.Time) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c UserLastSeenCol) Lt(v pgtype.Time) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserLastSeenCol) Gte(v pgtype.Time) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c UserLastSeenCol) Gte(v pgtype.Time) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserLastSeenCol) Lte(v pgtype.Time) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c UserLastSeenCol) Lte(v pgtype.Time) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserLastSeenCol) Between(a, b pgtype.Time) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c UserLastSeenCol) Between(a, b pgtype.Time) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // Avatar returns the typed accessor for column avatar.
 func (t UserTable) Avatar() UserAvatarCol {
-	return UserAvatarCol{core.Col{Table: "users", Name: "avatar"}}
+	return UserAvatarCol{pgb.Col{Table: "users", Name: "avatar"}}
 }
 
 // UserAvatarCol is the typed column users.avatar.
-type UserAvatarCol struct{ core.Col }
+type UserAvatarCol struct{ pgb.Col }
 
-func (c UserAvatarCol) Eq(v []byte) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserAvatarCol) Eq(v []byte) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserAvatarCol) Ne(v []byte) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserAvatarCol) Ne(v []byte) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserAvatarCol) In(vs ...[]byte) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "bytea[]"}}
+func (c UserAvatarCol) In(vs ...[]byte) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "bytea[]"}}
 }
 
-func (c UserAvatarCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserAvatarCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserAvatarCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserAvatarCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
 // Metadata returns the typed accessor for column metadata.
 func (t UserTable) Metadata() UserMetadataCol {
-	return UserMetadataCol{core.Col{Table: "users", Name: "metadata"}}
+	return UserMetadataCol{pgb.Col{Table: "users", Name: "metadata"}}
 }
 
 // UserMetadataCol is the typed column users.metadata.
-type UserMetadataCol struct{ core.Col }
+type UserMetadataCol struct{ pgb.Col }
 
-func (c UserMetadataCol) Eq(v []byte) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v, Cast: "jsonb"}}
+func (c UserMetadataCol) Eq(v []byte) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v, Cast: "jsonb"}}
 }
 
-func (c UserMetadataCol) Ne(v []byte) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v, Cast: "jsonb"}}
+func (c UserMetadataCol) Ne(v []byte) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v, Cast: "jsonb"}}
 }
 
-func (c UserMetadataCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserMetadataCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserMetadataCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserMetadataCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c UserMetadataCol) KeyEq(path string, v any) core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " ->> ?", Args: []any{path, v}}
+func (c UserMetadataCol) KeyEq(path string, v any) pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " ->> ?", Args: []any{path, v}}
 }
 
 // Settings returns the typed accessor for column settings.
 func (t UserTable) Settings() UserSettingsCol {
-	return UserSettingsCol{core.Col{Table: "users", Name: "settings"}}
+	return UserSettingsCol{pgb.Col{Table: "users", Name: "settings"}}
 }
 
 // UserSettingsCol is the typed column users.settings.
-type UserSettingsCol struct{ core.Col }
+type UserSettingsCol struct{ pgb.Col }
 
-func (c UserSettingsCol) Eq(v map[string]any) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v, Cast: "json"}}
+func (c UserSettingsCol) Eq(v map[string]any) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v, Cast: "json"}}
 }
 
-func (c UserSettingsCol) Ne(v map[string]any) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v, Cast: "json"}}
+func (c UserSettingsCol) Ne(v map[string]any) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v, Cast: "json"}}
 }
 
-func (c UserSettingsCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserSettingsCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserSettingsCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserSettingsCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c UserSettingsCol) KeyEq(path string, v any) core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " ->> ?", Args: []any{path, v}}
+func (c UserSettingsCol) KeyEq(path string, v any) pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " ->> ?", Args: []any{path, v}}
 }
 
 // Homepage returns the typed accessor for column homepage.
 func (t UserTable) Homepage() UserHomepageCol {
-	return UserHomepageCol{core.Col{Table: "users", Name: "homepage"}}
+	return UserHomepageCol{pgb.Col{Table: "users", Name: "homepage"}}
 }
 
 // UserHomepageCol is the typed column users.homepage.
-type UserHomepageCol struct{ core.Col }
+type UserHomepageCol struct{ pgb.Col }
 
-func (c UserHomepageCol) Eq(v netip.Prefix) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserHomepageCol) Eq(v netip.Prefix) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserHomepageCol) Ne(v netip.Prefix) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserHomepageCol) Ne(v netip.Prefix) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserHomepageCol) In(vs ...netip.Prefix) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "inet[]"}}
+func (c UserHomepageCol) In(vs ...netip.Prefix) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "inet[]"}}
 }
 
-func (c UserHomepageCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserHomepageCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserHomepageCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserHomepageCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
 // Lan returns the typed accessor for column lan.
 func (t UserTable) Lan() UserLanCol {
-	return UserLanCol{core.Col{Table: "users", Name: "lan"}}
+	return UserLanCol{pgb.Col{Table: "users", Name: "lan"}}
 }
 
 // UserLanCol is the typed column users.lan.
-type UserLanCol struct{ core.Col }
+type UserLanCol struct{ pgb.Col }
 
-func (c UserLanCol) Eq(v netip.Prefix) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserLanCol) Eq(v netip.Prefix) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserLanCol) Ne(v netip.Prefix) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserLanCol) Ne(v netip.Prefix) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserLanCol) In(vs ...netip.Prefix) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "cidr[]"}}
+func (c UserLanCol) In(vs ...netip.Prefix) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "cidr[]"}}
 }
 
-func (c UserLanCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserLanCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserLanCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserLanCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
 // Mac returns the typed accessor for column mac.
 func (t UserTable) Mac() UserMacCol {
-	return UserMacCol{core.Col{Table: "users", Name: "mac"}}
+	return UserMacCol{pgb.Col{Table: "users", Name: "mac"}}
 }
 
 // UserMacCol is the typed column users.mac.
-type UserMacCol struct{ core.Col }
+type UserMacCol struct{ pgb.Col }
 
-func (c UserMacCol) Eq(v net.HardwareAddr) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserMacCol) Eq(v net.HardwareAddr) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserMacCol) Ne(v net.HardwareAddr) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserMacCol) Ne(v net.HardwareAddr) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserMacCol) In(vs ...net.HardwareAddr) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "macaddr[]"}}
+func (c UserMacCol) In(vs ...net.HardwareAddr) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "macaddr[]"}}
 }
 
-func (c UserMacCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserMacCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserMacCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserMacCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
 // Mac8 returns the typed accessor for column mac8.
 func (t UserTable) Mac8() UserMac8Col {
-	return UserMac8Col{core.Col{Table: "users", Name: "mac8"}}
+	return UserMac8Col{pgb.Col{Table: "users", Name: "mac8"}}
 }
 
 // UserMac8Col is the typed column users.mac8.
-type UserMac8Col struct{ core.Col }
+type UserMac8Col struct{ pgb.Col }
 
-func (c UserMac8Col) Eq(v net.HardwareAddr) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserMac8Col) Eq(v net.HardwareAddr) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserMac8Col) Ne(v net.HardwareAddr) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserMac8Col) Ne(v net.HardwareAddr) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserMac8Col) In(vs ...net.HardwareAddr) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "macaddr8[]"}}
+func (c UserMac8Col) In(vs ...net.HardwareAddr) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "macaddr8[]"}}
 }
 
-func (c UserMac8Col) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserMac8Col) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserMac8Col) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserMac8Col) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
 // Bitfield returns the typed accessor for column bitfield.
 func (t UserTable) Bitfield() UserBitfieldCol {
-	return UserBitfieldCol{core.Col{Table: "users", Name: "bitfield"}}
+	return UserBitfieldCol{pgb.Col{Table: "users", Name: "bitfield"}}
 }
 
 // UserBitfieldCol is the typed column users.bitfield.
-type UserBitfieldCol struct{ core.Col }
+type UserBitfieldCol struct{ pgb.Col }
 
-func (c UserBitfieldCol) Eq(v any) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserBitfieldCol) Eq(v any) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserBitfieldCol) Ne(v any) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserBitfieldCol) Ne(v any) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserBitfieldCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserBitfieldCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserBitfieldCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserBitfieldCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
 // Flags returns the typed accessor for column flags.
 func (t UserTable) Flags() UserFlagsCol {
-	return UserFlagsCol{core.Col{Table: "users", Name: "flags"}}
+	return UserFlagsCol{pgb.Col{Table: "users", Name: "flags"}}
 }
 
 // UserFlagsCol is the typed column users.flags.
-type UserFlagsCol struct{ core.Col }
+type UserFlagsCol struct{ pgb.Col }
 
-func (c UserFlagsCol) Eq(v any) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserFlagsCol) Eq(v any) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserFlagsCol) Ne(v any) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserFlagsCol) Ne(v any) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserFlagsCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserFlagsCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserFlagsCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserFlagsCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
 // Tags returns the typed accessor for column tags.
 func (t UserTable) Tags() UserTagsCol {
-	return UserTagsCol{core.Col{Table: "users", Name: "tags"}}
+	return UserTagsCol{pgb.Col{Table: "users", Name: "tags"}}
 }
 
 // UserTagsCol is the typed column users.tags.
-type UserTagsCol struct{ core.Col }
+type UserTagsCol struct{ pgb.Col }
 
-func (c UserTagsCol) Eq(v []string) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v, Cast: "text[]"}}
+func (c UserTagsCol) Eq(v []string) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v, Cast: "text[]"}}
 }
 
-func (c UserTagsCol) Ne(v []string) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v, Cast: "text[]"}}
+func (c UserTagsCol) Ne(v []string) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v, Cast: "text[]"}}
 }
 
-func (c UserTagsCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserTagsCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserTagsCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserTagsCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c UserTagsCol) Contains(v []string) core.Expr {
-	return core.Bin{Op: "@>", L: c.Col, R: core.Lit{V: v, Cast: "text[]"}}
+func (c UserTagsCol) Contains(v []string) pgb.Expr {
+	return pgb.Bin{Op: "@>", L: c.Col, R: pgb.Lit{V: v, Cast: "text[]"}}
 }
 
 // Scores returns the typed accessor for column scores.
 func (t UserTable) Scores() UserScoresCol {
-	return UserScoresCol{core.Col{Table: "users", Name: "scores"}}
+	return UserScoresCol{pgb.Col{Table: "users", Name: "scores"}}
 }
 
 // UserScoresCol is the typed column users.scores.
-type UserScoresCol struct{ core.Col }
+type UserScoresCol struct{ pgb.Col }
 
-func (c UserScoresCol) Eq(v []int32) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v, Cast: "int4[]"}}
+func (c UserScoresCol) Eq(v []int32) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v, Cast: "int4[]"}}
 }
 
-func (c UserScoresCol) Ne(v []int32) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v, Cast: "int4[]"}}
+func (c UserScoresCol) Ne(v []int32) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v, Cast: "int4[]"}}
 }
 
-func (c UserScoresCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserScoresCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserScoresCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserScoresCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c UserScoresCol) Contains(v []int32) core.Expr {
-	return core.Bin{Op: "@>", L: c.Col, R: core.Lit{V: v, Cast: "int4[]"}}
+func (c UserScoresCol) Contains(v []int32) pgb.Expr {
+	return pgb.Bin{Op: "@>", L: c.Col, R: pgb.Lit{V: v, Cast: "int4[]"}}
 }
 
 // Grid returns the typed accessor for column grid.
 func (t UserTable) Grid() UserGridCol {
-	return UserGridCol{core.Col{Table: "users", Name: "grid"}}
+	return UserGridCol{pgb.Col{Table: "users", Name: "grid"}}
 }
 
 // UserGridCol is the typed column users.grid.
-type UserGridCol struct{ core.Col }
+type UserGridCol struct{ pgb.Col }
 
-func (c UserGridCol) Eq(v []int32) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v, Cast: "int4[]"}}
+func (c UserGridCol) Eq(v []int32) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v, Cast: "int4[]"}}
 }
 
-func (c UserGridCol) Ne(v []int32) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v, Cast: "int4[]"}}
+func (c UserGridCol) Ne(v []int32) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v, Cast: "int4[]"}}
 }
 
-func (c UserGridCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserGridCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserGridCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserGridCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c UserGridCol) Contains(v []int32) core.Expr {
-	return core.Bin{Op: "@>", L: c.Col, R: core.Lit{V: v, Cast: "int4[]"}}
+func (c UserGridCol) Contains(v []int32) pgb.Expr {
+	return pgb.Bin{Op: "@>", L: c.Col, R: pgb.Lit{V: v, Cast: "int4[]"}}
 }
 
 // Homesite returns the typed accessor for column homesite.
 func (t UserTable) Homesite() UserHomesiteCol {
-	return UserHomesiteCol{core.Col{Table: "users", Name: "homesite"}}
+	return UserHomesiteCol{pgb.Col{Table: "users", Name: "homesite"}}
 }
 
 // UserHomesiteCol is the typed column users.homesite.
-type UserHomesiteCol struct{ core.Col }
+type UserHomesiteCol struct{ pgb.Col }
 
-func (c UserHomesiteCol) Eq(v pgtype.Point) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserHomesiteCol) Eq(v pgtype.Point) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserHomesiteCol) Ne(v pgtype.Point) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserHomesiteCol) Ne(v pgtype.Point) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserHomesiteCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserHomesiteCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserHomesiteCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserHomesiteCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
 // Seg returns the typed accessor for column seg.
 func (t UserTable) Seg() UserSegCol {
-	return UserSegCol{core.Col{Table: "users", Name: "seg"}}
+	return UserSegCol{pgb.Col{Table: "users", Name: "seg"}}
 }
 
 // UserSegCol is the typed column users.seg.
-type UserSegCol struct{ core.Col }
+type UserSegCol struct{ pgb.Col }
 
-func (c UserSegCol) Eq(v pgtype.Lseg) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserSegCol) Eq(v pgtype.Lseg) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserSegCol) Ne(v pgtype.Lseg) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserSegCol) Ne(v pgtype.Lseg) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserSegCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserSegCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserSegCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserSegCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
 // BoxCol returns the typed accessor for column box_col.
 func (t UserTable) BoxCol() UserBoxColCol {
-	return UserBoxColCol{core.Col{Table: "users", Name: "box_col"}}
+	return UserBoxColCol{pgb.Col{Table: "users", Name: "box_col"}}
 }
 
 // UserBoxColCol is the typed column users.box_col.
-type UserBoxColCol struct{ core.Col }
+type UserBoxColCol struct{ pgb.Col }
 
-func (c UserBoxColCol) Eq(v pgtype.Box) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserBoxColCol) Eq(v pgtype.Box) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserBoxColCol) Ne(v pgtype.Box) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserBoxColCol) Ne(v pgtype.Box) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserBoxColCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserBoxColCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserBoxColCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserBoxColCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
 // PathCol returns the typed accessor for column path_col.
 func (t UserTable) PathCol() UserPathColCol {
-	return UserPathColCol{core.Col{Table: "users", Name: "path_col"}}
+	return UserPathColCol{pgb.Col{Table: "users", Name: "path_col"}}
 }
 
 // UserPathColCol is the typed column users.path_col.
-type UserPathColCol struct{ core.Col }
+type UserPathColCol struct{ pgb.Col }
 
-func (c UserPathColCol) Eq(v pgtype.Path) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserPathColCol) Eq(v pgtype.Path) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserPathColCol) Ne(v pgtype.Path) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserPathColCol) Ne(v pgtype.Path) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserPathColCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserPathColCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserPathColCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserPathColCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
 // Poly returns the typed accessor for column poly.
 func (t UserTable) Poly() UserPolyCol {
-	return UserPolyCol{core.Col{Table: "users", Name: "poly"}}
+	return UserPolyCol{pgb.Col{Table: "users", Name: "poly"}}
 }
 
 // UserPolyCol is the typed column users.poly.
-type UserPolyCol struct{ core.Col }
+type UserPolyCol struct{ pgb.Col }
 
-func (c UserPolyCol) Eq(v pgtype.Polygon) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserPolyCol) Eq(v pgtype.Polygon) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserPolyCol) Ne(v pgtype.Polygon) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserPolyCol) Ne(v pgtype.Polygon) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserPolyCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserPolyCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserPolyCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserPolyCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
 // CircleCol returns the typed accessor for column circle_col.
 func (t UserTable) CircleCol() UserCircleColCol {
-	return UserCircleColCol{core.Col{Table: "users", Name: "circle_col"}}
+	return UserCircleColCol{pgb.Col{Table: "users", Name: "circle_col"}}
 }
 
 // UserCircleColCol is the typed column users.circle_col.
-type UserCircleColCol struct{ core.Col }
+type UserCircleColCol struct{ pgb.Col }
 
-func (c UserCircleColCol) Eq(v pgtype.Circle) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserCircleColCol) Eq(v pgtype.Circle) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserCircleColCol) Ne(v pgtype.Circle) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserCircleColCol) Ne(v pgtype.Circle) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserCircleColCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserCircleColCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserCircleColCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserCircleColCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
 // LineCol returns the typed accessor for column line_col.
 func (t UserTable) LineCol() UserLineColCol {
-	return UserLineColCol{core.Col{Table: "users", Name: "line_col"}}
+	return UserLineColCol{pgb.Col{Table: "users", Name: "line_col"}}
 }
 
 // UserLineColCol is the typed column users.line_col.
-type UserLineColCol struct{ core.Col }
+type UserLineColCol struct{ pgb.Col }
 
-func (c UserLineColCol) Eq(v pgtype.Line) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserLineColCol) Eq(v pgtype.Line) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserLineColCol) Ne(v pgtype.Line) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserLineColCol) Ne(v pgtype.Line) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserLineColCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserLineColCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserLineColCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserLineColCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
 // Tsv returns the typed accessor for column tsv.
 func (t UserTable) Tsv() UserTsvCol {
-	return UserTsvCol{core.Col{Table: "users", Name: "tsv"}}
+	return UserTsvCol{pgb.Col{Table: "users", Name: "tsv"}}
 }
 
 // UserTsvCol is the typed column users.tsv.
-type UserTsvCol struct{ core.Col }
+type UserTsvCol struct{ pgb.Col }
 
-func (c UserTsvCol) Eq(v any) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserTsvCol) Eq(v any) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserTsvCol) Ne(v any) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserTsvCol) Ne(v any) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserTsvCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserTsvCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserTsvCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserTsvCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
 // Tsq returns the typed accessor for column tsq.
 func (t UserTable) Tsq() UserTsqCol {
-	return UserTsqCol{core.Col{Table: "users", Name: "tsq"}}
+	return UserTsqCol{pgb.Col{Table: "users", Name: "tsq"}}
 }
 
 // UserTsqCol is the typed column users.tsq.
-type UserTsqCol struct{ core.Col }
+type UserTsqCol struct{ pgb.Col }
 
-func (c UserTsqCol) Eq(v any) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserTsqCol) Eq(v any) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserTsqCol) Ne(v any) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserTsqCol) Ne(v any) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserTsqCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserTsqCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserTsqCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserTsqCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
 // XMLDoc returns the typed accessor for column xml_doc.
 func (t UserTable) XMLDoc() UserXMLDocCol {
-	return UserXMLDocCol{core.Col{Table: "users", Name: "xml_doc"}}
+	return UserXMLDocCol{pgb.Col{Table: "users", Name: "xml_doc"}}
 }
 
 // UserXMLDocCol is the typed column users.xml_doc.
-type UserXMLDocCol struct{ core.Col }
+type UserXMLDocCol struct{ pgb.Col }
 
-func (c UserXMLDocCol) Eq(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserXMLDocCol) Eq(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserXMLDocCol) Ne(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserXMLDocCol) Ne(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserXMLDocCol) In(vs ...pgtype.Text) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c UserXMLDocCol) In(vs ...pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c UserXMLDocCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserXMLDocCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserXMLDocCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserXMLDocCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c UserXMLDocCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserXMLDocCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c UserXMLDocCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserXMLDocCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c UserXMLDocCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserXMLDocCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c UserXMLDocCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserXMLDocCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // LogLsn returns the typed accessor for column log_lsn.
 func (t UserTable) LogLsn() UserLogLsnCol {
-	return UserLogLsnCol{core.Col{Table: "users", Name: "log_lsn"}}
+	return UserLogLsnCol{pgb.Col{Table: "users", Name: "log_lsn"}}
 }
 
 // UserLogLsnCol is the typed column users.log_lsn.
-type UserLogLsnCol struct{ core.Col }
+type UserLogLsnCol struct{ pgb.Col }
 
-func (c UserLogLsnCol) Eq(v any) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserLogLsnCol) Eq(v any) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserLogLsnCol) Ne(v any) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserLogLsnCol) Ne(v any) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserLogLsnCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserLogLsnCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserLogLsnCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserLogLsnCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
 // LastXid returns the typed accessor for column last_xid.
 func (t UserTable) LastXid() UserLastXidCol {
-	return UserLastXidCol{core.Col{Table: "users", Name: "last_xid"}}
+	return UserLastXidCol{pgb.Col{Table: "users", Name: "last_xid"}}
 }
 
 // UserLastXidCol is the typed column users.last_xid.
-type UserLastXidCol struct{ core.Col }
+type UserLastXidCol struct{ pgb.Col }
 
-func (c UserLastXidCol) Eq(v pgtype.Uint64) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserLastXidCol) Eq(v pgtype.Uint64) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserLastXidCol) Ne(v pgtype.Uint64) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserLastXidCol) Ne(v pgtype.Uint64) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserLastXidCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserLastXidCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserLastXidCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserLastXidCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
 // SlotTid returns the typed accessor for column slot_tid.
 func (t UserTable) SlotTid() UserSlotTidCol {
-	return UserSlotTidCol{core.Col{Table: "users", Name: "slot_tid"}}
+	return UserSlotTidCol{pgb.Col{Table: "users", Name: "slot_tid"}}
 }
 
 // UserSlotTidCol is the typed column users.slot_tid.
-type UserSlotTidCol struct{ core.Col }
+type UserSlotTidCol struct{ pgb.Col }
 
-func (c UserSlotTidCol) Eq(v pgtype.TID) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserSlotTidCol) Eq(v pgtype.TID) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserSlotTidCol) Ne(v pgtype.TID) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserSlotTidCol) Ne(v pgtype.TID) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserSlotTidCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserSlotTidCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserSlotTidCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserSlotTidCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
 // Cash returns the typed accessor for column cash.
 func (t UserTable) Cash() UserCashCol {
-	return UserCashCol{core.Col{Table: "users", Name: "cash"}}
+	return UserCashCol{pgb.Col{Table: "users", Name: "cash"}}
 }
 
 // UserCashCol is the typed column users.cash.
-type UserCashCol struct{ core.Col }
+type UserCashCol struct{ pgb.Col }
 
-func (c UserCashCol) Eq(v pgtype.Numeric) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserCashCol) Eq(v pgtype.Numeric) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserCashCol) Ne(v pgtype.Numeric) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserCashCol) Ne(v pgtype.Numeric) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserCashCol) In(vs ...pgtype.Numeric) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "money[]"}}
+func (c UserCashCol) In(vs ...pgtype.Numeric) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "money[]"}}
 }
 
-func (c UserCashCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserCashCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserCashCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserCashCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c UserCashCol) Gt(v pgtype.Numeric) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c UserCashCol) Gt(v pgtype.Numeric) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserCashCol) Lt(v pgtype.Numeric) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c UserCashCol) Lt(v pgtype.Numeric) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserCashCol) Gte(v pgtype.Numeric) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c UserCashCol) Gte(v pgtype.Numeric) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserCashCol) Lte(v pgtype.Numeric) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c UserCashCol) Lte(v pgtype.Numeric) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserCashCol) Between(a, b pgtype.Numeric) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c UserCashCol) Between(a, b pgtype.Numeric) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // Status returns the typed accessor for column status.
 func (t UserTable) Status() UserStatusCol {
-	return UserStatusCol{core.Col{Table: "users", Name: "status"}}
+	return UserStatusCol{pgb.Col{Table: "users", Name: "status"}}
 }
 
 // UserStatusCol is the typed column users.status.
-type UserStatusCol struct{ core.Col }
+type UserStatusCol struct{ pgb.Col }
 
-func (c UserStatusCol) Eq(v UserStatus) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v, Cast: "user_status"}}
+func (c UserStatusCol) Eq(v UserStatus) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v, Cast: "user_status"}}
 }
 
-func (c UserStatusCol) Ne(v UserStatus) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v, Cast: "user_status"}}
+func (c UserStatusCol) Ne(v UserStatus) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v, Cast: "user_status"}}
 }
 
-func (c UserStatusCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserStatusCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserStatusCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserStatusCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
 // Addr returns the typed accessor for column addr.
 func (t UserTable) Addr() UserAddrCol {
-	return UserAddrCol{core.Col{Table: "users", Name: "addr"}}
+	return UserAddrCol{pgb.Col{Table: "users", Name: "addr"}}
 }
 
 // UserAddrCol is the typed column users.addr.
-type UserAddrCol struct{ core.Col }
+type UserAddrCol struct{ pgb.Col }
 
-func (c UserAddrCol) Eq(v any) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserAddrCol) Eq(v any) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserAddrCol) Ne(v any) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserAddrCol) Ne(v any) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserAddrCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserAddrCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserAddrCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserAddrCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
 // EmailDomain returns the typed accessor for column email_domain.
 func (t UserTable) EmailDomain() UserEmailDomainCol {
-	return UserEmailDomainCol{core.Col{Table: "users", Name: "email_domain"}}
+	return UserEmailDomainCol{pgb.Col{Table: "users", Name: "email_domain"}}
 }
 
 // UserEmailDomainCol is the typed column users.email_domain.
-type UserEmailDomainCol struct{ core.Col }
+type UserEmailDomainCol struct{ pgb.Col }
 
-func (c UserEmailDomainCol) Eq(v any) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserEmailDomainCol) Eq(v any) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserEmailDomainCol) Ne(v any) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserEmailDomainCol) Ne(v any) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserEmailDomainCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserEmailDomainCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserEmailDomainCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserEmailDomainCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
 // Positive returns the typed accessor for column positive.
 func (t UserTable) Positive() UserPositiveCol {
-	return UserPositiveCol{core.Col{Table: "users", Name: "positive"}}
+	return UserPositiveCol{pgb.Col{Table: "users", Name: "positive"}}
 }
 
 // UserPositiveCol is the typed column users.positive.
-type UserPositiveCol struct{ core.Col }
+type UserPositiveCol struct{ pgb.Col }
 
-func (c UserPositiveCol) Eq(v any) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserPositiveCol) Eq(v any) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserPositiveCol) Ne(v any) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserPositiveCol) Ne(v any) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserPositiveCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserPositiveCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserPositiveCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserPositiveCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
 // UUIDCol returns the typed accessor for column uuid_col.
 func (t UserTable) UUIDCol() UserUUIDColCol {
-	return UserUUIDColCol{core.Col{Table: "users", Name: "uuid_col"}}
+	return UserUUIDColCol{pgb.Col{Table: "users", Name: "uuid_col"}}
 }
 
 // UserUUIDColCol is the typed column users.uuid_col.
-type UserUUIDColCol struct{ core.Col }
+type UserUUIDColCol struct{ pgb.Col }
 
-func (c UserUUIDColCol) Eq(v uuid.UUID) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserUUIDColCol) Eq(v uuid.UUID) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserUUIDColCol) Ne(v uuid.UUID) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserUUIDColCol) Ne(v uuid.UUID) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserUUIDColCol) In(vs ...uuid.UUID) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "uuid[]"}}
+func (c UserUUIDColCol) In(vs ...uuid.UUID) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "uuid[]"}}
 }
 
-func (c UserUUIDColCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserUUIDColCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserUUIDColCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserUUIDColCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
 // LoginCi returns the typed accessor for column login_ci.
 func (t UserTable) LoginCi() UserLoginCiCol {
-	return UserLoginCiCol{core.Col{Table: "users", Name: "login_ci"}}
+	return UserLoginCiCol{pgb.Col{Table: "users", Name: "login_ci"}}
 }
 
 // UserLoginCiCol is the typed column users.login_ci.
-type UserLoginCiCol struct{ core.Col }
+type UserLoginCiCol struct{ pgb.Col }
 
-func (c UserLoginCiCol) Eq(v string) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserLoginCiCol) Eq(v string) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserLoginCiCol) Ne(v string) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserLoginCiCol) Ne(v string) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserLoginCiCol) In(vs ...string) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c UserLoginCiCol) In(vs ...string) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c UserLoginCiCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserLoginCiCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserLoginCiCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserLoginCiCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c UserLoginCiCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserLoginCiCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c UserLoginCiCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserLoginCiCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c UserLoginCiCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserLoginCiCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c UserLoginCiCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserLoginCiCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // CollateCol returns the typed accessor for column collate_col.
 func (t UserTable) CollateCol() UserCollateColCol {
-	return UserCollateColCol{core.Col{Table: "users", Name: "collate_col"}}
+	return UserCollateColCol{pgb.Col{Table: "users", Name: "collate_col"}}
 }
 
 // UserCollateColCol is the typed column users.collate_col.
-type UserCollateColCol struct{ core.Col }
+type UserCollateColCol struct{ pgb.Col }
 
-func (c UserCollateColCol) Eq(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserCollateColCol) Eq(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserCollateColCol) Ne(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserCollateColCol) Ne(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserCollateColCol) In(vs ...pgtype.Text) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c UserCollateColCol) In(vs ...pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c UserCollateColCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserCollateColCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserCollateColCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserCollateColCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c UserCollateColCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserCollateColCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c UserCollateColCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserCollateColCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c UserCollateColCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserCollateColCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c UserCollateColCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserCollateColCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // SearchSlug returns the typed accessor for column search_slug.
 func (t UserTable) SearchSlug() UserSearchSlugCol {
-	return UserSearchSlugCol{core.Col{Table: "users", Name: "search_slug"}}
+	return UserSearchSlugCol{pgb.Col{Table: "users", Name: "search_slug"}}
 }
 
 // UserSearchSlugCol is the typed column users.search_slug.
-type UserSearchSlugCol struct{ core.Col }
+type UserSearchSlugCol struct{ pgb.Col }
 
-func (c UserSearchSlugCol) Eq(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserSearchSlugCol) Eq(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserSearchSlugCol) Ne(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserSearchSlugCol) Ne(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserSearchSlugCol) In(vs ...pgtype.Text) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c UserSearchSlugCol) In(vs ...pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c UserSearchSlugCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserSearchSlugCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserSearchSlugCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserSearchSlugCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c UserSearchSlugCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserSearchSlugCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c UserSearchSlugCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserSearchSlugCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c UserSearchSlugCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserSearchSlugCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c UserSearchSlugCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserSearchSlugCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // NameUpper returns the typed accessor for column name_upper.
 func (t UserTable) NameUpper() UserNameUpperCol {
-	return UserNameUpperCol{core.Col{Table: "users", Name: "name_upper"}}
+	return UserNameUpperCol{pgb.Col{Table: "users", Name: "name_upper"}}
 }
 
 // UserNameUpperCol is the typed column users.name_upper.
-type UserNameUpperCol struct{ core.Col }
+type UserNameUpperCol struct{ pgb.Col }
 
-func (c UserNameUpperCol) Eq(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserNameUpperCol) Eq(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserNameUpperCol) Ne(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserNameUpperCol) Ne(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserNameUpperCol) In(vs ...pgtype.Text) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c UserNameUpperCol) In(vs ...pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c UserNameUpperCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserNameUpperCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserNameUpperCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserNameUpperCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c UserNameUpperCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserNameUpperCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c UserNameUpperCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserNameUpperCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c UserNameUpperCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserNameUpperCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c UserNameUpperCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserNameUpperCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // DeletedAt returns the typed accessor for column deleted_at.
 func (t UserTable) DeletedAt() UserDeletedAtCol {
-	return UserDeletedAtCol{core.Col{Table: "users", Name: "deleted_at"}}
+	return UserDeletedAtCol{pgb.Col{Table: "users", Name: "deleted_at"}}
 }
 
 // UserDeletedAtCol is the typed column users.deleted_at.
-type UserDeletedAtCol struct{ core.Col }
+type UserDeletedAtCol struct{ pgb.Col }
 
-func (c UserDeletedAtCol) Eq(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserDeletedAtCol) Eq(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserDeletedAtCol) Ne(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserDeletedAtCol) Ne(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserDeletedAtCol) In(vs ...pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "timestamptz[]"}}
+func (c UserDeletedAtCol) In(vs ...pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "timestamptz[]"}}
 }
 
-func (c UserDeletedAtCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserDeletedAtCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserDeletedAtCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserDeletedAtCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c UserDeletedAtCol) Gt(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c UserDeletedAtCol) Gt(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserDeletedAtCol) Lt(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c UserDeletedAtCol) Lt(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserDeletedAtCol) Gte(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c UserDeletedAtCol) Gte(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserDeletedAtCol) Lte(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c UserDeletedAtCol) Lte(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserDeletedAtCol) Between(a, b pgtype.Timestamptz) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c UserDeletedAtCol) Between(a, b pgtype.Timestamptz) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // VeryLongColumnIdentifierExactlySixtyThreeCharactersInL returns the typed accessor for column very_long_column_identifier_exactly_sixty_three_characters_in_l.
 func (t UserTable) VeryLongColumnIdentifierExactlySixtyThreeCharactersInL() UserVeryLongColumnIdentifierExactlySixtyThreeCharactersInLCol {
-	return UserVeryLongColumnIdentifierExactlySixtyThreeCharactersInLCol{core.Col{Table: "users", Name: "very_long_column_identifier_exactly_sixty_three_characters_in_l"}}
+	return UserVeryLongColumnIdentifierExactlySixtyThreeCharactersInLCol{pgb.Col{Table: "users", Name: "very_long_column_identifier_exactly_sixty_three_characters_in_l"}}
 }
 
 // UserVeryLongColumnIdentifierExactlySixtyThreeCharactersInLCol is the typed column users.very_long_column_identifier_exactly_sixty_three_characters_in_l.
-type UserVeryLongColumnIdentifierExactlySixtyThreeCharactersInLCol struct{ core.Col }
+type UserVeryLongColumnIdentifierExactlySixtyThreeCharactersInLCol struct{ pgb.Col }
 
-func (c UserVeryLongColumnIdentifierExactlySixtyThreeCharactersInLCol) Eq(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c UserVeryLongColumnIdentifierExactlySixtyThreeCharactersInLCol) Eq(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserVeryLongColumnIdentifierExactlySixtyThreeCharactersInLCol) Ne(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c UserVeryLongColumnIdentifierExactlySixtyThreeCharactersInLCol) Ne(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c UserVeryLongColumnIdentifierExactlySixtyThreeCharactersInLCol) In(vs ...pgtype.Text) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c UserVeryLongColumnIdentifierExactlySixtyThreeCharactersInLCol) In(vs ...pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c UserVeryLongColumnIdentifierExactlySixtyThreeCharactersInLCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c UserVeryLongColumnIdentifierExactlySixtyThreeCharactersInLCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c UserVeryLongColumnIdentifierExactlySixtyThreeCharactersInLCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c UserVeryLongColumnIdentifierExactlySixtyThreeCharactersInLCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c UserVeryLongColumnIdentifierExactlySixtyThreeCharactersInLCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserVeryLongColumnIdentifierExactlySixtyThreeCharactersInLCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c UserVeryLongColumnIdentifierExactlySixtyThreeCharactersInLCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserVeryLongColumnIdentifierExactlySixtyThreeCharactersInLCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c UserVeryLongColumnIdentifierExactlySixtyThreeCharactersInLCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserVeryLongColumnIdentifierExactlySixtyThreeCharactersInLCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c UserVeryLongColumnIdentifierExactlySixtyThreeCharactersInLCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c UserVeryLongColumnIdentifierExactlySixtyThreeCharactersInLCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // Select starts a SELECT of every column; chain Where/OrderBy/Limit/...
 // and terminate with Run (or a static function).
-func (t UserTable) Select() *core.Select {
-	return core.NewSelect("public.users", core.Col{Table: "users", Name: "id"}, core.Col{Table: "users", Name: "email"}, core.Col{Table: "users", Name: "password"}, core.Col{Table: "users", Name: "name"}, core.Col{Table: "users", Name: "bio"}, core.Col{Table: "users", Name: "age"}, core.Col{Table: "users", Name: "balance"}, core.Col{Table: "users", Name: "rating"}, core.Col{Table: "users", Name: "score"}, core.Col{Table: "users", Name: "is_active"}, core.Col{Table: "users", Name: "created_at"}, core.Col{Table: "users", Name: "updated_at"}, core.Col{Table: "users", Name: "birth_date"}, core.Col{Table: "users", Name: "last_seen"}, core.Col{Table: "users", Name: "avatar"}, core.Col{Table: "users", Name: "metadata"}, core.Col{Table: "users", Name: "settings"}, core.Col{Table: "users", Name: "homepage"}, core.Col{Table: "users", Name: "lan"}, core.Col{Table: "users", Name: "mac"}, core.Col{Table: "users", Name: "mac8"}, core.Col{Table: "users", Name: "bitfield"}, core.Col{Table: "users", Name: "flags"}, core.Col{Table: "users", Name: "tags"}, core.Col{Table: "users", Name: "scores"}, core.Col{Table: "users", Name: "grid"}, core.Col{Table: "users", Name: "homesite"}, core.Col{Table: "users", Name: "seg"}, core.Col{Table: "users", Name: "box_col"}, core.Col{Table: "users", Name: "path_col"}, core.Col{Table: "users", Name: "poly"}, core.Col{Table: "users", Name: "circle_col"}, core.Col{Table: "users", Name: "line_col"}, core.Col{Table: "users", Name: "tsv"}, core.Col{Table: "users", Name: "tsq"}, core.Col{Table: "users", Name: "xml_doc"}, core.Col{Table: "users", Name: "log_lsn"}, core.Col{Table: "users", Name: "last_xid"}, core.Col{Table: "users", Name: "slot_tid"}, core.Col{Table: "users", Name: "cash"}, core.Col{Table: "users", Name: "status"}, core.Col{Table: "users", Name: "addr"}, core.Col{Table: "users", Name: "email_domain"}, core.Col{Table: "users", Name: "positive"}, core.Col{Table: "users", Name: "uuid_col"}, core.Col{Table: "users", Name: "login_ci"}, core.Col{Table: "users", Name: "collate_col"}, core.Col{Table: "users", Name: "search_slug"}, core.Col{Table: "users", Name: "name_upper"}, core.Col{Table: "users", Name: "deleted_at"}, core.Col{Table: "users", Name: "very_long_column_identifier_exactly_sixty_three_characters_in_l"})
+func (t UserTable) Select() *pgb.Select {
+	return pgb.NewSelect("public.users", pgb.Col{Table: "users", Name: "id"}, pgb.Col{Table: "users", Name: "email"}, pgb.Col{Table: "users", Name: "password"}, pgb.Col{Table: "users", Name: "name"}, pgb.Col{Table: "users", Name: "bio"}, pgb.Col{Table: "users", Name: "age"}, pgb.Col{Table: "users", Name: "balance"}, pgb.Col{Table: "users", Name: "rating"}, pgb.Col{Table: "users", Name: "score"}, pgb.Col{Table: "users", Name: "is_active"}, pgb.Col{Table: "users", Name: "created_at"}, pgb.Col{Table: "users", Name: "updated_at"}, pgb.Col{Table: "users", Name: "birth_date"}, pgb.Col{Table: "users", Name: "last_seen"}, pgb.Col{Table: "users", Name: "avatar"}, pgb.Col{Table: "users", Name: "metadata"}, pgb.Col{Table: "users", Name: "settings"}, pgb.Col{Table: "users", Name: "homepage"}, pgb.Col{Table: "users", Name: "lan"}, pgb.Col{Table: "users", Name: "mac"}, pgb.Col{Table: "users", Name: "mac8"}, pgb.Col{Table: "users", Name: "bitfield"}, pgb.Col{Table: "users", Name: "flags"}, pgb.Col{Table: "users", Name: "tags"}, pgb.Col{Table: "users", Name: "scores"}, pgb.Col{Table: "users", Name: "grid"}, pgb.Col{Table: "users", Name: "homesite"}, pgb.Col{Table: "users", Name: "seg"}, pgb.Col{Table: "users", Name: "box_col"}, pgb.Col{Table: "users", Name: "path_col"}, pgb.Col{Table: "users", Name: "poly"}, pgb.Col{Table: "users", Name: "circle_col"}, pgb.Col{Table: "users", Name: "line_col"}, pgb.Col{Table: "users", Name: "tsv"}, pgb.Col{Table: "users", Name: "tsq"}, pgb.Col{Table: "users", Name: "xml_doc"}, pgb.Col{Table: "users", Name: "log_lsn"}, pgb.Col{Table: "users", Name: "last_xid"}, pgb.Col{Table: "users", Name: "slot_tid"}, pgb.Col{Table: "users", Name: "cash"}, pgb.Col{Table: "users", Name: "status"}, pgb.Col{Table: "users", Name: "addr"}, pgb.Col{Table: "users", Name: "email_domain"}, pgb.Col{Table: "users", Name: "positive"}, pgb.Col{Table: "users", Name: "uuid_col"}, pgb.Col{Table: "users", Name: "login_ci"}, pgb.Col{Table: "users", Name: "collate_col"}, pgb.Col{Table: "users", Name: "search_slug"}, pgb.Col{Table: "users", Name: "name_upper"}, pgb.Col{Table: "users", Name: "deleted_at"}, pgb.Col{Table: "users", Name: "very_long_column_identifier_exactly_sixty_three_characters_in_l"})
 }
 
-// Update starts an UPDATE; an empty WHERE fails with core.ErrNoWhere.
-func (t UserTable) Update() *core.Update { return core.NewUpdate("public.users") }
+// Update starts an UPDATE; an empty WHERE fails with pgb.ErrNoWhere.
+func (t UserTable) Update() *pgb.Update { return pgb.NewUpdate("public.users") }
 
-// Delete starts a DELETE; an empty WHERE fails with core.ErrNoWhere.
-func (t UserTable) Delete() *core.Delete { return core.NewDelete("public.users") }
+// Delete starts a DELETE; an empty WHERE fails with pgb.ErrNoWhere.
+func (t UserTable) Delete() *pgb.Delete { return pgb.NewDelete("public.users") }

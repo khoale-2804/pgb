@@ -7,147 +7,147 @@ package db
 
 import (
 	"github.com/jackc/pgx/v5/pgtype"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 )
 
 // CacheBlobs is the table descriptor for public.cache_blob; immutable, safe for
 // concurrent use.
-var CacheBlobs = CacheBlobTable{core.NewTableMeta("public", "cache_blob")}
+var CacheBlobs = CacheBlobTable{pgb.NewTableMeta("public", "cache_blob")}
 
 // CacheBlobTable provides typed column accessors and statement entry points.
-type CacheBlobTable struct{ core.TableMeta }
+type CacheBlobTable struct{ pgb.TableMeta }
 
 // Key returns the typed accessor for column key.
 func (t CacheBlobTable) Key() CacheBlobKeyCol {
-	return CacheBlobKeyCol{core.Col{Table: "cache_blob", Name: "key"}}
+	return CacheBlobKeyCol{pgb.Col{Table: "cache_blob", Name: "key"}}
 }
 
 // CacheBlobKeyCol is the typed column cache_blob.key.
-type CacheBlobKeyCol struct{ core.Col }
+type CacheBlobKeyCol struct{ pgb.Col }
 
-func (c CacheBlobKeyCol) Eq(v string) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c CacheBlobKeyCol) Eq(v string) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CacheBlobKeyCol) Ne(v string) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c CacheBlobKeyCol) Ne(v string) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CacheBlobKeyCol) In(vs ...string) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c CacheBlobKeyCol) In(vs ...string) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c CacheBlobKeyCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c CacheBlobKeyCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c CacheBlobKeyCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c CacheBlobKeyCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c CacheBlobKeyCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c CacheBlobKeyCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c CacheBlobKeyCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c CacheBlobKeyCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c CacheBlobKeyCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c CacheBlobKeyCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c CacheBlobKeyCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c CacheBlobKeyCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // Value returns the typed accessor for column value.
 func (t CacheBlobTable) Value() CacheBlobValueCol {
-	return CacheBlobValueCol{core.Col{Table: "cache_blob", Name: "value"}}
+	return CacheBlobValueCol{pgb.Col{Table: "cache_blob", Name: "value"}}
 }
 
 // CacheBlobValueCol is the typed column cache_blob.value.
-type CacheBlobValueCol struct{ core.Col }
+type CacheBlobValueCol struct{ pgb.Col }
 
-func (c CacheBlobValueCol) Eq(v []byte) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c CacheBlobValueCol) Eq(v []byte) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CacheBlobValueCol) Ne(v []byte) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c CacheBlobValueCol) Ne(v []byte) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CacheBlobValueCol) In(vs ...[]byte) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "bytea[]"}}
+func (c CacheBlobValueCol) In(vs ...[]byte) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "bytea[]"}}
 }
 
-func (c CacheBlobValueCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c CacheBlobValueCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c CacheBlobValueCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c CacheBlobValueCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
 // ExpiresAt returns the typed accessor for column expires_at.
 func (t CacheBlobTable) ExpiresAt() CacheBlobExpiresAtCol {
-	return CacheBlobExpiresAtCol{core.Col{Table: "cache_blob", Name: "expires_at"}}
+	return CacheBlobExpiresAtCol{pgb.Col{Table: "cache_blob", Name: "expires_at"}}
 }
 
 // CacheBlobExpiresAtCol is the typed column cache_blob.expires_at.
-type CacheBlobExpiresAtCol struct{ core.Col }
+type CacheBlobExpiresAtCol struct{ pgb.Col }
 
-func (c CacheBlobExpiresAtCol) Eq(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c CacheBlobExpiresAtCol) Eq(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CacheBlobExpiresAtCol) Ne(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c CacheBlobExpiresAtCol) Ne(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CacheBlobExpiresAtCol) In(vs ...pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "timestamptz[]"}}
+func (c CacheBlobExpiresAtCol) In(vs ...pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "timestamptz[]"}}
 }
 
-func (c CacheBlobExpiresAtCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c CacheBlobExpiresAtCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c CacheBlobExpiresAtCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c CacheBlobExpiresAtCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c CacheBlobExpiresAtCol) Gt(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c CacheBlobExpiresAtCol) Gt(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CacheBlobExpiresAtCol) Lt(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c CacheBlobExpiresAtCol) Lt(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CacheBlobExpiresAtCol) Gte(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c CacheBlobExpiresAtCol) Gte(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CacheBlobExpiresAtCol) Lte(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c CacheBlobExpiresAtCol) Lte(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c CacheBlobExpiresAtCol) Between(a, b pgtype.Timestamptz) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c CacheBlobExpiresAtCol) Between(a, b pgtype.Timestamptz) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // Select starts a SELECT of every column; chain Where/OrderBy/Limit/...
 // and terminate with Run (or a static function).
-func (t CacheBlobTable) Select() *core.Select {
-	return core.NewSelect("public.cache_blob", core.Col{Table: "cache_blob", Name: "key"}, core.Col{Table: "cache_blob", Name: "value"}, core.Col{Table: "cache_blob", Name: "expires_at"})
+func (t CacheBlobTable) Select() *pgb.Select {
+	return pgb.NewSelect("public.cache_blob", pgb.Col{Table: "cache_blob", Name: "key"}, pgb.Col{Table: "cache_blob", Name: "value"}, pgb.Col{Table: "cache_blob", Name: "expires_at"})
 }
 
-// Update starts an UPDATE; an empty WHERE fails with core.ErrNoWhere.
-func (t CacheBlobTable) Update() *core.Update { return core.NewUpdate("public.cache_blob") }
+// Update starts an UPDATE; an empty WHERE fails with pgb.ErrNoWhere.
+func (t CacheBlobTable) Update() *pgb.Update { return pgb.NewUpdate("public.cache_blob") }
 
-// Delete starts a DELETE; an empty WHERE fails with core.ErrNoWhere.
-func (t CacheBlobTable) Delete() *core.Delete { return core.NewDelete("public.cache_blob") }
+// Delete starts a DELETE; an empty WHERE fails with pgb.ErrNoWhere.
+func (t CacheBlobTable) Delete() *pgb.Delete { return pgb.NewDelete("public.cache_blob") }

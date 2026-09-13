@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 	"net"
 	"net/netip"
 )
@@ -158,13 +158,13 @@ type UserFilter struct {
 	VeryLongColumnIdentifierExactlySixtyThreeCharactersInLIn    []pgtype.Text
 	VeryLongColumnIdentifierExactlySixtyThreeCharactersInLLike  *string
 	VeryLongColumnIdentifierExactlySixtyThreeCharactersInLILike *string
-	Extra                                                       []core.Expr
+	Extra                                                       []pgb.Expr
 }
 
 // usersFilterWhere compiles f into the ANDed predicate list; an empty
 // filter yields an empty list (no WHERE).
-func usersFilterWhere(f UserFilter) []core.Expr {
-	var w []core.Expr
+func usersFilterWhere(f UserFilter) []pgb.Expr {
+	var w []pgb.Expr
 	if f.ID != nil {
 		w = append(w, Users.ID().Eq(*f.ID))
 	}
@@ -702,15 +702,15 @@ func scanUser(row pgx.CollectableRow) (User, error) {
 	return m, nil
 }
 
-// GetUser returns one row by id; core.ErrNotFound when absent
+// GetUser returns one row by id; pgb.ErrNotFound when absent
 // (pgx.ErrNoRows mapped — errors.Is keeps working for both).
-func GetUser(ctx context.Context, exec core.DBTX, id int64) (User, error) {
+func GetUser(ctx context.Context, exec pgb.DBTX, id int64) (User, error) {
 	sql, args := Users.Select().Where(Users.ID().Eq(id)).SQL()
 	var m User
 	err := exec.QueryRow(ctx, sql, args...).Scan(&m.ID, &m.Email, &m.Password, &m.Name, &m.Bio, &m.Age, &m.Balance, &m.Rating, &m.Score, &m.IsActive, &m.CreatedAt, &m.UpdatedAt, &m.BirthDate, &m.LastSeen, &m.Avatar, &m.Metadata, &m.Settings, &m.Homepage, &m.Lan, &m.Mac, &m.Mac8, &m.Bitfield, &m.Flags, &m.Tags, &m.Scores, &m.Grid, &m.Homesite, &m.Seg, &m.BoxCol, &m.PathCol, &m.Poly, &m.CircleCol, &m.LineCol, &m.Tsv, &m.Tsq, &m.XMLDoc, &m.LogLsn, &m.LastXid, &m.SlotTid, &m.Cash, &m.Status, &m.Addr, &m.EmailDomain, &m.Positive, &m.UUIDCol, &m.LoginCi, &m.CollateCol, &m.SearchSlug, &m.NameUpper, &m.DeletedAt, &m.VeryLongColumnIdentifierExactlySixtyThreeCharactersInL)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return User{}, core.ErrNotFound
+			return User{}, pgb.ErrNotFound
 		}
 		return User{}, err
 	}
@@ -718,8 +718,9 @@ func GetUser(ctx context.Context, exec core.DBTX, id int64) (User, error) {
 }
 
 // ListUsers returns the rows matching f; limit <= 0 means no LIMIT.
-func ListUsers(ctx context.Context, exec core.DBTX, f UserFilter, limit int) ([]User, error) {
-	rows, err := Users.Select().Where(usersFilterWhere(f)...).Limit(limit).Run(ctx, exec)
+func ListUsers(ctx context.Context, exec pgb.DBTX, f UserFilter, opts ...pgb.ListOpt) ([]User, error) {
+	sel := Users.Select().Where(usersFilterWhere(f)...).ApplyList(opts...)
+	rows, err := sel.Run(ctx, exec)
 	if err != nil {
 		return nil, err
 	}
@@ -727,8 +728,8 @@ func ListUsers(ctx context.Context, exec core.DBTX, f UserFilter, limit int) ([]
 }
 
 // CountUsers counts the rows matching f.
-func CountUsers(ctx context.Context, exec core.DBTX, f UserFilter) (int64, error) {
-	sql, args := core.NewSelect("public.users", core.Raw{SQL: "count(*)"}).Where(usersFilterWhere(f)...).SQL()
+func CountUsers(ctx context.Context, exec pgb.DBTX, f UserFilter) (int64, error) {
+	sql, args := pgb.NewSelect("public.users", pgb.Raw{SQL: "count(*)"}).Where(usersFilterWhere(f)...).SQL()
 	var n int64
 	if err := exec.QueryRow(ctx, sql, args...).Scan(&n); err != nil {
 		return 0, err
@@ -738,11 +739,11 @@ func CountUsers(ctx context.Context, exec core.DBTX, f UserFilter) (int64, error
 
 // InsertUser inserts one row and returns it (RETURNING every
 // column, defaults included).
-func InsertUser(ctx context.Context, exec core.DBTX, p InsertUserParams) (User, error) {
-	rows, err := core.NewInsert("public.users",
+func InsertUser(ctx context.Context, exec pgb.DBTX, p InsertUserParams) (User, error) {
+	rows, err := pgb.NewInsert("public.users",
 		[]string{"email", "password", "name", "bio", "age", "balance", "rating", "score", "is_active", "created_at", "updated_at", "birth_date", "last_seen", "avatar", "metadata", "settings", "homepage", "lan", "mac", "mac8", "bitfield", "flags", "tags", "scores", "grid", "homesite", "seg", "box_col", "path_col", "poly", "circle_col", "line_col", "tsv", "tsq", "xml_doc", "log_lsn", "last_xid", "slot_tid", "cash", "status", "addr", "email_domain", "positive", "uuid_col", "login_ci", "collate_col", "deleted_at", "very_long_column_identifier_exactly_sixty_three_characters_in_l"},
-		[]core.Expr{core.Lit{V: p.Email}, core.Lit{V: p.Password}, core.Lit{V: p.Name}, core.Lit{V: p.Bio}, core.Lit{V: p.Age}, core.Lit{V: p.Balance}, core.Lit{V: p.Rating}, core.Lit{V: p.Score}, core.Lit{V: p.IsActive}, core.Lit{V: p.CreatedAt}, core.Lit{V: p.UpdatedAt}, core.Lit{V: p.BirthDate}, core.Lit{V: p.LastSeen}, core.Lit{V: p.Avatar}, core.Lit{V: p.Metadata, Cast: "jsonb"}, core.Lit{V: p.Settings, Cast: "json"}, core.Lit{V: p.Homepage}, core.Lit{V: p.Lan}, core.Lit{V: p.Mac}, core.Lit{V: p.Mac8}, core.Lit{V: p.Bitfield}, core.Lit{V: p.Flags}, core.Lit{V: p.Tags, Cast: "text[]"}, core.Lit{V: p.Scores, Cast: "int4[]"}, core.Lit{V: p.Grid, Cast: "int4[]"}, core.Lit{V: p.Homesite}, core.Lit{V: p.Seg}, core.Lit{V: p.BoxCol}, core.Lit{V: p.PathCol}, core.Lit{V: p.Poly}, core.Lit{V: p.CircleCol}, core.Lit{V: p.LineCol}, core.Lit{V: p.Tsv}, core.Lit{V: p.Tsq}, core.Lit{V: p.XMLDoc}, core.Lit{V: p.LogLsn}, core.Lit{V: p.LastXid}, core.Lit{V: p.SlotTid}, core.Lit{V: p.Cash}, core.Lit{V: p.Status, Cast: "user_status"}, core.Lit{V: p.Addr}, core.Lit{V: p.EmailDomain}, core.Lit{V: p.Positive}, core.Lit{V: p.UUIDCol}, core.Lit{V: p.LoginCi}, core.Lit{V: p.CollateCol}, core.Lit{V: p.DeletedAt}, core.Lit{V: p.VeryLongColumnIdentifierExactlySixtyThreeCharactersInL}},
-	).Returning(core.Col{Table: "users", Name: "id"}, core.Col{Table: "users", Name: "email"}, core.Col{Table: "users", Name: "password"}, core.Col{Table: "users", Name: "name"}, core.Col{Table: "users", Name: "bio"}, core.Col{Table: "users", Name: "age"}, core.Col{Table: "users", Name: "balance"}, core.Col{Table: "users", Name: "rating"}, core.Col{Table: "users", Name: "score"}, core.Col{Table: "users", Name: "is_active"}, core.Col{Table: "users", Name: "created_at"}, core.Col{Table: "users", Name: "updated_at"}, core.Col{Table: "users", Name: "birth_date"}, core.Col{Table: "users", Name: "last_seen"}, core.Col{Table: "users", Name: "avatar"}, core.Col{Table: "users", Name: "metadata"}, core.Col{Table: "users", Name: "settings"}, core.Col{Table: "users", Name: "homepage"}, core.Col{Table: "users", Name: "lan"}, core.Col{Table: "users", Name: "mac"}, core.Col{Table: "users", Name: "mac8"}, core.Col{Table: "users", Name: "bitfield"}, core.Col{Table: "users", Name: "flags"}, core.Col{Table: "users", Name: "tags"}, core.Col{Table: "users", Name: "scores"}, core.Col{Table: "users", Name: "grid"}, core.Col{Table: "users", Name: "homesite"}, core.Col{Table: "users", Name: "seg"}, core.Col{Table: "users", Name: "box_col"}, core.Col{Table: "users", Name: "path_col"}, core.Col{Table: "users", Name: "poly"}, core.Col{Table: "users", Name: "circle_col"}, core.Col{Table: "users", Name: "line_col"}, core.Col{Table: "users", Name: "tsv"}, core.Col{Table: "users", Name: "tsq"}, core.Col{Table: "users", Name: "xml_doc"}, core.Col{Table: "users", Name: "log_lsn"}, core.Col{Table: "users", Name: "last_xid"}, core.Col{Table: "users", Name: "slot_tid"}, core.Col{Table: "users", Name: "cash"}, core.Col{Table: "users", Name: "status"}, core.Col{Table: "users", Name: "addr"}, core.Col{Table: "users", Name: "email_domain"}, core.Col{Table: "users", Name: "positive"}, core.Col{Table: "users", Name: "uuid_col"}, core.Col{Table: "users", Name: "login_ci"}, core.Col{Table: "users", Name: "collate_col"}, core.Col{Table: "users", Name: "search_slug"}, core.Col{Table: "users", Name: "name_upper"}, core.Col{Table: "users", Name: "deleted_at"}, core.Col{Table: "users", Name: "very_long_column_identifier_exactly_sixty_three_characters_in_l"}).Run(ctx, exec)
+		[]pgb.Expr{pgb.Lit{V: p.Email}, pgb.Lit{V: p.Password}, pgb.Lit{V: p.Name}, pgb.Lit{V: p.Bio}, pgb.Lit{V: p.Age}, pgb.Lit{V: p.Balance}, pgb.Lit{V: p.Rating}, pgb.Lit{V: p.Score}, pgb.Lit{V: p.IsActive}, pgb.Lit{V: p.CreatedAt}, pgb.Lit{V: p.UpdatedAt}, pgb.Lit{V: p.BirthDate}, pgb.Lit{V: p.LastSeen}, pgb.Lit{V: p.Avatar}, pgb.Lit{V: p.Metadata, Cast: "jsonb"}, pgb.Lit{V: p.Settings, Cast: "json"}, pgb.Lit{V: p.Homepage}, pgb.Lit{V: p.Lan}, pgb.Lit{V: p.Mac}, pgb.Lit{V: p.Mac8}, pgb.Lit{V: p.Bitfield}, pgb.Lit{V: p.Flags}, pgb.Lit{V: p.Tags, Cast: "text[]"}, pgb.Lit{V: p.Scores, Cast: "int4[]"}, pgb.Lit{V: p.Grid, Cast: "int4[]"}, pgb.Lit{V: p.Homesite}, pgb.Lit{V: p.Seg}, pgb.Lit{V: p.BoxCol}, pgb.Lit{V: p.PathCol}, pgb.Lit{V: p.Poly}, pgb.Lit{V: p.CircleCol}, pgb.Lit{V: p.LineCol}, pgb.Lit{V: p.Tsv}, pgb.Lit{V: p.Tsq}, pgb.Lit{V: p.XMLDoc}, pgb.Lit{V: p.LogLsn}, pgb.Lit{V: p.LastXid}, pgb.Lit{V: p.SlotTid}, pgb.Lit{V: p.Cash}, pgb.Lit{V: p.Status, Cast: "user_status"}, pgb.Lit{V: p.Addr}, pgb.Lit{V: p.EmailDomain}, pgb.Lit{V: p.Positive}, pgb.Lit{V: p.UUIDCol}, pgb.Lit{V: p.LoginCi}, pgb.Lit{V: p.CollateCol}, pgb.Lit{V: p.DeletedAt}, pgb.Lit{V: p.VeryLongColumnIdentifierExactlySixtyThreeCharactersInL}},
+	).Returning(pgb.Col{Table: "users", Name: "id"}, pgb.Col{Table: "users", Name: "email"}, pgb.Col{Table: "users", Name: "password"}, pgb.Col{Table: "users", Name: "name"}, pgb.Col{Table: "users", Name: "bio"}, pgb.Col{Table: "users", Name: "age"}, pgb.Col{Table: "users", Name: "balance"}, pgb.Col{Table: "users", Name: "rating"}, pgb.Col{Table: "users", Name: "score"}, pgb.Col{Table: "users", Name: "is_active"}, pgb.Col{Table: "users", Name: "created_at"}, pgb.Col{Table: "users", Name: "updated_at"}, pgb.Col{Table: "users", Name: "birth_date"}, pgb.Col{Table: "users", Name: "last_seen"}, pgb.Col{Table: "users", Name: "avatar"}, pgb.Col{Table: "users", Name: "metadata"}, pgb.Col{Table: "users", Name: "settings"}, pgb.Col{Table: "users", Name: "homepage"}, pgb.Col{Table: "users", Name: "lan"}, pgb.Col{Table: "users", Name: "mac"}, pgb.Col{Table: "users", Name: "mac8"}, pgb.Col{Table: "users", Name: "bitfield"}, pgb.Col{Table: "users", Name: "flags"}, pgb.Col{Table: "users", Name: "tags"}, pgb.Col{Table: "users", Name: "scores"}, pgb.Col{Table: "users", Name: "grid"}, pgb.Col{Table: "users", Name: "homesite"}, pgb.Col{Table: "users", Name: "seg"}, pgb.Col{Table: "users", Name: "box_col"}, pgb.Col{Table: "users", Name: "path_col"}, pgb.Col{Table: "users", Name: "poly"}, pgb.Col{Table: "users", Name: "circle_col"}, pgb.Col{Table: "users", Name: "line_col"}, pgb.Col{Table: "users", Name: "tsv"}, pgb.Col{Table: "users", Name: "tsq"}, pgb.Col{Table: "users", Name: "xml_doc"}, pgb.Col{Table: "users", Name: "log_lsn"}, pgb.Col{Table: "users", Name: "last_xid"}, pgb.Col{Table: "users", Name: "slot_tid"}, pgb.Col{Table: "users", Name: "cash"}, pgb.Col{Table: "users", Name: "status"}, pgb.Col{Table: "users", Name: "addr"}, pgb.Col{Table: "users", Name: "email_domain"}, pgb.Col{Table: "users", Name: "positive"}, pgb.Col{Table: "users", Name: "uuid_col"}, pgb.Col{Table: "users", Name: "login_ci"}, pgb.Col{Table: "users", Name: "collate_col"}, pgb.Col{Table: "users", Name: "search_slug"}, pgb.Col{Table: "users", Name: "name_upper"}, pgb.Col{Table: "users", Name: "deleted_at"}, pgb.Col{Table: "users", Name: "very_long_column_identifier_exactly_sixty_three_characters_in_l"}).Run(ctx, exec)
 	if err != nil {
 		return User{}, err
 	}
@@ -751,396 +752,396 @@ func InsertUser(ctx context.Context, exec core.DBTX, p InsertUserParams) (User, 
 		return User{}, err
 	}
 	if len(us) == 0 {
-		return User{}, core.ErrNotFound
+		return User{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // UpdateUser applies the non-zero fields of s to one row and
-// returns the updated row; core.ErrNotFound when absent.
-func UpdateUser(ctx context.Context, exec core.DBTX, id int64, s UserSet) (User, error) {
+// returns the updated row; pgb.ErrNotFound when absent.
+func UpdateUser(ctx context.Context, exec pgb.DBTX, id int64, s UserSet) (User, error) {
 	u := Users.Update()
 	n := 0
 	if s.Email.Valid {
 		n++
 		if s.Email.Null {
-			u.Set("email", core.Lit{V: nil})
+			u.Set("email", pgb.Lit{V: nil})
 		} else {
-			u.Set("email", core.Lit{V: s.Email.V})
+			u.Set("email", pgb.Lit{V: s.Email.V})
 		}
 	}
 	if s.Name.Valid {
 		n++
 		if s.Name.Null {
-			u.Set("name", core.Lit{V: nil})
+			u.Set("name", pgb.Lit{V: nil})
 		} else {
-			u.Set("name", core.Lit{V: s.Name.V})
+			u.Set("name", pgb.Lit{V: s.Name.V})
 		}
 	}
 	if s.Bio.Valid {
 		n++
 		if s.Bio.Null {
-			u.Set("bio", core.Lit{V: nil})
+			u.Set("bio", pgb.Lit{V: nil})
 		} else {
-			u.Set("bio", core.Lit{V: s.Bio.V})
+			u.Set("bio", pgb.Lit{V: s.Bio.V})
 		}
 	}
 	if s.Age.Valid {
 		n++
 		if s.Age.Null {
-			u.Set("age", core.Lit{V: nil})
+			u.Set("age", pgb.Lit{V: nil})
 		} else {
-			u.Set("age", core.Lit{V: s.Age.V})
+			u.Set("age", pgb.Lit{V: s.Age.V})
 		}
 	}
 	if s.Balance.Valid {
 		n++
 		if s.Balance.Null {
-			u.Set("balance", core.Lit{V: nil})
+			u.Set("balance", pgb.Lit{V: nil})
 		} else {
-			u.Set("balance", core.Lit{V: s.Balance.V})
+			u.Set("balance", pgb.Lit{V: s.Balance.V})
 		}
 	}
 	if s.Rating.Valid {
 		n++
 		if s.Rating.Null {
-			u.Set("rating", core.Lit{V: nil})
+			u.Set("rating", pgb.Lit{V: nil})
 		} else {
-			u.Set("rating", core.Lit{V: s.Rating.V})
+			u.Set("rating", pgb.Lit{V: s.Rating.V})
 		}
 	}
 	if s.Score.Valid {
 		n++
 		if s.Score.Null {
-			u.Set("score", core.Lit{V: nil})
+			u.Set("score", pgb.Lit{V: nil})
 		} else {
-			u.Set("score", core.Lit{V: s.Score.V})
+			u.Set("score", pgb.Lit{V: s.Score.V})
 		}
 	}
 	if s.IsActive.Valid {
 		n++
 		if s.IsActive.Null {
-			u.Set("is_active", core.Lit{V: nil})
+			u.Set("is_active", pgb.Lit{V: nil})
 		} else {
-			u.Set("is_active", core.Lit{V: s.IsActive.V})
+			u.Set("is_active", pgb.Lit{V: s.IsActive.V})
 		}
 	}
 	if s.CreatedAt.Valid {
 		n++
 		if s.CreatedAt.Null {
-			u.Set("created_at", core.Lit{V: nil})
+			u.Set("created_at", pgb.Lit{V: nil})
 		} else {
-			u.Set("created_at", core.Lit{V: s.CreatedAt.V})
+			u.Set("created_at", pgb.Lit{V: s.CreatedAt.V})
 		}
 	}
 	if s.UpdatedAt.Valid {
 		n++
 		if s.UpdatedAt.Null {
-			u.Set("updated_at", core.Lit{V: nil})
+			u.Set("updated_at", pgb.Lit{V: nil})
 		} else {
-			u.Set("updated_at", core.Lit{V: s.UpdatedAt.V})
+			u.Set("updated_at", pgb.Lit{V: s.UpdatedAt.V})
 		}
 	}
 	if s.BirthDate.Valid {
 		n++
 		if s.BirthDate.Null {
-			u.Set("birth_date", core.Lit{V: nil})
+			u.Set("birth_date", pgb.Lit{V: nil})
 		} else {
-			u.Set("birth_date", core.Lit{V: s.BirthDate.V})
+			u.Set("birth_date", pgb.Lit{V: s.BirthDate.V})
 		}
 	}
 	if s.LastSeen.Valid {
 		n++
 		if s.LastSeen.Null {
-			u.Set("last_seen", core.Lit{V: nil})
+			u.Set("last_seen", pgb.Lit{V: nil})
 		} else {
-			u.Set("last_seen", core.Lit{V: s.LastSeen.V})
+			u.Set("last_seen", pgb.Lit{V: s.LastSeen.V})
 		}
 	}
 	if s.Avatar.Valid {
 		n++
 		if s.Avatar.Null {
-			u.Set("avatar", core.Lit{V: nil})
+			u.Set("avatar", pgb.Lit{V: nil})
 		} else {
-			u.Set("avatar", core.Lit{V: s.Avatar.V})
+			u.Set("avatar", pgb.Lit{V: s.Avatar.V})
 		}
 	}
 	if s.Metadata.Valid {
 		n++
 		if s.Metadata.Null {
-			u.Set("metadata", core.Lit{V: nil})
+			u.Set("metadata", pgb.Lit{V: nil})
 		} else {
-			u.Set("metadata", core.Lit{V: s.Metadata.V, Cast: "jsonb"})
+			u.Set("metadata", pgb.Lit{V: s.Metadata.V, Cast: "jsonb"})
 		}
 	}
 	if s.Settings.Valid {
 		n++
 		if s.Settings.Null {
-			u.Set("settings", core.Lit{V: nil})
+			u.Set("settings", pgb.Lit{V: nil})
 		} else {
-			u.Set("settings", core.Lit{V: s.Settings.V, Cast: "json"})
+			u.Set("settings", pgb.Lit{V: s.Settings.V, Cast: "json"})
 		}
 	}
 	if s.Homepage.Valid {
 		n++
 		if s.Homepage.Null {
-			u.Set("homepage", core.Lit{V: nil})
+			u.Set("homepage", pgb.Lit{V: nil})
 		} else {
-			u.Set("homepage", core.Lit{V: s.Homepage.V})
+			u.Set("homepage", pgb.Lit{V: s.Homepage.V})
 		}
 	}
 	if s.Lan.Valid {
 		n++
 		if s.Lan.Null {
-			u.Set("lan", core.Lit{V: nil})
+			u.Set("lan", pgb.Lit{V: nil})
 		} else {
-			u.Set("lan", core.Lit{V: s.Lan.V})
+			u.Set("lan", pgb.Lit{V: s.Lan.V})
 		}
 	}
 	if s.Mac.Valid {
 		n++
 		if s.Mac.Null {
-			u.Set("mac", core.Lit{V: nil})
+			u.Set("mac", pgb.Lit{V: nil})
 		} else {
-			u.Set("mac", core.Lit{V: s.Mac.V})
+			u.Set("mac", pgb.Lit{V: s.Mac.V})
 		}
 	}
 	if s.Mac8.Valid {
 		n++
 		if s.Mac8.Null {
-			u.Set("mac8", core.Lit{V: nil})
+			u.Set("mac8", pgb.Lit{V: nil})
 		} else {
-			u.Set("mac8", core.Lit{V: s.Mac8.V})
+			u.Set("mac8", pgb.Lit{V: s.Mac8.V})
 		}
 	}
 	if s.Bitfield.Valid {
 		n++
 		if s.Bitfield.Null {
-			u.Set("bitfield", core.Lit{V: nil})
+			u.Set("bitfield", pgb.Lit{V: nil})
 		} else {
-			u.Set("bitfield", core.Lit{V: s.Bitfield.V})
+			u.Set("bitfield", pgb.Lit{V: s.Bitfield.V})
 		}
 	}
 	if s.Flags.Valid {
 		n++
 		if s.Flags.Null {
-			u.Set("flags", core.Lit{V: nil})
+			u.Set("flags", pgb.Lit{V: nil})
 		} else {
-			u.Set("flags", core.Lit{V: s.Flags.V})
+			u.Set("flags", pgb.Lit{V: s.Flags.V})
 		}
 	}
 	if s.Tags.Valid {
 		n++
 		if s.Tags.Null {
-			u.Set("tags", core.Lit{V: nil})
+			u.Set("tags", pgb.Lit{V: nil})
 		} else {
-			u.Set("tags", core.Lit{V: s.Tags.V, Cast: "text[]"})
+			u.Set("tags", pgb.Lit{V: s.Tags.V, Cast: "text[]"})
 		}
 	}
 	if s.Scores.Valid {
 		n++
 		if s.Scores.Null {
-			u.Set("scores", core.Lit{V: nil})
+			u.Set("scores", pgb.Lit{V: nil})
 		} else {
-			u.Set("scores", core.Lit{V: s.Scores.V, Cast: "int4[]"})
+			u.Set("scores", pgb.Lit{V: s.Scores.V, Cast: "int4[]"})
 		}
 	}
 	if s.Grid.Valid {
 		n++
 		if s.Grid.Null {
-			u.Set("grid", core.Lit{V: nil})
+			u.Set("grid", pgb.Lit{V: nil})
 		} else {
-			u.Set("grid", core.Lit{V: s.Grid.V, Cast: "int4[]"})
+			u.Set("grid", pgb.Lit{V: s.Grid.V, Cast: "int4[]"})
 		}
 	}
 	if s.Homesite.Valid {
 		n++
 		if s.Homesite.Null {
-			u.Set("homesite", core.Lit{V: nil})
+			u.Set("homesite", pgb.Lit{V: nil})
 		} else {
-			u.Set("homesite", core.Lit{V: s.Homesite.V})
+			u.Set("homesite", pgb.Lit{V: s.Homesite.V})
 		}
 	}
 	if s.Seg.Valid {
 		n++
 		if s.Seg.Null {
-			u.Set("seg", core.Lit{V: nil})
+			u.Set("seg", pgb.Lit{V: nil})
 		} else {
-			u.Set("seg", core.Lit{V: s.Seg.V})
+			u.Set("seg", pgb.Lit{V: s.Seg.V})
 		}
 	}
 	if s.BoxCol.Valid {
 		n++
 		if s.BoxCol.Null {
-			u.Set("box_col", core.Lit{V: nil})
+			u.Set("box_col", pgb.Lit{V: nil})
 		} else {
-			u.Set("box_col", core.Lit{V: s.BoxCol.V})
+			u.Set("box_col", pgb.Lit{V: s.BoxCol.V})
 		}
 	}
 	if s.PathCol.Valid {
 		n++
 		if s.PathCol.Null {
-			u.Set("path_col", core.Lit{V: nil})
+			u.Set("path_col", pgb.Lit{V: nil})
 		} else {
-			u.Set("path_col", core.Lit{V: s.PathCol.V})
+			u.Set("path_col", pgb.Lit{V: s.PathCol.V})
 		}
 	}
 	if s.Poly.Valid {
 		n++
 		if s.Poly.Null {
-			u.Set("poly", core.Lit{V: nil})
+			u.Set("poly", pgb.Lit{V: nil})
 		} else {
-			u.Set("poly", core.Lit{V: s.Poly.V})
+			u.Set("poly", pgb.Lit{V: s.Poly.V})
 		}
 	}
 	if s.CircleCol.Valid {
 		n++
 		if s.CircleCol.Null {
-			u.Set("circle_col", core.Lit{V: nil})
+			u.Set("circle_col", pgb.Lit{V: nil})
 		} else {
-			u.Set("circle_col", core.Lit{V: s.CircleCol.V})
+			u.Set("circle_col", pgb.Lit{V: s.CircleCol.V})
 		}
 	}
 	if s.LineCol.Valid {
 		n++
 		if s.LineCol.Null {
-			u.Set("line_col", core.Lit{V: nil})
+			u.Set("line_col", pgb.Lit{V: nil})
 		} else {
-			u.Set("line_col", core.Lit{V: s.LineCol.V})
+			u.Set("line_col", pgb.Lit{V: s.LineCol.V})
 		}
 	}
 	if s.Tsv.Valid {
 		n++
 		if s.Tsv.Null {
-			u.Set("tsv", core.Lit{V: nil})
+			u.Set("tsv", pgb.Lit{V: nil})
 		} else {
-			u.Set("tsv", core.Lit{V: s.Tsv.V})
+			u.Set("tsv", pgb.Lit{V: s.Tsv.V})
 		}
 	}
 	if s.Tsq.Valid {
 		n++
 		if s.Tsq.Null {
-			u.Set("tsq", core.Lit{V: nil})
+			u.Set("tsq", pgb.Lit{V: nil})
 		} else {
-			u.Set("tsq", core.Lit{V: s.Tsq.V})
+			u.Set("tsq", pgb.Lit{V: s.Tsq.V})
 		}
 	}
 	if s.XMLDoc.Valid {
 		n++
 		if s.XMLDoc.Null {
-			u.Set("xml_doc", core.Lit{V: nil})
+			u.Set("xml_doc", pgb.Lit{V: nil})
 		} else {
-			u.Set("xml_doc", core.Lit{V: s.XMLDoc.V})
+			u.Set("xml_doc", pgb.Lit{V: s.XMLDoc.V})
 		}
 	}
 	if s.LogLsn.Valid {
 		n++
 		if s.LogLsn.Null {
-			u.Set("log_lsn", core.Lit{V: nil})
+			u.Set("log_lsn", pgb.Lit{V: nil})
 		} else {
-			u.Set("log_lsn", core.Lit{V: s.LogLsn.V})
+			u.Set("log_lsn", pgb.Lit{V: s.LogLsn.V})
 		}
 	}
 	if s.LastXid.Valid {
 		n++
 		if s.LastXid.Null {
-			u.Set("last_xid", core.Lit{V: nil})
+			u.Set("last_xid", pgb.Lit{V: nil})
 		} else {
-			u.Set("last_xid", core.Lit{V: s.LastXid.V})
+			u.Set("last_xid", pgb.Lit{V: s.LastXid.V})
 		}
 	}
 	if s.SlotTid.Valid {
 		n++
 		if s.SlotTid.Null {
-			u.Set("slot_tid", core.Lit{V: nil})
+			u.Set("slot_tid", pgb.Lit{V: nil})
 		} else {
-			u.Set("slot_tid", core.Lit{V: s.SlotTid.V})
+			u.Set("slot_tid", pgb.Lit{V: s.SlotTid.V})
 		}
 	}
 	if s.Cash.Valid {
 		n++
 		if s.Cash.Null {
-			u.Set("cash", core.Lit{V: nil})
+			u.Set("cash", pgb.Lit{V: nil})
 		} else {
-			u.Set("cash", core.Lit{V: s.Cash.V})
+			u.Set("cash", pgb.Lit{V: s.Cash.V})
 		}
 	}
 	if s.Status.Valid {
 		n++
 		if s.Status.Null {
-			u.Set("status", core.Lit{V: nil})
+			u.Set("status", pgb.Lit{V: nil})
 		} else {
-			u.Set("status", core.Lit{V: s.Status.V, Cast: "user_status"})
+			u.Set("status", pgb.Lit{V: s.Status.V, Cast: "user_status"})
 		}
 	}
 	if s.Addr.Valid {
 		n++
 		if s.Addr.Null {
-			u.Set("addr", core.Lit{V: nil})
+			u.Set("addr", pgb.Lit{V: nil})
 		} else {
-			u.Set("addr", core.Lit{V: s.Addr.V})
+			u.Set("addr", pgb.Lit{V: s.Addr.V})
 		}
 	}
 	if s.EmailDomain.Valid {
 		n++
 		if s.EmailDomain.Null {
-			u.Set("email_domain", core.Lit{V: nil})
+			u.Set("email_domain", pgb.Lit{V: nil})
 		} else {
-			u.Set("email_domain", core.Lit{V: s.EmailDomain.V})
+			u.Set("email_domain", pgb.Lit{V: s.EmailDomain.V})
 		}
 	}
 	if s.Positive.Valid {
 		n++
 		if s.Positive.Null {
-			u.Set("positive", core.Lit{V: nil})
+			u.Set("positive", pgb.Lit{V: nil})
 		} else {
-			u.Set("positive", core.Lit{V: s.Positive.V})
+			u.Set("positive", pgb.Lit{V: s.Positive.V})
 		}
 	}
 	if s.UUIDCol.Valid {
 		n++
 		if s.UUIDCol.Null {
-			u.Set("uuid_col", core.Lit{V: nil})
+			u.Set("uuid_col", pgb.Lit{V: nil})
 		} else {
-			u.Set("uuid_col", core.Lit{V: s.UUIDCol.V})
+			u.Set("uuid_col", pgb.Lit{V: s.UUIDCol.V})
 		}
 	}
 	if s.LoginCi.Valid {
 		n++
 		if s.LoginCi.Null {
-			u.Set("login_ci", core.Lit{V: nil})
+			u.Set("login_ci", pgb.Lit{V: nil})
 		} else {
-			u.Set("login_ci", core.Lit{V: s.LoginCi.V})
+			u.Set("login_ci", pgb.Lit{V: s.LoginCi.V})
 		}
 	}
 	if s.CollateCol.Valid {
 		n++
 		if s.CollateCol.Null {
-			u.Set("collate_col", core.Lit{V: nil})
+			u.Set("collate_col", pgb.Lit{V: nil})
 		} else {
-			u.Set("collate_col", core.Lit{V: s.CollateCol.V})
+			u.Set("collate_col", pgb.Lit{V: s.CollateCol.V})
 		}
 	}
 	if s.DeletedAt.Valid {
 		n++
 		if s.DeletedAt.Null {
-			u.Set("deleted_at", core.Lit{V: nil})
+			u.Set("deleted_at", pgb.Lit{V: nil})
 		} else {
-			u.Set("deleted_at", core.Lit{V: s.DeletedAt.V})
+			u.Set("deleted_at", pgb.Lit{V: s.DeletedAt.V})
 		}
 	}
 	if s.VeryLongColumnIdentifierExactlySixtyThreeCharactersInL.Valid {
 		n++
 		if s.VeryLongColumnIdentifierExactlySixtyThreeCharactersInL.Null {
-			u.Set("very_long_column_identifier_exactly_sixty_three_characters_in_l", core.Lit{V: nil})
+			u.Set("very_long_column_identifier_exactly_sixty_three_characters_in_l", pgb.Lit{V: nil})
 		} else {
-			u.Set("very_long_column_identifier_exactly_sixty_three_characters_in_l", core.Lit{V: s.VeryLongColumnIdentifierExactlySixtyThreeCharactersInL.V})
+			u.Set("very_long_column_identifier_exactly_sixty_three_characters_in_l", pgb.Lit{V: s.VeryLongColumnIdentifierExactlySixtyThreeCharactersInL.V})
 		}
 	}
 	if n == 0 {
 		return GetUser(ctx, exec, id)
 	}
-	u.Where(Users.ID().Eq(id)).Returning(core.Col{Table: "users", Name: "id"}, core.Col{Table: "users", Name: "email"}, core.Col{Table: "users", Name: "password"}, core.Col{Table: "users", Name: "name"}, core.Col{Table: "users", Name: "bio"}, core.Col{Table: "users", Name: "age"}, core.Col{Table: "users", Name: "balance"}, core.Col{Table: "users", Name: "rating"}, core.Col{Table: "users", Name: "score"}, core.Col{Table: "users", Name: "is_active"}, core.Col{Table: "users", Name: "created_at"}, core.Col{Table: "users", Name: "updated_at"}, core.Col{Table: "users", Name: "birth_date"}, core.Col{Table: "users", Name: "last_seen"}, core.Col{Table: "users", Name: "avatar"}, core.Col{Table: "users", Name: "metadata"}, core.Col{Table: "users", Name: "settings"}, core.Col{Table: "users", Name: "homepage"}, core.Col{Table: "users", Name: "lan"}, core.Col{Table: "users", Name: "mac"}, core.Col{Table: "users", Name: "mac8"}, core.Col{Table: "users", Name: "bitfield"}, core.Col{Table: "users", Name: "flags"}, core.Col{Table: "users", Name: "tags"}, core.Col{Table: "users", Name: "scores"}, core.Col{Table: "users", Name: "grid"}, core.Col{Table: "users", Name: "homesite"}, core.Col{Table: "users", Name: "seg"}, core.Col{Table: "users", Name: "box_col"}, core.Col{Table: "users", Name: "path_col"}, core.Col{Table: "users", Name: "poly"}, core.Col{Table: "users", Name: "circle_col"}, core.Col{Table: "users", Name: "line_col"}, core.Col{Table: "users", Name: "tsv"}, core.Col{Table: "users", Name: "tsq"}, core.Col{Table: "users", Name: "xml_doc"}, core.Col{Table: "users", Name: "log_lsn"}, core.Col{Table: "users", Name: "last_xid"}, core.Col{Table: "users", Name: "slot_tid"}, core.Col{Table: "users", Name: "cash"}, core.Col{Table: "users", Name: "status"}, core.Col{Table: "users", Name: "addr"}, core.Col{Table: "users", Name: "email_domain"}, core.Col{Table: "users", Name: "positive"}, core.Col{Table: "users", Name: "uuid_col"}, core.Col{Table: "users", Name: "login_ci"}, core.Col{Table: "users", Name: "collate_col"}, core.Col{Table: "users", Name: "search_slug"}, core.Col{Table: "users", Name: "name_upper"}, core.Col{Table: "users", Name: "deleted_at"}, core.Col{Table: "users", Name: "very_long_column_identifier_exactly_sixty_three_characters_in_l"})
+	u.Where(Users.ID().Eq(id)).Returning(pgb.Col{Table: "users", Name: "id"}, pgb.Col{Table: "users", Name: "email"}, pgb.Col{Table: "users", Name: "password"}, pgb.Col{Table: "users", Name: "name"}, pgb.Col{Table: "users", Name: "bio"}, pgb.Col{Table: "users", Name: "age"}, pgb.Col{Table: "users", Name: "balance"}, pgb.Col{Table: "users", Name: "rating"}, pgb.Col{Table: "users", Name: "score"}, pgb.Col{Table: "users", Name: "is_active"}, pgb.Col{Table: "users", Name: "created_at"}, pgb.Col{Table: "users", Name: "updated_at"}, pgb.Col{Table: "users", Name: "birth_date"}, pgb.Col{Table: "users", Name: "last_seen"}, pgb.Col{Table: "users", Name: "avatar"}, pgb.Col{Table: "users", Name: "metadata"}, pgb.Col{Table: "users", Name: "settings"}, pgb.Col{Table: "users", Name: "homepage"}, pgb.Col{Table: "users", Name: "lan"}, pgb.Col{Table: "users", Name: "mac"}, pgb.Col{Table: "users", Name: "mac8"}, pgb.Col{Table: "users", Name: "bitfield"}, pgb.Col{Table: "users", Name: "flags"}, pgb.Col{Table: "users", Name: "tags"}, pgb.Col{Table: "users", Name: "scores"}, pgb.Col{Table: "users", Name: "grid"}, pgb.Col{Table: "users", Name: "homesite"}, pgb.Col{Table: "users", Name: "seg"}, pgb.Col{Table: "users", Name: "box_col"}, pgb.Col{Table: "users", Name: "path_col"}, pgb.Col{Table: "users", Name: "poly"}, pgb.Col{Table: "users", Name: "circle_col"}, pgb.Col{Table: "users", Name: "line_col"}, pgb.Col{Table: "users", Name: "tsv"}, pgb.Col{Table: "users", Name: "tsq"}, pgb.Col{Table: "users", Name: "xml_doc"}, pgb.Col{Table: "users", Name: "log_lsn"}, pgb.Col{Table: "users", Name: "last_xid"}, pgb.Col{Table: "users", Name: "slot_tid"}, pgb.Col{Table: "users", Name: "cash"}, pgb.Col{Table: "users", Name: "status"}, pgb.Col{Table: "users", Name: "addr"}, pgb.Col{Table: "users", Name: "email_domain"}, pgb.Col{Table: "users", Name: "positive"}, pgb.Col{Table: "users", Name: "uuid_col"}, pgb.Col{Table: "users", Name: "login_ci"}, pgb.Col{Table: "users", Name: "collate_col"}, pgb.Col{Table: "users", Name: "search_slug"}, pgb.Col{Table: "users", Name: "name_upper"}, pgb.Col{Table: "users", Name: "deleted_at"}, pgb.Col{Table: "users", Name: "very_long_column_identifier_exactly_sixty_three_characters_in_l"})
 	rows, err := u.Run(ctx, exec)
 	if err != nil {
 		return User{}, err
@@ -1150,398 +1151,398 @@ func UpdateUser(ctx context.Context, exec core.DBTX, id int64, s UserSet) (User,
 		return User{}, err
 	}
 	if len(us) == 0 {
-		return User{}, core.ErrNotFound
+		return User{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // UpdateUsers applies s to every row matching where and
 // returns the affected count; an empty where is refused with
-// core.ErrNoWhere before any SQL is sent.
-func UpdateUsers(ctx context.Context, exec core.DBTX, where []core.Expr, s UserSet) (int64, error) {
+// pgb.ErrNoWhere before any SQL is sent.
+func UpdateUsers(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, s UserSet) (int64, error) {
 	u := Users.Update()
 	n := 0
 	if s.Email.Valid {
 		n++
 		if s.Email.Null {
-			u.Set("email", core.Lit{V: nil})
+			u.Set("email", pgb.Lit{V: nil})
 		} else {
-			u.Set("email", core.Lit{V: s.Email.V})
+			u.Set("email", pgb.Lit{V: s.Email.V})
 		}
 	}
 	if s.Name.Valid {
 		n++
 		if s.Name.Null {
-			u.Set("name", core.Lit{V: nil})
+			u.Set("name", pgb.Lit{V: nil})
 		} else {
-			u.Set("name", core.Lit{V: s.Name.V})
+			u.Set("name", pgb.Lit{V: s.Name.V})
 		}
 	}
 	if s.Bio.Valid {
 		n++
 		if s.Bio.Null {
-			u.Set("bio", core.Lit{V: nil})
+			u.Set("bio", pgb.Lit{V: nil})
 		} else {
-			u.Set("bio", core.Lit{V: s.Bio.V})
+			u.Set("bio", pgb.Lit{V: s.Bio.V})
 		}
 	}
 	if s.Age.Valid {
 		n++
 		if s.Age.Null {
-			u.Set("age", core.Lit{V: nil})
+			u.Set("age", pgb.Lit{V: nil})
 		} else {
-			u.Set("age", core.Lit{V: s.Age.V})
+			u.Set("age", pgb.Lit{V: s.Age.V})
 		}
 	}
 	if s.Balance.Valid {
 		n++
 		if s.Balance.Null {
-			u.Set("balance", core.Lit{V: nil})
+			u.Set("balance", pgb.Lit{V: nil})
 		} else {
-			u.Set("balance", core.Lit{V: s.Balance.V})
+			u.Set("balance", pgb.Lit{V: s.Balance.V})
 		}
 	}
 	if s.Rating.Valid {
 		n++
 		if s.Rating.Null {
-			u.Set("rating", core.Lit{V: nil})
+			u.Set("rating", pgb.Lit{V: nil})
 		} else {
-			u.Set("rating", core.Lit{V: s.Rating.V})
+			u.Set("rating", pgb.Lit{V: s.Rating.V})
 		}
 	}
 	if s.Score.Valid {
 		n++
 		if s.Score.Null {
-			u.Set("score", core.Lit{V: nil})
+			u.Set("score", pgb.Lit{V: nil})
 		} else {
-			u.Set("score", core.Lit{V: s.Score.V})
+			u.Set("score", pgb.Lit{V: s.Score.V})
 		}
 	}
 	if s.IsActive.Valid {
 		n++
 		if s.IsActive.Null {
-			u.Set("is_active", core.Lit{V: nil})
+			u.Set("is_active", pgb.Lit{V: nil})
 		} else {
-			u.Set("is_active", core.Lit{V: s.IsActive.V})
+			u.Set("is_active", pgb.Lit{V: s.IsActive.V})
 		}
 	}
 	if s.CreatedAt.Valid {
 		n++
 		if s.CreatedAt.Null {
-			u.Set("created_at", core.Lit{V: nil})
+			u.Set("created_at", pgb.Lit{V: nil})
 		} else {
-			u.Set("created_at", core.Lit{V: s.CreatedAt.V})
+			u.Set("created_at", pgb.Lit{V: s.CreatedAt.V})
 		}
 	}
 	if s.UpdatedAt.Valid {
 		n++
 		if s.UpdatedAt.Null {
-			u.Set("updated_at", core.Lit{V: nil})
+			u.Set("updated_at", pgb.Lit{V: nil})
 		} else {
-			u.Set("updated_at", core.Lit{V: s.UpdatedAt.V})
+			u.Set("updated_at", pgb.Lit{V: s.UpdatedAt.V})
 		}
 	}
 	if s.BirthDate.Valid {
 		n++
 		if s.BirthDate.Null {
-			u.Set("birth_date", core.Lit{V: nil})
+			u.Set("birth_date", pgb.Lit{V: nil})
 		} else {
-			u.Set("birth_date", core.Lit{V: s.BirthDate.V})
+			u.Set("birth_date", pgb.Lit{V: s.BirthDate.V})
 		}
 	}
 	if s.LastSeen.Valid {
 		n++
 		if s.LastSeen.Null {
-			u.Set("last_seen", core.Lit{V: nil})
+			u.Set("last_seen", pgb.Lit{V: nil})
 		} else {
-			u.Set("last_seen", core.Lit{V: s.LastSeen.V})
+			u.Set("last_seen", pgb.Lit{V: s.LastSeen.V})
 		}
 	}
 	if s.Avatar.Valid {
 		n++
 		if s.Avatar.Null {
-			u.Set("avatar", core.Lit{V: nil})
+			u.Set("avatar", pgb.Lit{V: nil})
 		} else {
-			u.Set("avatar", core.Lit{V: s.Avatar.V})
+			u.Set("avatar", pgb.Lit{V: s.Avatar.V})
 		}
 	}
 	if s.Metadata.Valid {
 		n++
 		if s.Metadata.Null {
-			u.Set("metadata", core.Lit{V: nil})
+			u.Set("metadata", pgb.Lit{V: nil})
 		} else {
-			u.Set("metadata", core.Lit{V: s.Metadata.V, Cast: "jsonb"})
+			u.Set("metadata", pgb.Lit{V: s.Metadata.V, Cast: "jsonb"})
 		}
 	}
 	if s.Settings.Valid {
 		n++
 		if s.Settings.Null {
-			u.Set("settings", core.Lit{V: nil})
+			u.Set("settings", pgb.Lit{V: nil})
 		} else {
-			u.Set("settings", core.Lit{V: s.Settings.V, Cast: "json"})
+			u.Set("settings", pgb.Lit{V: s.Settings.V, Cast: "json"})
 		}
 	}
 	if s.Homepage.Valid {
 		n++
 		if s.Homepage.Null {
-			u.Set("homepage", core.Lit{V: nil})
+			u.Set("homepage", pgb.Lit{V: nil})
 		} else {
-			u.Set("homepage", core.Lit{V: s.Homepage.V})
+			u.Set("homepage", pgb.Lit{V: s.Homepage.V})
 		}
 	}
 	if s.Lan.Valid {
 		n++
 		if s.Lan.Null {
-			u.Set("lan", core.Lit{V: nil})
+			u.Set("lan", pgb.Lit{V: nil})
 		} else {
-			u.Set("lan", core.Lit{V: s.Lan.V})
+			u.Set("lan", pgb.Lit{V: s.Lan.V})
 		}
 	}
 	if s.Mac.Valid {
 		n++
 		if s.Mac.Null {
-			u.Set("mac", core.Lit{V: nil})
+			u.Set("mac", pgb.Lit{V: nil})
 		} else {
-			u.Set("mac", core.Lit{V: s.Mac.V})
+			u.Set("mac", pgb.Lit{V: s.Mac.V})
 		}
 	}
 	if s.Mac8.Valid {
 		n++
 		if s.Mac8.Null {
-			u.Set("mac8", core.Lit{V: nil})
+			u.Set("mac8", pgb.Lit{V: nil})
 		} else {
-			u.Set("mac8", core.Lit{V: s.Mac8.V})
+			u.Set("mac8", pgb.Lit{V: s.Mac8.V})
 		}
 	}
 	if s.Bitfield.Valid {
 		n++
 		if s.Bitfield.Null {
-			u.Set("bitfield", core.Lit{V: nil})
+			u.Set("bitfield", pgb.Lit{V: nil})
 		} else {
-			u.Set("bitfield", core.Lit{V: s.Bitfield.V})
+			u.Set("bitfield", pgb.Lit{V: s.Bitfield.V})
 		}
 	}
 	if s.Flags.Valid {
 		n++
 		if s.Flags.Null {
-			u.Set("flags", core.Lit{V: nil})
+			u.Set("flags", pgb.Lit{V: nil})
 		} else {
-			u.Set("flags", core.Lit{V: s.Flags.V})
+			u.Set("flags", pgb.Lit{V: s.Flags.V})
 		}
 	}
 	if s.Tags.Valid {
 		n++
 		if s.Tags.Null {
-			u.Set("tags", core.Lit{V: nil})
+			u.Set("tags", pgb.Lit{V: nil})
 		} else {
-			u.Set("tags", core.Lit{V: s.Tags.V, Cast: "text[]"})
+			u.Set("tags", pgb.Lit{V: s.Tags.V, Cast: "text[]"})
 		}
 	}
 	if s.Scores.Valid {
 		n++
 		if s.Scores.Null {
-			u.Set("scores", core.Lit{V: nil})
+			u.Set("scores", pgb.Lit{V: nil})
 		} else {
-			u.Set("scores", core.Lit{V: s.Scores.V, Cast: "int4[]"})
+			u.Set("scores", pgb.Lit{V: s.Scores.V, Cast: "int4[]"})
 		}
 	}
 	if s.Grid.Valid {
 		n++
 		if s.Grid.Null {
-			u.Set("grid", core.Lit{V: nil})
+			u.Set("grid", pgb.Lit{V: nil})
 		} else {
-			u.Set("grid", core.Lit{V: s.Grid.V, Cast: "int4[]"})
+			u.Set("grid", pgb.Lit{V: s.Grid.V, Cast: "int4[]"})
 		}
 	}
 	if s.Homesite.Valid {
 		n++
 		if s.Homesite.Null {
-			u.Set("homesite", core.Lit{V: nil})
+			u.Set("homesite", pgb.Lit{V: nil})
 		} else {
-			u.Set("homesite", core.Lit{V: s.Homesite.V})
+			u.Set("homesite", pgb.Lit{V: s.Homesite.V})
 		}
 	}
 	if s.Seg.Valid {
 		n++
 		if s.Seg.Null {
-			u.Set("seg", core.Lit{V: nil})
+			u.Set("seg", pgb.Lit{V: nil})
 		} else {
-			u.Set("seg", core.Lit{V: s.Seg.V})
+			u.Set("seg", pgb.Lit{V: s.Seg.V})
 		}
 	}
 	if s.BoxCol.Valid {
 		n++
 		if s.BoxCol.Null {
-			u.Set("box_col", core.Lit{V: nil})
+			u.Set("box_col", pgb.Lit{V: nil})
 		} else {
-			u.Set("box_col", core.Lit{V: s.BoxCol.V})
+			u.Set("box_col", pgb.Lit{V: s.BoxCol.V})
 		}
 	}
 	if s.PathCol.Valid {
 		n++
 		if s.PathCol.Null {
-			u.Set("path_col", core.Lit{V: nil})
+			u.Set("path_col", pgb.Lit{V: nil})
 		} else {
-			u.Set("path_col", core.Lit{V: s.PathCol.V})
+			u.Set("path_col", pgb.Lit{V: s.PathCol.V})
 		}
 	}
 	if s.Poly.Valid {
 		n++
 		if s.Poly.Null {
-			u.Set("poly", core.Lit{V: nil})
+			u.Set("poly", pgb.Lit{V: nil})
 		} else {
-			u.Set("poly", core.Lit{V: s.Poly.V})
+			u.Set("poly", pgb.Lit{V: s.Poly.V})
 		}
 	}
 	if s.CircleCol.Valid {
 		n++
 		if s.CircleCol.Null {
-			u.Set("circle_col", core.Lit{V: nil})
+			u.Set("circle_col", pgb.Lit{V: nil})
 		} else {
-			u.Set("circle_col", core.Lit{V: s.CircleCol.V})
+			u.Set("circle_col", pgb.Lit{V: s.CircleCol.V})
 		}
 	}
 	if s.LineCol.Valid {
 		n++
 		if s.LineCol.Null {
-			u.Set("line_col", core.Lit{V: nil})
+			u.Set("line_col", pgb.Lit{V: nil})
 		} else {
-			u.Set("line_col", core.Lit{V: s.LineCol.V})
+			u.Set("line_col", pgb.Lit{V: s.LineCol.V})
 		}
 	}
 	if s.Tsv.Valid {
 		n++
 		if s.Tsv.Null {
-			u.Set("tsv", core.Lit{V: nil})
+			u.Set("tsv", pgb.Lit{V: nil})
 		} else {
-			u.Set("tsv", core.Lit{V: s.Tsv.V})
+			u.Set("tsv", pgb.Lit{V: s.Tsv.V})
 		}
 	}
 	if s.Tsq.Valid {
 		n++
 		if s.Tsq.Null {
-			u.Set("tsq", core.Lit{V: nil})
+			u.Set("tsq", pgb.Lit{V: nil})
 		} else {
-			u.Set("tsq", core.Lit{V: s.Tsq.V})
+			u.Set("tsq", pgb.Lit{V: s.Tsq.V})
 		}
 	}
 	if s.XMLDoc.Valid {
 		n++
 		if s.XMLDoc.Null {
-			u.Set("xml_doc", core.Lit{V: nil})
+			u.Set("xml_doc", pgb.Lit{V: nil})
 		} else {
-			u.Set("xml_doc", core.Lit{V: s.XMLDoc.V})
+			u.Set("xml_doc", pgb.Lit{V: s.XMLDoc.V})
 		}
 	}
 	if s.LogLsn.Valid {
 		n++
 		if s.LogLsn.Null {
-			u.Set("log_lsn", core.Lit{V: nil})
+			u.Set("log_lsn", pgb.Lit{V: nil})
 		} else {
-			u.Set("log_lsn", core.Lit{V: s.LogLsn.V})
+			u.Set("log_lsn", pgb.Lit{V: s.LogLsn.V})
 		}
 	}
 	if s.LastXid.Valid {
 		n++
 		if s.LastXid.Null {
-			u.Set("last_xid", core.Lit{V: nil})
+			u.Set("last_xid", pgb.Lit{V: nil})
 		} else {
-			u.Set("last_xid", core.Lit{V: s.LastXid.V})
+			u.Set("last_xid", pgb.Lit{V: s.LastXid.V})
 		}
 	}
 	if s.SlotTid.Valid {
 		n++
 		if s.SlotTid.Null {
-			u.Set("slot_tid", core.Lit{V: nil})
+			u.Set("slot_tid", pgb.Lit{V: nil})
 		} else {
-			u.Set("slot_tid", core.Lit{V: s.SlotTid.V})
+			u.Set("slot_tid", pgb.Lit{V: s.SlotTid.V})
 		}
 	}
 	if s.Cash.Valid {
 		n++
 		if s.Cash.Null {
-			u.Set("cash", core.Lit{V: nil})
+			u.Set("cash", pgb.Lit{V: nil})
 		} else {
-			u.Set("cash", core.Lit{V: s.Cash.V})
+			u.Set("cash", pgb.Lit{V: s.Cash.V})
 		}
 	}
 	if s.Status.Valid {
 		n++
 		if s.Status.Null {
-			u.Set("status", core.Lit{V: nil})
+			u.Set("status", pgb.Lit{V: nil})
 		} else {
-			u.Set("status", core.Lit{V: s.Status.V, Cast: "user_status"})
+			u.Set("status", pgb.Lit{V: s.Status.V, Cast: "user_status"})
 		}
 	}
 	if s.Addr.Valid {
 		n++
 		if s.Addr.Null {
-			u.Set("addr", core.Lit{V: nil})
+			u.Set("addr", pgb.Lit{V: nil})
 		} else {
-			u.Set("addr", core.Lit{V: s.Addr.V})
+			u.Set("addr", pgb.Lit{V: s.Addr.V})
 		}
 	}
 	if s.EmailDomain.Valid {
 		n++
 		if s.EmailDomain.Null {
-			u.Set("email_domain", core.Lit{V: nil})
+			u.Set("email_domain", pgb.Lit{V: nil})
 		} else {
-			u.Set("email_domain", core.Lit{V: s.EmailDomain.V})
+			u.Set("email_domain", pgb.Lit{V: s.EmailDomain.V})
 		}
 	}
 	if s.Positive.Valid {
 		n++
 		if s.Positive.Null {
-			u.Set("positive", core.Lit{V: nil})
+			u.Set("positive", pgb.Lit{V: nil})
 		} else {
-			u.Set("positive", core.Lit{V: s.Positive.V})
+			u.Set("positive", pgb.Lit{V: s.Positive.V})
 		}
 	}
 	if s.UUIDCol.Valid {
 		n++
 		if s.UUIDCol.Null {
-			u.Set("uuid_col", core.Lit{V: nil})
+			u.Set("uuid_col", pgb.Lit{V: nil})
 		} else {
-			u.Set("uuid_col", core.Lit{V: s.UUIDCol.V})
+			u.Set("uuid_col", pgb.Lit{V: s.UUIDCol.V})
 		}
 	}
 	if s.LoginCi.Valid {
 		n++
 		if s.LoginCi.Null {
-			u.Set("login_ci", core.Lit{V: nil})
+			u.Set("login_ci", pgb.Lit{V: nil})
 		} else {
-			u.Set("login_ci", core.Lit{V: s.LoginCi.V})
+			u.Set("login_ci", pgb.Lit{V: s.LoginCi.V})
 		}
 	}
 	if s.CollateCol.Valid {
 		n++
 		if s.CollateCol.Null {
-			u.Set("collate_col", core.Lit{V: nil})
+			u.Set("collate_col", pgb.Lit{V: nil})
 		} else {
-			u.Set("collate_col", core.Lit{V: s.CollateCol.V})
+			u.Set("collate_col", pgb.Lit{V: s.CollateCol.V})
 		}
 	}
 	if s.DeletedAt.Valid {
 		n++
 		if s.DeletedAt.Null {
-			u.Set("deleted_at", core.Lit{V: nil})
+			u.Set("deleted_at", pgb.Lit{V: nil})
 		} else {
-			u.Set("deleted_at", core.Lit{V: s.DeletedAt.V})
+			u.Set("deleted_at", pgb.Lit{V: s.DeletedAt.V})
 		}
 	}
 	if s.VeryLongColumnIdentifierExactlySixtyThreeCharactersInL.Valid {
 		n++
 		if s.VeryLongColumnIdentifierExactlySixtyThreeCharactersInL.Null {
-			u.Set("very_long_column_identifier_exactly_sixty_three_characters_in_l", core.Lit{V: nil})
+			u.Set("very_long_column_identifier_exactly_sixty_three_characters_in_l", pgb.Lit{V: nil})
 		} else {
-			u.Set("very_long_column_identifier_exactly_sixty_three_characters_in_l", core.Lit{V: s.VeryLongColumnIdentifierExactlySixtyThreeCharactersInL.V})
+			u.Set("very_long_column_identifier_exactly_sixty_three_characters_in_l", pgb.Lit{V: s.VeryLongColumnIdentifierExactlySixtyThreeCharactersInL.V})
 		}
 	}
 	if n == 0 {
 		return 0, nil
 	}
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	u.Where(where...)
 	tag, err := u.Exec(ctx, exec)
@@ -1553,63 +1554,63 @@ func UpdateUsers(ctx context.Context, exec core.DBTX, where []core.Expr, s UserS
 
 // UpsertUser inserts p under id, or on conflict updates
 // every settable column from the proposed row (EXCLUDED.*) and returns
-// the resulting row; core.ErrNotFound when DO NOTHING matched.
-func UpsertUser(ctx context.Context, exec core.DBTX, id int64, p InsertUserParams) (User, error) {
-	rows, err := core.NewInsert("public.users",
+// the resulting row; pgb.ErrNotFound when DO NOTHING matched.
+func UpsertUser(ctx context.Context, exec pgb.DBTX, id int64, p InsertUserParams) (User, error) {
+	rows, err := pgb.NewInsert("public.users",
 		[]string{"id", "email", "password", "name", "bio", "age", "balance", "rating", "score", "is_active", "created_at", "updated_at", "birth_date", "last_seen", "avatar", "metadata", "settings", "homepage", "lan", "mac", "mac8", "bitfield", "flags", "tags", "scores", "grid", "homesite", "seg", "box_col", "path_col", "poly", "circle_col", "line_col", "tsv", "tsq", "xml_doc", "log_lsn", "last_xid", "slot_tid", "cash", "status", "addr", "email_domain", "positive", "uuid_col", "login_ci", "collate_col", "deleted_at", "very_long_column_identifier_exactly_sixty_three_characters_in_l"},
-		[]core.Expr{core.Lit{V: id}, core.Lit{V: p.Email}, core.Lit{V: p.Password}, core.Lit{V: p.Name}, core.Lit{V: p.Bio}, core.Lit{V: p.Age}, core.Lit{V: p.Balance}, core.Lit{V: p.Rating}, core.Lit{V: p.Score}, core.Lit{V: p.IsActive}, core.Lit{V: p.CreatedAt}, core.Lit{V: p.UpdatedAt}, core.Lit{V: p.BirthDate}, core.Lit{V: p.LastSeen}, core.Lit{V: p.Avatar}, core.Lit{V: p.Metadata, Cast: "jsonb"}, core.Lit{V: p.Settings, Cast: "json"}, core.Lit{V: p.Homepage}, core.Lit{V: p.Lan}, core.Lit{V: p.Mac}, core.Lit{V: p.Mac8}, core.Lit{V: p.Bitfield}, core.Lit{V: p.Flags}, core.Lit{V: p.Tags, Cast: "text[]"}, core.Lit{V: p.Scores, Cast: "int4[]"}, core.Lit{V: p.Grid, Cast: "int4[]"}, core.Lit{V: p.Homesite}, core.Lit{V: p.Seg}, core.Lit{V: p.BoxCol}, core.Lit{V: p.PathCol}, core.Lit{V: p.Poly}, core.Lit{V: p.CircleCol}, core.Lit{V: p.LineCol}, core.Lit{V: p.Tsv}, core.Lit{V: p.Tsq}, core.Lit{V: p.XMLDoc}, core.Lit{V: p.LogLsn}, core.Lit{V: p.LastXid}, core.Lit{V: p.SlotTid}, core.Lit{V: p.Cash}, core.Lit{V: p.Status, Cast: "user_status"}, core.Lit{V: p.Addr}, core.Lit{V: p.EmailDomain}, core.Lit{V: p.Positive}, core.Lit{V: p.UUIDCol}, core.Lit{V: p.LoginCi}, core.Lit{V: p.CollateCol}, core.Lit{V: p.DeletedAt}, core.Lit{V: p.VeryLongColumnIdentifierExactlySixtyThreeCharactersInL}},
-	).OnConflict(core.OnConflict{
+		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.Email}, pgb.Lit{V: p.Password}, pgb.Lit{V: p.Name}, pgb.Lit{V: p.Bio}, pgb.Lit{V: p.Age}, pgb.Lit{V: p.Balance}, pgb.Lit{V: p.Rating}, pgb.Lit{V: p.Score}, pgb.Lit{V: p.IsActive}, pgb.Lit{V: p.CreatedAt}, pgb.Lit{V: p.UpdatedAt}, pgb.Lit{V: p.BirthDate}, pgb.Lit{V: p.LastSeen}, pgb.Lit{V: p.Avatar}, pgb.Lit{V: p.Metadata, Cast: "jsonb"}, pgb.Lit{V: p.Settings, Cast: "json"}, pgb.Lit{V: p.Homepage}, pgb.Lit{V: p.Lan}, pgb.Lit{V: p.Mac}, pgb.Lit{V: p.Mac8}, pgb.Lit{V: p.Bitfield}, pgb.Lit{V: p.Flags}, pgb.Lit{V: p.Tags, Cast: "text[]"}, pgb.Lit{V: p.Scores, Cast: "int4[]"}, pgb.Lit{V: p.Grid, Cast: "int4[]"}, pgb.Lit{V: p.Homesite}, pgb.Lit{V: p.Seg}, pgb.Lit{V: p.BoxCol}, pgb.Lit{V: p.PathCol}, pgb.Lit{V: p.Poly}, pgb.Lit{V: p.CircleCol}, pgb.Lit{V: p.LineCol}, pgb.Lit{V: p.Tsv}, pgb.Lit{V: p.Tsq}, pgb.Lit{V: p.XMLDoc}, pgb.Lit{V: p.LogLsn}, pgb.Lit{V: p.LastXid}, pgb.Lit{V: p.SlotTid}, pgb.Lit{V: p.Cash}, pgb.Lit{V: p.Status, Cast: "user_status"}, pgb.Lit{V: p.Addr}, pgb.Lit{V: p.EmailDomain}, pgb.Lit{V: p.Positive}, pgb.Lit{V: p.UUIDCol}, pgb.Lit{V: p.LoginCi}, pgb.Lit{V: p.CollateCol}, pgb.Lit{V: p.DeletedAt}, pgb.Lit{V: p.VeryLongColumnIdentifierExactlySixtyThreeCharactersInL}},
+	).OnConflict(pgb.OnConflict{
 		Target: []string{"id"},
-		Sets: []core.SetClause{
-			{Col: "email", E: core.Col{Table: "excluded", Name: "email"}},
-			{Col: "name", E: core.Col{Table: "excluded", Name: "name"}},
-			{Col: "bio", E: core.Col{Table: "excluded", Name: "bio"}},
-			{Col: "age", E: core.Col{Table: "excluded", Name: "age"}},
-			{Col: "balance", E: core.Col{Table: "excluded", Name: "balance"}},
-			{Col: "rating", E: core.Col{Table: "excluded", Name: "rating"}},
-			{Col: "score", E: core.Col{Table: "excluded", Name: "score"}},
-			{Col: "is_active", E: core.Col{Table: "excluded", Name: "is_active"}},
-			{Col: "created_at", E: core.Col{Table: "excluded", Name: "created_at"}},
-			{Col: "updated_at", E: core.Col{Table: "excluded", Name: "updated_at"}},
-			{Col: "birth_date", E: core.Col{Table: "excluded", Name: "birth_date"}},
-			{Col: "last_seen", E: core.Col{Table: "excluded", Name: "last_seen"}},
-			{Col: "avatar", E: core.Col{Table: "excluded", Name: "avatar"}},
-			{Col: "metadata", E: core.Col{Table: "excluded", Name: "metadata"}},
-			{Col: "settings", E: core.Col{Table: "excluded", Name: "settings"}},
-			{Col: "homepage", E: core.Col{Table: "excluded", Name: "homepage"}},
-			{Col: "lan", E: core.Col{Table: "excluded", Name: "lan"}},
-			{Col: "mac", E: core.Col{Table: "excluded", Name: "mac"}},
-			{Col: "mac8", E: core.Col{Table: "excluded", Name: "mac8"}},
-			{Col: "bitfield", E: core.Col{Table: "excluded", Name: "bitfield"}},
-			{Col: "flags", E: core.Col{Table: "excluded", Name: "flags"}},
-			{Col: "tags", E: core.Col{Table: "excluded", Name: "tags"}},
-			{Col: "scores", E: core.Col{Table: "excluded", Name: "scores"}},
-			{Col: "grid", E: core.Col{Table: "excluded", Name: "grid"}},
-			{Col: "homesite", E: core.Col{Table: "excluded", Name: "homesite"}},
-			{Col: "seg", E: core.Col{Table: "excluded", Name: "seg"}},
-			{Col: "box_col", E: core.Col{Table: "excluded", Name: "box_col"}},
-			{Col: "path_col", E: core.Col{Table: "excluded", Name: "path_col"}},
-			{Col: "poly", E: core.Col{Table: "excluded", Name: "poly"}},
-			{Col: "circle_col", E: core.Col{Table: "excluded", Name: "circle_col"}},
-			{Col: "line_col", E: core.Col{Table: "excluded", Name: "line_col"}},
-			{Col: "tsv", E: core.Col{Table: "excluded", Name: "tsv"}},
-			{Col: "tsq", E: core.Col{Table: "excluded", Name: "tsq"}},
-			{Col: "xml_doc", E: core.Col{Table: "excluded", Name: "xml_doc"}},
-			{Col: "log_lsn", E: core.Col{Table: "excluded", Name: "log_lsn"}},
-			{Col: "last_xid", E: core.Col{Table: "excluded", Name: "last_xid"}},
-			{Col: "slot_tid", E: core.Col{Table: "excluded", Name: "slot_tid"}},
-			{Col: "cash", E: core.Col{Table: "excluded", Name: "cash"}},
-			{Col: "status", E: core.Col{Table: "excluded", Name: "status"}},
-			{Col: "addr", E: core.Col{Table: "excluded", Name: "addr"}},
-			{Col: "email_domain", E: core.Col{Table: "excluded", Name: "email_domain"}},
-			{Col: "positive", E: core.Col{Table: "excluded", Name: "positive"}},
-			{Col: "uuid_col", E: core.Col{Table: "excluded", Name: "uuid_col"}},
-			{Col: "login_ci", E: core.Col{Table: "excluded", Name: "login_ci"}},
-			{Col: "collate_col", E: core.Col{Table: "excluded", Name: "collate_col"}},
-			{Col: "deleted_at", E: core.Col{Table: "excluded", Name: "deleted_at"}},
-			{Col: "very_long_column_identifier_exactly_sixty_three_characters_in_l", E: core.Col{Table: "excluded", Name: "very_long_column_identifier_exactly_sixty_three_characters_in_l"}},
+		Sets: []pgb.SetClause{
+			{Col: "email", E: pgb.Col{Table: "excluded", Name: "email"}},
+			{Col: "name", E: pgb.Col{Table: "excluded", Name: "name"}},
+			{Col: "bio", E: pgb.Col{Table: "excluded", Name: "bio"}},
+			{Col: "age", E: pgb.Col{Table: "excluded", Name: "age"}},
+			{Col: "balance", E: pgb.Col{Table: "excluded", Name: "balance"}},
+			{Col: "rating", E: pgb.Col{Table: "excluded", Name: "rating"}},
+			{Col: "score", E: pgb.Col{Table: "excluded", Name: "score"}},
+			{Col: "is_active", E: pgb.Col{Table: "excluded", Name: "is_active"}},
+			{Col: "created_at", E: pgb.Col{Table: "excluded", Name: "created_at"}},
+			{Col: "updated_at", E: pgb.Col{Table: "excluded", Name: "updated_at"}},
+			{Col: "birth_date", E: pgb.Col{Table: "excluded", Name: "birth_date"}},
+			{Col: "last_seen", E: pgb.Col{Table: "excluded", Name: "last_seen"}},
+			{Col: "avatar", E: pgb.Col{Table: "excluded", Name: "avatar"}},
+			{Col: "metadata", E: pgb.Col{Table: "excluded", Name: "metadata"}},
+			{Col: "settings", E: pgb.Col{Table: "excluded", Name: "settings"}},
+			{Col: "homepage", E: pgb.Col{Table: "excluded", Name: "homepage"}},
+			{Col: "lan", E: pgb.Col{Table: "excluded", Name: "lan"}},
+			{Col: "mac", E: pgb.Col{Table: "excluded", Name: "mac"}},
+			{Col: "mac8", E: pgb.Col{Table: "excluded", Name: "mac8"}},
+			{Col: "bitfield", E: pgb.Col{Table: "excluded", Name: "bitfield"}},
+			{Col: "flags", E: pgb.Col{Table: "excluded", Name: "flags"}},
+			{Col: "tags", E: pgb.Col{Table: "excluded", Name: "tags"}},
+			{Col: "scores", E: pgb.Col{Table: "excluded", Name: "scores"}},
+			{Col: "grid", E: pgb.Col{Table: "excluded", Name: "grid"}},
+			{Col: "homesite", E: pgb.Col{Table: "excluded", Name: "homesite"}},
+			{Col: "seg", E: pgb.Col{Table: "excluded", Name: "seg"}},
+			{Col: "box_col", E: pgb.Col{Table: "excluded", Name: "box_col"}},
+			{Col: "path_col", E: pgb.Col{Table: "excluded", Name: "path_col"}},
+			{Col: "poly", E: pgb.Col{Table: "excluded", Name: "poly"}},
+			{Col: "circle_col", E: pgb.Col{Table: "excluded", Name: "circle_col"}},
+			{Col: "line_col", E: pgb.Col{Table: "excluded", Name: "line_col"}},
+			{Col: "tsv", E: pgb.Col{Table: "excluded", Name: "tsv"}},
+			{Col: "tsq", E: pgb.Col{Table: "excluded", Name: "tsq"}},
+			{Col: "xml_doc", E: pgb.Col{Table: "excluded", Name: "xml_doc"}},
+			{Col: "log_lsn", E: pgb.Col{Table: "excluded", Name: "log_lsn"}},
+			{Col: "last_xid", E: pgb.Col{Table: "excluded", Name: "last_xid"}},
+			{Col: "slot_tid", E: pgb.Col{Table: "excluded", Name: "slot_tid"}},
+			{Col: "cash", E: pgb.Col{Table: "excluded", Name: "cash"}},
+			{Col: "status", E: pgb.Col{Table: "excluded", Name: "status"}},
+			{Col: "addr", E: pgb.Col{Table: "excluded", Name: "addr"}},
+			{Col: "email_domain", E: pgb.Col{Table: "excluded", Name: "email_domain"}},
+			{Col: "positive", E: pgb.Col{Table: "excluded", Name: "positive"}},
+			{Col: "uuid_col", E: pgb.Col{Table: "excluded", Name: "uuid_col"}},
+			{Col: "login_ci", E: pgb.Col{Table: "excluded", Name: "login_ci"}},
+			{Col: "collate_col", E: pgb.Col{Table: "excluded", Name: "collate_col"}},
+			{Col: "deleted_at", E: pgb.Col{Table: "excluded", Name: "deleted_at"}},
+			{Col: "very_long_column_identifier_exactly_sixty_three_characters_in_l", E: pgb.Col{Table: "excluded", Name: "very_long_column_identifier_exactly_sixty_three_characters_in_l"}},
 		},
-	}).Returning(core.Col{Table: "users", Name: "id"}, core.Col{Table: "users", Name: "email"}, core.Col{Table: "users", Name: "password"}, core.Col{Table: "users", Name: "name"}, core.Col{Table: "users", Name: "bio"}, core.Col{Table: "users", Name: "age"}, core.Col{Table: "users", Name: "balance"}, core.Col{Table: "users", Name: "rating"}, core.Col{Table: "users", Name: "score"}, core.Col{Table: "users", Name: "is_active"}, core.Col{Table: "users", Name: "created_at"}, core.Col{Table: "users", Name: "updated_at"}, core.Col{Table: "users", Name: "birth_date"}, core.Col{Table: "users", Name: "last_seen"}, core.Col{Table: "users", Name: "avatar"}, core.Col{Table: "users", Name: "metadata"}, core.Col{Table: "users", Name: "settings"}, core.Col{Table: "users", Name: "homepage"}, core.Col{Table: "users", Name: "lan"}, core.Col{Table: "users", Name: "mac"}, core.Col{Table: "users", Name: "mac8"}, core.Col{Table: "users", Name: "bitfield"}, core.Col{Table: "users", Name: "flags"}, core.Col{Table: "users", Name: "tags"}, core.Col{Table: "users", Name: "scores"}, core.Col{Table: "users", Name: "grid"}, core.Col{Table: "users", Name: "homesite"}, core.Col{Table: "users", Name: "seg"}, core.Col{Table: "users", Name: "box_col"}, core.Col{Table: "users", Name: "path_col"}, core.Col{Table: "users", Name: "poly"}, core.Col{Table: "users", Name: "circle_col"}, core.Col{Table: "users", Name: "line_col"}, core.Col{Table: "users", Name: "tsv"}, core.Col{Table: "users", Name: "tsq"}, core.Col{Table: "users", Name: "xml_doc"}, core.Col{Table: "users", Name: "log_lsn"}, core.Col{Table: "users", Name: "last_xid"}, core.Col{Table: "users", Name: "slot_tid"}, core.Col{Table: "users", Name: "cash"}, core.Col{Table: "users", Name: "status"}, core.Col{Table: "users", Name: "addr"}, core.Col{Table: "users", Name: "email_domain"}, core.Col{Table: "users", Name: "positive"}, core.Col{Table: "users", Name: "uuid_col"}, core.Col{Table: "users", Name: "login_ci"}, core.Col{Table: "users", Name: "collate_col"}, core.Col{Table: "users", Name: "search_slug"}, core.Col{Table: "users", Name: "name_upper"}, core.Col{Table: "users", Name: "deleted_at"}, core.Col{Table: "users", Name: "very_long_column_identifier_exactly_sixty_three_characters_in_l"}).Run(ctx, exec)
+	}).Returning(pgb.Col{Table: "users", Name: "id"}, pgb.Col{Table: "users", Name: "email"}, pgb.Col{Table: "users", Name: "password"}, pgb.Col{Table: "users", Name: "name"}, pgb.Col{Table: "users", Name: "bio"}, pgb.Col{Table: "users", Name: "age"}, pgb.Col{Table: "users", Name: "balance"}, pgb.Col{Table: "users", Name: "rating"}, pgb.Col{Table: "users", Name: "score"}, pgb.Col{Table: "users", Name: "is_active"}, pgb.Col{Table: "users", Name: "created_at"}, pgb.Col{Table: "users", Name: "updated_at"}, pgb.Col{Table: "users", Name: "birth_date"}, pgb.Col{Table: "users", Name: "last_seen"}, pgb.Col{Table: "users", Name: "avatar"}, pgb.Col{Table: "users", Name: "metadata"}, pgb.Col{Table: "users", Name: "settings"}, pgb.Col{Table: "users", Name: "homepage"}, pgb.Col{Table: "users", Name: "lan"}, pgb.Col{Table: "users", Name: "mac"}, pgb.Col{Table: "users", Name: "mac8"}, pgb.Col{Table: "users", Name: "bitfield"}, pgb.Col{Table: "users", Name: "flags"}, pgb.Col{Table: "users", Name: "tags"}, pgb.Col{Table: "users", Name: "scores"}, pgb.Col{Table: "users", Name: "grid"}, pgb.Col{Table: "users", Name: "homesite"}, pgb.Col{Table: "users", Name: "seg"}, pgb.Col{Table: "users", Name: "box_col"}, pgb.Col{Table: "users", Name: "path_col"}, pgb.Col{Table: "users", Name: "poly"}, pgb.Col{Table: "users", Name: "circle_col"}, pgb.Col{Table: "users", Name: "line_col"}, pgb.Col{Table: "users", Name: "tsv"}, pgb.Col{Table: "users", Name: "tsq"}, pgb.Col{Table: "users", Name: "xml_doc"}, pgb.Col{Table: "users", Name: "log_lsn"}, pgb.Col{Table: "users", Name: "last_xid"}, pgb.Col{Table: "users", Name: "slot_tid"}, pgb.Col{Table: "users", Name: "cash"}, pgb.Col{Table: "users", Name: "status"}, pgb.Col{Table: "users", Name: "addr"}, pgb.Col{Table: "users", Name: "email_domain"}, pgb.Col{Table: "users", Name: "positive"}, pgb.Col{Table: "users", Name: "uuid_col"}, pgb.Col{Table: "users", Name: "login_ci"}, pgb.Col{Table: "users", Name: "collate_col"}, pgb.Col{Table: "users", Name: "search_slug"}, pgb.Col{Table: "users", Name: "name_upper"}, pgb.Col{Table: "users", Name: "deleted_at"}, pgb.Col{Table: "users", Name: "very_long_column_identifier_exactly_sixty_three_characters_in_l"}).Run(ctx, exec)
 	if err != nil {
 		return User{}, err
 	}
@@ -1618,22 +1619,22 @@ func UpsertUser(ctx context.Context, exec core.DBTX, id int64, p InsertUserParam
 		return User{}, err
 	}
 	if len(us) == 0 {
-		return User{}, core.ErrNotFound
+		return User{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // DeleteUser removes one row by id.
-func DeleteUser(ctx context.Context, exec core.DBTX, id int64) error {
+func DeleteUser(ctx context.Context, exec pgb.DBTX, id int64) error {
 	_, err := Users.Delete().Where(Users.ID().Eq(id)).Exec(ctx, exec)
 	return err
 }
 
 // DeleteUsers removes every row matching where and returns the
-// affected count; an empty where is refused with core.ErrNoWhere.
-func DeleteUsers(ctx context.Context, exec core.DBTX, where []core.Expr) (int64, error) {
+// affected count; an empty where is refused with pgb.ErrNoWhere.
+func DeleteUsers(ctx context.Context, exec pgb.DBTX, where []pgb.Expr) (int64, error) {
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	tag, err := Users.Delete().Where(where...).Exec(ctx, exec)
 	if err != nil {

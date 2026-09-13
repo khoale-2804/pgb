@@ -10,7 +10,7 @@ import (
 	"errors"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 )
 
 // TicketFilter narrows ListTickets and CountTickets:
@@ -46,13 +46,13 @@ type TicketFilter struct {
 	CreatedAtLt   *pgtype.Timestamptz
 	CreatedAtGte  *pgtype.Timestamptz
 	CreatedAtLte  *pgtype.Timestamptz
-	Extra         []core.Expr
+	Extra         []pgb.Expr
 }
 
 // ticketsFilterWhere compiles f into the ANDed predicate list; an empty
 // filter yields an empty list (no WHERE).
-func ticketsFilterWhere(f TicketFilter) []core.Expr {
-	var w []core.Expr
+func ticketsFilterWhere(f TicketFilter) []pgb.Expr {
+	var w []pgb.Expr
 	if f.ID != nil {
 		w = append(w, Tickets.ID().Eq(*f.ID))
 	}
@@ -178,15 +178,15 @@ func scanTicket(row pgx.CollectableRow) (Ticket, error) {
 	return m, nil
 }
 
-// GetTicket returns one row by id; core.ErrNotFound when absent
+// GetTicket returns one row by id; pgb.ErrNotFound when absent
 // (pgx.ErrNoRows mapped — errors.Is keeps working for both).
-func GetTicket(ctx context.Context, exec core.DBTX, id int64) (Ticket, error) {
+func GetTicket(ctx context.Context, exec pgb.DBTX, id int64) (Ticket, error) {
 	sql, args := Tickets.Select().Where(Tickets.ID().Eq(id)).SQL()
 	var m Ticket
 	err := exec.QueryRow(ctx, sql, args...).Scan(&m.ID, &m.Number, &m.Subject, &m.Priority, &m.Status, &m.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Ticket{}, core.ErrNotFound
+			return Ticket{}, pgb.ErrNotFound
 		}
 		return Ticket{}, err
 	}
@@ -194,8 +194,9 @@ func GetTicket(ctx context.Context, exec core.DBTX, id int64) (Ticket, error) {
 }
 
 // ListTickets returns the rows matching f; limit <= 0 means no LIMIT.
-func ListTickets(ctx context.Context, exec core.DBTX, f TicketFilter, limit int) ([]Ticket, error) {
-	rows, err := Tickets.Select().Where(ticketsFilterWhere(f)...).Limit(limit).Run(ctx, exec)
+func ListTickets(ctx context.Context, exec pgb.DBTX, f TicketFilter, opts ...pgb.ListOpt) ([]Ticket, error) {
+	sel := Tickets.Select().Where(ticketsFilterWhere(f)...).ApplyList(opts...)
+	rows, err := sel.Run(ctx, exec)
 	if err != nil {
 		return nil, err
 	}
@@ -203,8 +204,8 @@ func ListTickets(ctx context.Context, exec core.DBTX, f TicketFilter, limit int)
 }
 
 // CountTickets counts the rows matching f.
-func CountTickets(ctx context.Context, exec core.DBTX, f TicketFilter) (int64, error) {
-	sql, args := core.NewSelect("public.tickets", core.Raw{SQL: "count(*)"}).Where(ticketsFilterWhere(f)...).SQL()
+func CountTickets(ctx context.Context, exec pgb.DBTX, f TicketFilter) (int64, error) {
+	sql, args := pgb.NewSelect("public.tickets", pgb.Raw{SQL: "count(*)"}).Where(ticketsFilterWhere(f)...).SQL()
 	var n int64
 	if err := exec.QueryRow(ctx, sql, args...).Scan(&n); err != nil {
 		return 0, err
@@ -214,11 +215,11 @@ func CountTickets(ctx context.Context, exec core.DBTX, f TicketFilter) (int64, e
 
 // InsertTicket inserts one row and returns it (RETURNING every
 // column, defaults included).
-func InsertTicket(ctx context.Context, exec core.DBTX, p InsertTicketParams) (Ticket, error) {
-	rows, err := core.NewInsert("public.tickets",
+func InsertTicket(ctx context.Context, exec pgb.DBTX, p InsertTicketParams) (Ticket, error) {
+	rows, err := pgb.NewInsert("public.tickets",
 		[]string{"number", "subject", "priority", "status", "created_at"},
-		[]core.Expr{core.Lit{V: p.Number}, core.Lit{V: p.Subject}, core.Lit{V: p.Priority}, core.Lit{V: p.Status}, core.Lit{V: p.CreatedAt}},
-	).Returning(core.Col{Table: "tickets", Name: "id"}, core.Col{Table: "tickets", Name: "number"}, core.Col{Table: "tickets", Name: "subject"}, core.Col{Table: "tickets", Name: "priority"}, core.Col{Table: "tickets", Name: "status"}, core.Col{Table: "tickets", Name: "created_at"}).Run(ctx, exec)
+		[]pgb.Expr{pgb.Lit{V: p.Number}, pgb.Lit{V: p.Subject}, pgb.Lit{V: p.Priority}, pgb.Lit{V: p.Status}, pgb.Lit{V: p.CreatedAt}},
+	).Returning(pgb.Col{Table: "tickets", Name: "id"}, pgb.Col{Table: "tickets", Name: "number"}, pgb.Col{Table: "tickets", Name: "subject"}, pgb.Col{Table: "tickets", Name: "priority"}, pgb.Col{Table: "tickets", Name: "status"}, pgb.Col{Table: "tickets", Name: "created_at"}).Run(ctx, exec)
 	if err != nil {
 		return Ticket{}, err
 	}
@@ -227,7 +228,7 @@ func InsertTicket(ctx context.Context, exec core.DBTX, p InsertTicketParams) (Ti
 		return Ticket{}, err
 	}
 	if len(us) == 0 {
-		return Ticket{}, core.ErrNotFound
+		return Ticket{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
@@ -236,7 +237,7 @@ const insertTicketsSQL = "INSERT INTO public.tickets (number, subject, priority,
 
 // InsertTickets inserts a whole batch in one round trip via
 // unnest and returns every inserted row.
-func InsertTickets(ctx context.Context, exec core.DBTX, ps []InsertTicketParams) ([]Ticket, error) {
+func InsertTickets(ctx context.Context, exec pgb.DBTX, ps []InsertTicketParams) ([]Ticket, error) {
 	if len(ps) == 0 {
 		return nil, nil
 	}
@@ -262,54 +263,54 @@ func InsertTickets(ctx context.Context, exec core.DBTX, ps []InsertTicketParams)
 }
 
 // UpdateTicket applies the non-zero fields of s to one row and
-// returns the updated row; core.ErrNotFound when absent.
-func UpdateTicket(ctx context.Context, exec core.DBTX, id int64, s TicketSet) (Ticket, error) {
+// returns the updated row; pgb.ErrNotFound when absent.
+func UpdateTicket(ctx context.Context, exec pgb.DBTX, id int64, s TicketSet) (Ticket, error) {
 	u := Tickets.Update()
 	n := 0
 	if s.Number.Valid {
 		n++
 		if s.Number.Null {
-			u.Set("number", core.Lit{V: nil})
+			u.Set("number", pgb.Lit{V: nil})
 		} else {
-			u.Set("number", core.Lit{V: s.Number.V})
+			u.Set("number", pgb.Lit{V: s.Number.V})
 		}
 	}
 	if s.Subject.Valid {
 		n++
 		if s.Subject.Null {
-			u.Set("subject", core.Lit{V: nil})
+			u.Set("subject", pgb.Lit{V: nil})
 		} else {
-			u.Set("subject", core.Lit{V: s.Subject.V})
+			u.Set("subject", pgb.Lit{V: s.Subject.V})
 		}
 	}
 	if s.Priority.Valid {
 		n++
 		if s.Priority.Null {
-			u.Set("priority", core.Lit{V: nil})
+			u.Set("priority", pgb.Lit{V: nil})
 		} else {
-			u.Set("priority", core.Lit{V: s.Priority.V})
+			u.Set("priority", pgb.Lit{V: s.Priority.V})
 		}
 	}
 	if s.Status.Valid {
 		n++
 		if s.Status.Null {
-			u.Set("status", core.Lit{V: nil})
+			u.Set("status", pgb.Lit{V: nil})
 		} else {
-			u.Set("status", core.Lit{V: s.Status.V})
+			u.Set("status", pgb.Lit{V: s.Status.V})
 		}
 	}
 	if s.CreatedAt.Valid {
 		n++
 		if s.CreatedAt.Null {
-			u.Set("created_at", core.Lit{V: nil})
+			u.Set("created_at", pgb.Lit{V: nil})
 		} else {
-			u.Set("created_at", core.Lit{V: s.CreatedAt.V})
+			u.Set("created_at", pgb.Lit{V: s.CreatedAt.V})
 		}
 	}
 	if n == 0 {
 		return GetTicket(ctx, exec, id)
 	}
-	u.Where(Tickets.ID().Eq(id)).Returning(core.Col{Table: "tickets", Name: "id"}, core.Col{Table: "tickets", Name: "number"}, core.Col{Table: "tickets", Name: "subject"}, core.Col{Table: "tickets", Name: "priority"}, core.Col{Table: "tickets", Name: "status"}, core.Col{Table: "tickets", Name: "created_at"})
+	u.Where(Tickets.ID().Eq(id)).Returning(pgb.Col{Table: "tickets", Name: "id"}, pgb.Col{Table: "tickets", Name: "number"}, pgb.Col{Table: "tickets", Name: "subject"}, pgb.Col{Table: "tickets", Name: "priority"}, pgb.Col{Table: "tickets", Name: "status"}, pgb.Col{Table: "tickets", Name: "created_at"})
 	rows, err := u.Run(ctx, exec)
 	if err != nil {
 		return Ticket{}, err
@@ -319,62 +320,62 @@ func UpdateTicket(ctx context.Context, exec core.DBTX, id int64, s TicketSet) (T
 		return Ticket{}, err
 	}
 	if len(us) == 0 {
-		return Ticket{}, core.ErrNotFound
+		return Ticket{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // UpdateTickets applies s to every row matching where and
 // returns the affected count; an empty where is refused with
-// core.ErrNoWhere before any SQL is sent.
-func UpdateTickets(ctx context.Context, exec core.DBTX, where []core.Expr, s TicketSet) (int64, error) {
+// pgb.ErrNoWhere before any SQL is sent.
+func UpdateTickets(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, s TicketSet) (int64, error) {
 	u := Tickets.Update()
 	n := 0
 	if s.Number.Valid {
 		n++
 		if s.Number.Null {
-			u.Set("number", core.Lit{V: nil})
+			u.Set("number", pgb.Lit{V: nil})
 		} else {
-			u.Set("number", core.Lit{V: s.Number.V})
+			u.Set("number", pgb.Lit{V: s.Number.V})
 		}
 	}
 	if s.Subject.Valid {
 		n++
 		if s.Subject.Null {
-			u.Set("subject", core.Lit{V: nil})
+			u.Set("subject", pgb.Lit{V: nil})
 		} else {
-			u.Set("subject", core.Lit{V: s.Subject.V})
+			u.Set("subject", pgb.Lit{V: s.Subject.V})
 		}
 	}
 	if s.Priority.Valid {
 		n++
 		if s.Priority.Null {
-			u.Set("priority", core.Lit{V: nil})
+			u.Set("priority", pgb.Lit{V: nil})
 		} else {
-			u.Set("priority", core.Lit{V: s.Priority.V})
+			u.Set("priority", pgb.Lit{V: s.Priority.V})
 		}
 	}
 	if s.Status.Valid {
 		n++
 		if s.Status.Null {
-			u.Set("status", core.Lit{V: nil})
+			u.Set("status", pgb.Lit{V: nil})
 		} else {
-			u.Set("status", core.Lit{V: s.Status.V})
+			u.Set("status", pgb.Lit{V: s.Status.V})
 		}
 	}
 	if s.CreatedAt.Valid {
 		n++
 		if s.CreatedAt.Null {
-			u.Set("created_at", core.Lit{V: nil})
+			u.Set("created_at", pgb.Lit{V: nil})
 		} else {
-			u.Set("created_at", core.Lit{V: s.CreatedAt.V})
+			u.Set("created_at", pgb.Lit{V: s.CreatedAt.V})
 		}
 	}
 	if n == 0 {
 		return 0, nil
 	}
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	u.Where(where...)
 	tag, err := u.Exec(ctx, exec)
@@ -386,21 +387,21 @@ func UpdateTickets(ctx context.Context, exec core.DBTX, where []core.Expr, s Tic
 
 // UpsertTicket inserts p under id, or on conflict updates
 // every settable column from the proposed row (EXCLUDED.*) and returns
-// the resulting row; core.ErrNotFound when DO NOTHING matched.
-func UpsertTicket(ctx context.Context, exec core.DBTX, id int64, p InsertTicketParams) (Ticket, error) {
-	rows, err := core.NewInsert("public.tickets",
+// the resulting row; pgb.ErrNotFound when DO NOTHING matched.
+func UpsertTicket(ctx context.Context, exec pgb.DBTX, id int64, p InsertTicketParams) (Ticket, error) {
+	rows, err := pgb.NewInsert("public.tickets",
 		[]string{"id", "number", "subject", "priority", "status", "created_at"},
-		[]core.Expr{core.Lit{V: id}, core.Lit{V: p.Number}, core.Lit{V: p.Subject}, core.Lit{V: p.Priority}, core.Lit{V: p.Status}, core.Lit{V: p.CreatedAt}},
-	).OnConflict(core.OnConflict{
+		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.Number}, pgb.Lit{V: p.Subject}, pgb.Lit{V: p.Priority}, pgb.Lit{V: p.Status}, pgb.Lit{V: p.CreatedAt}},
+	).OnConflict(pgb.OnConflict{
 		Target: []string{"id"},
-		Sets: []core.SetClause{
-			{Col: "number", E: core.Col{Table: "excluded", Name: "number"}},
-			{Col: "subject", E: core.Col{Table: "excluded", Name: "subject"}},
-			{Col: "priority", E: core.Col{Table: "excluded", Name: "priority"}},
-			{Col: "status", E: core.Col{Table: "excluded", Name: "status"}},
-			{Col: "created_at", E: core.Col{Table: "excluded", Name: "created_at"}},
+		Sets: []pgb.SetClause{
+			{Col: "number", E: pgb.Col{Table: "excluded", Name: "number"}},
+			{Col: "subject", E: pgb.Col{Table: "excluded", Name: "subject"}},
+			{Col: "priority", E: pgb.Col{Table: "excluded", Name: "priority"}},
+			{Col: "status", E: pgb.Col{Table: "excluded", Name: "status"}},
+			{Col: "created_at", E: pgb.Col{Table: "excluded", Name: "created_at"}},
 		},
-	}).Returning(core.Col{Table: "tickets", Name: "id"}, core.Col{Table: "tickets", Name: "number"}, core.Col{Table: "tickets", Name: "subject"}, core.Col{Table: "tickets", Name: "priority"}, core.Col{Table: "tickets", Name: "status"}, core.Col{Table: "tickets", Name: "created_at"}).Run(ctx, exec)
+	}).Returning(pgb.Col{Table: "tickets", Name: "id"}, pgb.Col{Table: "tickets", Name: "number"}, pgb.Col{Table: "tickets", Name: "subject"}, pgb.Col{Table: "tickets", Name: "priority"}, pgb.Col{Table: "tickets", Name: "status"}, pgb.Col{Table: "tickets", Name: "created_at"}).Run(ctx, exec)
 	if err != nil {
 		return Ticket{}, err
 	}
@@ -409,22 +410,22 @@ func UpsertTicket(ctx context.Context, exec core.DBTX, id int64, p InsertTicketP
 		return Ticket{}, err
 	}
 	if len(us) == 0 {
-		return Ticket{}, core.ErrNotFound
+		return Ticket{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // DeleteTicket removes one row by id.
-func DeleteTicket(ctx context.Context, exec core.DBTX, id int64) error {
+func DeleteTicket(ctx context.Context, exec pgb.DBTX, id int64) error {
 	_, err := Tickets.Delete().Where(Tickets.ID().Eq(id)).Exec(ctx, exec)
 	return err
 }
 
 // DeleteTickets removes every row matching where and returns the
-// affected count; an empty where is refused with core.ErrNoWhere.
-func DeleteTickets(ctx context.Context, exec core.DBTX, where []core.Expr) (int64, error) {
+// affected count; an empty where is refused with pgb.ErrNoWhere.
+func DeleteTickets(ctx context.Context, exec pgb.DBTX, where []pgb.Expr) (int64, error) {
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	tag, err := Tickets.Delete().Where(where...).Exec(ctx, exec)
 	if err != nil {

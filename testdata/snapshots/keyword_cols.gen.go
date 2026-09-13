@@ -7,478 +7,478 @@ package db
 
 import (
 	"github.com/jackc/pgx/v5/pgtype"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 )
 
 // KeywordCols is the table descriptor for public.keyword_cols; immutable, safe for
 // concurrent use.
-var KeywordCols = KeywordColTable{core.NewTableMeta("public", "keyword_cols")}
+var KeywordCols = KeywordColTable{pgb.NewTableMeta("public", "keyword_cols")}
 
 // KeywordColTable provides typed column accessors and statement entry points.
-type KeywordColTable struct{ core.TableMeta }
+type KeywordColTable struct{ pgb.TableMeta }
 
 // ID returns the typed accessor for column id.
 func (t KeywordColTable) ID() KeywordColIDCol {
-	return KeywordColIDCol{core.Col{Table: "keyword_cols", Name: "id"}}
+	return KeywordColIDCol{pgb.Col{Table: "keyword_cols", Name: "id"}}
 }
 
 // KeywordColIDCol is the typed column keyword_cols.id.
-type KeywordColIDCol struct{ core.Col }
+type KeywordColIDCol struct{ pgb.Col }
 
-func (c KeywordColIDCol) Eq(v int64) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c KeywordColIDCol) Eq(v int64) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c KeywordColIDCol) Ne(v int64) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c KeywordColIDCol) Ne(v int64) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c KeywordColIDCol) In(vs ...int64) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "bigserial[]"}}
+func (c KeywordColIDCol) In(vs ...int64) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "bigserial[]"}}
 }
 
-func (c KeywordColIDCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c KeywordColIDCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c KeywordColIDCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c KeywordColIDCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c KeywordColIDCol) Gt(v int64) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c KeywordColIDCol) Gt(v int64) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c KeywordColIDCol) Lt(v int64) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c KeywordColIDCol) Lt(v int64) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c KeywordColIDCol) Gte(v int64) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c KeywordColIDCol) Gte(v int64) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c KeywordColIDCol) Lte(v int64) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c KeywordColIDCol) Lte(v int64) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c KeywordColIDCol) Between(a, b int64) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c KeywordColIDCol) Between(a, b int64) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // Type returns the typed accessor for column type.
 func (t KeywordColTable) Type() KeywordColTypeCol {
-	return KeywordColTypeCol{core.Col{Table: "keyword_cols", Name: "type"}}
+	return KeywordColTypeCol{pgb.Col{Table: "keyword_cols", Name: "type"}}
 }
 
 // KeywordColTypeCol is the typed column keyword_cols.type.
-type KeywordColTypeCol struct{ core.Col }
+type KeywordColTypeCol struct{ pgb.Col }
 
-func (c KeywordColTypeCol) Eq(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c KeywordColTypeCol) Eq(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c KeywordColTypeCol) Ne(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c KeywordColTypeCol) Ne(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c KeywordColTypeCol) In(vs ...pgtype.Text) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c KeywordColTypeCol) In(vs ...pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c KeywordColTypeCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c KeywordColTypeCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c KeywordColTypeCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c KeywordColTypeCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c KeywordColTypeCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColTypeCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c KeywordColTypeCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColTypeCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c KeywordColTypeCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColTypeCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c KeywordColTypeCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColTypeCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // Range returns the typed accessor for column range.
 func (t KeywordColTable) Range() KeywordColRangeCol {
-	return KeywordColRangeCol{core.Col{Table: "keyword_cols", Name: "range"}}
+	return KeywordColRangeCol{pgb.Col{Table: "keyword_cols", Name: "range"}}
 }
 
 // KeywordColRangeCol is the typed column keyword_cols.range.
-type KeywordColRangeCol struct{ core.Col }
+type KeywordColRangeCol struct{ pgb.Col }
 
-func (c KeywordColRangeCol) Eq(v pgtype.Int4) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c KeywordColRangeCol) Eq(v pgtype.Int4) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c KeywordColRangeCol) Ne(v pgtype.Int4) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c KeywordColRangeCol) Ne(v pgtype.Int4) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c KeywordColRangeCol) In(vs ...pgtype.Int4) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "int4[]"}}
+func (c KeywordColRangeCol) In(vs ...pgtype.Int4) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int4[]"}}
 }
 
-func (c KeywordColRangeCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c KeywordColRangeCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c KeywordColRangeCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c KeywordColRangeCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c KeywordColRangeCol) Gt(v pgtype.Int4) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c KeywordColRangeCol) Gt(v pgtype.Int4) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c KeywordColRangeCol) Lt(v pgtype.Int4) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c KeywordColRangeCol) Lt(v pgtype.Int4) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c KeywordColRangeCol) Gte(v pgtype.Int4) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c KeywordColRangeCol) Gte(v pgtype.Int4) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c KeywordColRangeCol) Lte(v pgtype.Int4) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c KeywordColRangeCol) Lte(v pgtype.Int4) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c KeywordColRangeCol) Between(a, b pgtype.Int4) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c KeywordColRangeCol) Between(a, b pgtype.Int4) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // SelectCol returns the typed accessor for column select.
 func (t KeywordColTable) SelectCol() KeywordColSelectCol {
-	return KeywordColSelectCol{core.Col{Table: "keyword_cols", Name: "select"}}
+	return KeywordColSelectCol{pgb.Col{Table: "keyword_cols", Name: "select"}}
 }
 
 // KeywordColSelectCol is the typed column keyword_cols.select.
-type KeywordColSelectCol struct{ core.Col }
+type KeywordColSelectCol struct{ pgb.Col }
 
-func (c KeywordColSelectCol) Eq(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c KeywordColSelectCol) Eq(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c KeywordColSelectCol) Ne(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c KeywordColSelectCol) Ne(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c KeywordColSelectCol) In(vs ...pgtype.Text) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c KeywordColSelectCol) In(vs ...pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c KeywordColSelectCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c KeywordColSelectCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c KeywordColSelectCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c KeywordColSelectCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c KeywordColSelectCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColSelectCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c KeywordColSelectCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColSelectCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c KeywordColSelectCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColSelectCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c KeywordColSelectCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColSelectCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // Class returns the typed accessor for column class.
 func (t KeywordColTable) Class() KeywordColClassCol {
-	return KeywordColClassCol{core.Col{Table: "keyword_cols", Name: "class"}}
+	return KeywordColClassCol{pgb.Col{Table: "keyword_cols", Name: "class"}}
 }
 
 // KeywordColClassCol is the typed column keyword_cols.class.
-type KeywordColClassCol struct{ core.Col }
+type KeywordColClassCol struct{ pgb.Col }
 
-func (c KeywordColClassCol) Eq(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c KeywordColClassCol) Eq(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c KeywordColClassCol) Ne(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c KeywordColClassCol) Ne(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c KeywordColClassCol) In(vs ...pgtype.Text) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c KeywordColClassCol) In(vs ...pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c KeywordColClassCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c KeywordColClassCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c KeywordColClassCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c KeywordColClassCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c KeywordColClassCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColClassCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c KeywordColClassCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColClassCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c KeywordColClassCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColClassCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c KeywordColClassCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColClassCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // Interface returns the typed accessor for column interface.
 func (t KeywordColTable) Interface() KeywordColInterfaceCol {
-	return KeywordColInterfaceCol{core.Col{Table: "keyword_cols", Name: "interface"}}
+	return KeywordColInterfaceCol{pgb.Col{Table: "keyword_cols", Name: "interface"}}
 }
 
 // KeywordColInterfaceCol is the typed column keyword_cols.interface.
-type KeywordColInterfaceCol struct{ core.Col }
+type KeywordColInterfaceCol struct{ pgb.Col }
 
-func (c KeywordColInterfaceCol) Eq(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c KeywordColInterfaceCol) Eq(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c KeywordColInterfaceCol) Ne(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c KeywordColInterfaceCol) Ne(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c KeywordColInterfaceCol) In(vs ...pgtype.Text) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c KeywordColInterfaceCol) In(vs ...pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c KeywordColInterfaceCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c KeywordColInterfaceCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c KeywordColInterfaceCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c KeywordColInterfaceCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c KeywordColInterfaceCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColInterfaceCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c KeywordColInterfaceCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColInterfaceCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c KeywordColInterfaceCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColInterfaceCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c KeywordColInterfaceCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColInterfaceCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // Map returns the typed accessor for column map.
 func (t KeywordColTable) Map() KeywordColMapCol {
-	return KeywordColMapCol{core.Col{Table: "keyword_cols", Name: "map"}}
+	return KeywordColMapCol{pgb.Col{Table: "keyword_cols", Name: "map"}}
 }
 
 // KeywordColMapCol is the typed column keyword_cols.map.
-type KeywordColMapCol struct{ core.Col }
+type KeywordColMapCol struct{ pgb.Col }
 
-func (c KeywordColMapCol) Eq(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c KeywordColMapCol) Eq(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c KeywordColMapCol) Ne(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c KeywordColMapCol) Ne(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c KeywordColMapCol) In(vs ...pgtype.Text) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c KeywordColMapCol) In(vs ...pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c KeywordColMapCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c KeywordColMapCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c KeywordColMapCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c KeywordColMapCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c KeywordColMapCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColMapCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c KeywordColMapCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColMapCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c KeywordColMapCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColMapCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c KeywordColMapCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColMapCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // Func returns the typed accessor for column func.
 func (t KeywordColTable) Func() KeywordColFuncCol {
-	return KeywordColFuncCol{core.Col{Table: "keyword_cols", Name: "func"}}
+	return KeywordColFuncCol{pgb.Col{Table: "keyword_cols", Name: "func"}}
 }
 
 // KeywordColFuncCol is the typed column keyword_cols.func.
-type KeywordColFuncCol struct{ core.Col }
+type KeywordColFuncCol struct{ pgb.Col }
 
-func (c KeywordColFuncCol) Eq(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c KeywordColFuncCol) Eq(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c KeywordColFuncCol) Ne(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c KeywordColFuncCol) Ne(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c KeywordColFuncCol) In(vs ...pgtype.Text) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c KeywordColFuncCol) In(vs ...pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c KeywordColFuncCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c KeywordColFuncCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c KeywordColFuncCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c KeywordColFuncCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c KeywordColFuncCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColFuncCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c KeywordColFuncCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColFuncCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c KeywordColFuncCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColFuncCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c KeywordColFuncCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColFuncCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // Return returns the typed accessor for column return.
 func (t KeywordColTable) Return() KeywordColReturnCol {
-	return KeywordColReturnCol{core.Col{Table: "keyword_cols", Name: "return"}}
+	return KeywordColReturnCol{pgb.Col{Table: "keyword_cols", Name: "return"}}
 }
 
 // KeywordColReturnCol is the typed column keyword_cols.return.
-type KeywordColReturnCol struct{ core.Col }
+type KeywordColReturnCol struct{ pgb.Col }
 
-func (c KeywordColReturnCol) Eq(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c KeywordColReturnCol) Eq(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c KeywordColReturnCol) Ne(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c KeywordColReturnCol) Ne(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c KeywordColReturnCol) In(vs ...pgtype.Text) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c KeywordColReturnCol) In(vs ...pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c KeywordColReturnCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c KeywordColReturnCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c KeywordColReturnCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c KeywordColReturnCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c KeywordColReturnCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColReturnCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c KeywordColReturnCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColReturnCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c KeywordColReturnCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColReturnCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c KeywordColReturnCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColReturnCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // Chan returns the typed accessor for column chan.
 func (t KeywordColTable) Chan() KeywordColChanCol {
-	return KeywordColChanCol{core.Col{Table: "keyword_cols", Name: "chan"}}
+	return KeywordColChanCol{pgb.Col{Table: "keyword_cols", Name: "chan"}}
 }
 
 // KeywordColChanCol is the typed column keyword_cols.chan.
-type KeywordColChanCol struct{ core.Col }
+type KeywordColChanCol struct{ pgb.Col }
 
-func (c KeywordColChanCol) Eq(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c KeywordColChanCol) Eq(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c KeywordColChanCol) Ne(v pgtype.Text) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c KeywordColChanCol) Ne(v pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c KeywordColChanCol) In(vs ...pgtype.Text) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c KeywordColChanCol) In(vs ...pgtype.Text) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c KeywordColChanCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c KeywordColChanCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c KeywordColChanCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c KeywordColChanCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c KeywordColChanCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColChanCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c KeywordColChanCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColChanCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c KeywordColChanCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColChanCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c KeywordColChanCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c KeywordColChanCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // Select starts a SELECT of every column; chain Where/OrderBy/Limit/...
 // and terminate with Run (or a static function).
-func (t KeywordColTable) Select() *core.Select {
-	return core.NewSelect("public.keyword_cols", core.Col{Table: "keyword_cols", Name: "id"}, core.Col{Table: "keyword_cols", Name: "type"}, core.Col{Table: "keyword_cols", Name: "range"}, core.Col{Table: "keyword_cols", Name: "select"}, core.Col{Table: "keyword_cols", Name: "class"}, core.Col{Table: "keyword_cols", Name: "interface"}, core.Col{Table: "keyword_cols", Name: "map"}, core.Col{Table: "keyword_cols", Name: "func"}, core.Col{Table: "keyword_cols", Name: "return"}, core.Col{Table: "keyword_cols", Name: "chan"})
+func (t KeywordColTable) Select() *pgb.Select {
+	return pgb.NewSelect("public.keyword_cols", pgb.Col{Table: "keyword_cols", Name: "id"}, pgb.Col{Table: "keyword_cols", Name: "type"}, pgb.Col{Table: "keyword_cols", Name: "range"}, pgb.Col{Table: "keyword_cols", Name: "select"}, pgb.Col{Table: "keyword_cols", Name: "class"}, pgb.Col{Table: "keyword_cols", Name: "interface"}, pgb.Col{Table: "keyword_cols", Name: "map"}, pgb.Col{Table: "keyword_cols", Name: "func"}, pgb.Col{Table: "keyword_cols", Name: "return"}, pgb.Col{Table: "keyword_cols", Name: "chan"})
 }
 
-// Update starts an UPDATE; an empty WHERE fails with core.ErrNoWhere.
-func (t KeywordColTable) Update() *core.Update { return core.NewUpdate("public.keyword_cols") }
+// Update starts an UPDATE; an empty WHERE fails with pgb.ErrNoWhere.
+func (t KeywordColTable) Update() *pgb.Update { return pgb.NewUpdate("public.keyword_cols") }
 
-// Delete starts a DELETE; an empty WHERE fails with core.ErrNoWhere.
-func (t KeywordColTable) Delete() *core.Delete { return core.NewDelete("public.keyword_cols") }
+// Delete starts a DELETE; an empty WHERE fails with pgb.ErrNoWhere.
+func (t KeywordColTable) Delete() *pgb.Delete { return pgb.NewDelete("public.keyword_cols") }

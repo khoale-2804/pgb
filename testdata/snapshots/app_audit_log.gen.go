@@ -7,249 +7,249 @@ package db
 
 import (
 	"github.com/jackc/pgx/v5/pgtype"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 )
 
 // AppAuditLogs is the table descriptor for app.audit_log; immutable, safe for
 // concurrent use.
-var AppAuditLogs = AppAuditLogTable{core.NewTableMeta("app", "audit_log")}
+var AppAuditLogs = AppAuditLogTable{pgb.NewTableMeta("app", "audit_log")}
 
 // AppAuditLogTable provides typed column accessors and statement entry points.
-type AppAuditLogTable struct{ core.TableMeta }
+type AppAuditLogTable struct{ pgb.TableMeta }
 
 // ID returns the typed accessor for column id.
 func (t AppAuditLogTable) ID() AppAuditLogIDCol {
-	return AppAuditLogIDCol{core.Col{Table: "audit_log", Name: "id"}}
+	return AppAuditLogIDCol{pgb.Col{Table: "audit_log", Name: "id"}}
 }
 
 // AppAuditLogIDCol is the typed column audit_log.id.
-type AppAuditLogIDCol struct{ core.Col }
+type AppAuditLogIDCol struct{ pgb.Col }
 
-func (c AppAuditLogIDCol) Eq(v int64) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c AppAuditLogIDCol) Eq(v int64) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c AppAuditLogIDCol) Ne(v int64) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c AppAuditLogIDCol) Ne(v int64) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c AppAuditLogIDCol) In(vs ...int64) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "bigserial[]"}}
+func (c AppAuditLogIDCol) In(vs ...int64) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "bigserial[]"}}
 }
 
-func (c AppAuditLogIDCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c AppAuditLogIDCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c AppAuditLogIDCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c AppAuditLogIDCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c AppAuditLogIDCol) Gt(v int64) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c AppAuditLogIDCol) Gt(v int64) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c AppAuditLogIDCol) Lt(v int64) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c AppAuditLogIDCol) Lt(v int64) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c AppAuditLogIDCol) Gte(v int64) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c AppAuditLogIDCol) Gte(v int64) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c AppAuditLogIDCol) Lte(v int64) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c AppAuditLogIDCol) Lte(v int64) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c AppAuditLogIDCol) Between(a, b int64) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c AppAuditLogIDCol) Between(a, b int64) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // Entity returns the typed accessor for column entity.
 func (t AppAuditLogTable) Entity() AppAuditLogEntityCol {
-	return AppAuditLogEntityCol{core.Col{Table: "audit_log", Name: "entity"}}
+	return AppAuditLogEntityCol{pgb.Col{Table: "audit_log", Name: "entity"}}
 }
 
 // AppAuditLogEntityCol is the typed column audit_log.entity.
-type AppAuditLogEntityCol struct{ core.Col }
+type AppAuditLogEntityCol struct{ pgb.Col }
 
-func (c AppAuditLogEntityCol) Eq(v string) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c AppAuditLogEntityCol) Eq(v string) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c AppAuditLogEntityCol) Ne(v string) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c AppAuditLogEntityCol) Ne(v string) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c AppAuditLogEntityCol) In(vs ...string) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c AppAuditLogEntityCol) In(vs ...string) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c AppAuditLogEntityCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c AppAuditLogEntityCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c AppAuditLogEntityCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c AppAuditLogEntityCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c AppAuditLogEntityCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c AppAuditLogEntityCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c AppAuditLogEntityCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c AppAuditLogEntityCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c AppAuditLogEntityCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c AppAuditLogEntityCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c AppAuditLogEntityCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c AppAuditLogEntityCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // EntityID returns the typed accessor for column entity_id.
 func (t AppAuditLogTable) EntityID() AppAuditLogEntityIDCol {
-	return AppAuditLogEntityIDCol{core.Col{Table: "audit_log", Name: "entity_id"}}
+	return AppAuditLogEntityIDCol{pgb.Col{Table: "audit_log", Name: "entity_id"}}
 }
 
 // AppAuditLogEntityIDCol is the typed column audit_log.entity_id.
-type AppAuditLogEntityIDCol struct{ core.Col }
+type AppAuditLogEntityIDCol struct{ pgb.Col }
 
-func (c AppAuditLogEntityIDCol) Eq(v int64) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c AppAuditLogEntityIDCol) Eq(v int64) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c AppAuditLogEntityIDCol) Ne(v int64) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c AppAuditLogEntityIDCol) Ne(v int64) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c AppAuditLogEntityIDCol) In(vs ...int64) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "int8[]"}}
+func (c AppAuditLogEntityIDCol) In(vs ...int64) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int8[]"}}
 }
 
-func (c AppAuditLogEntityIDCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c AppAuditLogEntityIDCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c AppAuditLogEntityIDCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c AppAuditLogEntityIDCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c AppAuditLogEntityIDCol) Gt(v int64) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c AppAuditLogEntityIDCol) Gt(v int64) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c AppAuditLogEntityIDCol) Lt(v int64) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c AppAuditLogEntityIDCol) Lt(v int64) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c AppAuditLogEntityIDCol) Gte(v int64) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c AppAuditLogEntityIDCol) Gte(v int64) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c AppAuditLogEntityIDCol) Lte(v int64) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c AppAuditLogEntityIDCol) Lte(v int64) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c AppAuditLogEntityIDCol) Between(a, b int64) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c AppAuditLogEntityIDCol) Between(a, b int64) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // Payload returns the typed accessor for column payload.
 func (t AppAuditLogTable) Payload() AppAuditLogPayloadCol {
-	return AppAuditLogPayloadCol{core.Col{Table: "audit_log", Name: "payload"}}
+	return AppAuditLogPayloadCol{pgb.Col{Table: "audit_log", Name: "payload"}}
 }
 
 // AppAuditLogPayloadCol is the typed column audit_log.payload.
-type AppAuditLogPayloadCol struct{ core.Col }
+type AppAuditLogPayloadCol struct{ pgb.Col }
 
-func (c AppAuditLogPayloadCol) Eq(v []byte) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v, Cast: "jsonb"}}
+func (c AppAuditLogPayloadCol) Eq(v []byte) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v, Cast: "jsonb"}}
 }
 
-func (c AppAuditLogPayloadCol) Ne(v []byte) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v, Cast: "jsonb"}}
+func (c AppAuditLogPayloadCol) Ne(v []byte) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v, Cast: "jsonb"}}
 }
 
-func (c AppAuditLogPayloadCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c AppAuditLogPayloadCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c AppAuditLogPayloadCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c AppAuditLogPayloadCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c AppAuditLogPayloadCol) KeyEq(path string, v any) core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " ->> ?", Args: []any{path, v}}
+func (c AppAuditLogPayloadCol) KeyEq(path string, v any) pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " ->> ?", Args: []any{path, v}}
 }
 
 // At returns the typed accessor for column at.
 func (t AppAuditLogTable) At() AppAuditLogAtCol {
-	return AppAuditLogAtCol{core.Col{Table: "audit_log", Name: "at"}}
+	return AppAuditLogAtCol{pgb.Col{Table: "audit_log", Name: "at"}}
 }
 
 // AppAuditLogAtCol is the typed column audit_log.at.
-type AppAuditLogAtCol struct{ core.Col }
+type AppAuditLogAtCol struct{ pgb.Col }
 
-func (c AppAuditLogAtCol) Eq(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c AppAuditLogAtCol) Eq(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c AppAuditLogAtCol) Ne(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c AppAuditLogAtCol) Ne(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c AppAuditLogAtCol) In(vs ...pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "timestamptz[]"}}
+func (c AppAuditLogAtCol) In(vs ...pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "timestamptz[]"}}
 }
 
-func (c AppAuditLogAtCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c AppAuditLogAtCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c AppAuditLogAtCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c AppAuditLogAtCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c AppAuditLogAtCol) Gt(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c AppAuditLogAtCol) Gt(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c AppAuditLogAtCol) Lt(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c AppAuditLogAtCol) Lt(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c AppAuditLogAtCol) Gte(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c AppAuditLogAtCol) Gte(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c AppAuditLogAtCol) Lte(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c AppAuditLogAtCol) Lte(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c AppAuditLogAtCol) Between(a, b pgtype.Timestamptz) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c AppAuditLogAtCol) Between(a, b pgtype.Timestamptz) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // Select starts a SELECT of every column; chain Where/OrderBy/Limit/...
 // and terminate with Run (or a static function).
-func (t AppAuditLogTable) Select() *core.Select {
-	return core.NewSelect("app.audit_log", core.Col{Table: "audit_log", Name: "id"}, core.Col{Table: "audit_log", Name: "entity"}, core.Col{Table: "audit_log", Name: "entity_id"}, core.Col{Table: "audit_log", Name: "payload"}, core.Col{Table: "audit_log", Name: "at"})
+func (t AppAuditLogTable) Select() *pgb.Select {
+	return pgb.NewSelect("app.audit_log", pgb.Col{Table: "audit_log", Name: "id"}, pgb.Col{Table: "audit_log", Name: "entity"}, pgb.Col{Table: "audit_log", Name: "entity_id"}, pgb.Col{Table: "audit_log", Name: "payload"}, pgb.Col{Table: "audit_log", Name: "at"})
 }
 
-// Update starts an UPDATE; an empty WHERE fails with core.ErrNoWhere.
-func (t AppAuditLogTable) Update() *core.Update { return core.NewUpdate("app.audit_log") }
+// Update starts an UPDATE; an empty WHERE fails with pgb.ErrNoWhere.
+func (t AppAuditLogTable) Update() *pgb.Update { return pgb.NewUpdate("app.audit_log") }
 
-// Delete starts a DELETE; an empty WHERE fails with core.ErrNoWhere.
-func (t AppAuditLogTable) Delete() *core.Delete { return core.NewDelete("app.audit_log") }
+// Delete starts a DELETE; an empty WHERE fails with pgb.ErrNoWhere.
+func (t AppAuditLogTable) Delete() *pgb.Delete { return pgb.NewDelete("app.audit_log") }

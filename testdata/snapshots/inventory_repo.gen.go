@@ -10,7 +10,7 @@ import (
 	"errors"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 )
 
 // InventoryFilter narrows ListInventorys and CountInventorys:
@@ -34,13 +34,13 @@ type InventoryFilter struct {
 	UpdatedAtLt  *pgtype.Timestamptz
 	UpdatedAtGte *pgtype.Timestamptz
 	UpdatedAtLte *pgtype.Timestamptz
-	Extra        []core.Expr
+	Extra        []pgb.Expr
 }
 
 // inventorysFilterWhere compiles f into the ANDed predicate list; an empty
 // filter yields an empty list (no WHERE).
-func inventorysFilterWhere(f InventoryFilter) []core.Expr {
-	var w []core.Expr
+func inventorysFilterWhere(f InventoryFilter) []pgb.Expr {
+	var w []pgb.Expr
 	if f.ItemID != nil {
 		w = append(w, Inventorys.ItemID().Eq(*f.ItemID))
 	}
@@ -125,15 +125,15 @@ func scanInventory(row pgx.CollectableRow) (Inventory, error) {
 	return m, nil
 }
 
-// GetInventory returns one row by item_id; core.ErrNotFound when absent
+// GetInventory returns one row by item_id; pgb.ErrNotFound when absent
 // (pgx.ErrNoRows mapped — errors.Is keeps working for both).
-func GetInventory(ctx context.Context, exec core.DBTX, item_id int64) (Inventory, error) {
+func GetInventory(ctx context.Context, exec pgb.DBTX, item_id int64) (Inventory, error) {
 	sql, args := Inventorys.Select().Where(Inventorys.ItemID().Eq(item_id)).SQL()
 	var m Inventory
 	err := exec.QueryRow(ctx, sql, args...).Scan(&m.ItemID, &m.Qty, &m.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Inventory{}, core.ErrNotFound
+			return Inventory{}, pgb.ErrNotFound
 		}
 		return Inventory{}, err
 	}
@@ -141,8 +141,9 @@ func GetInventory(ctx context.Context, exec core.DBTX, item_id int64) (Inventory
 }
 
 // ListInventorys returns the rows matching f; limit <= 0 means no LIMIT.
-func ListInventorys(ctx context.Context, exec core.DBTX, f InventoryFilter, limit int) ([]Inventory, error) {
-	rows, err := Inventorys.Select().Where(inventorysFilterWhere(f)...).Limit(limit).Run(ctx, exec)
+func ListInventorys(ctx context.Context, exec pgb.DBTX, f InventoryFilter, opts ...pgb.ListOpt) ([]Inventory, error) {
+	sel := Inventorys.Select().Where(inventorysFilterWhere(f)...).ApplyList(opts...)
+	rows, err := sel.Run(ctx, exec)
 	if err != nil {
 		return nil, err
 	}
@@ -150,8 +151,8 @@ func ListInventorys(ctx context.Context, exec core.DBTX, f InventoryFilter, limi
 }
 
 // CountInventorys counts the rows matching f.
-func CountInventorys(ctx context.Context, exec core.DBTX, f InventoryFilter) (int64, error) {
-	sql, args := core.NewSelect("public.inventory", core.Raw{SQL: "count(*)"}).Where(inventorysFilterWhere(f)...).SQL()
+func CountInventorys(ctx context.Context, exec pgb.DBTX, f InventoryFilter) (int64, error) {
+	sql, args := pgb.NewSelect("public.inventory", pgb.Raw{SQL: "count(*)"}).Where(inventorysFilterWhere(f)...).SQL()
 	var n int64
 	if err := exec.QueryRow(ctx, sql, args...).Scan(&n); err != nil {
 		return 0, err
@@ -161,11 +162,11 @@ func CountInventorys(ctx context.Context, exec core.DBTX, f InventoryFilter) (in
 
 // InsertInventory inserts one row and returns it (RETURNING every
 // column, defaults included).
-func InsertInventory(ctx context.Context, exec core.DBTX, p InsertInventoryParams) (Inventory, error) {
-	rows, err := core.NewInsert("public.inventory",
+func InsertInventory(ctx context.Context, exec pgb.DBTX, p InsertInventoryParams) (Inventory, error) {
+	rows, err := pgb.NewInsert("public.inventory",
 		[]string{"item_id", "qty", "updated_at"},
-		[]core.Expr{core.Lit{V: p.ItemID}, core.Lit{V: p.Qty}, core.Lit{V: p.UpdatedAt}},
-	).Returning(core.Col{Table: "inventory", Name: "item_id"}, core.Col{Table: "inventory", Name: "qty"}, core.Col{Table: "inventory", Name: "updated_at"}).Run(ctx, exec)
+		[]pgb.Expr{pgb.Lit{V: p.ItemID}, pgb.Lit{V: p.Qty}, pgb.Lit{V: p.UpdatedAt}},
+	).Returning(pgb.Col{Table: "inventory", Name: "item_id"}, pgb.Col{Table: "inventory", Name: "qty"}, pgb.Col{Table: "inventory", Name: "updated_at"}).Run(ctx, exec)
 	if err != nil {
 		return Inventory{}, err
 	}
@@ -174,7 +175,7 @@ func InsertInventory(ctx context.Context, exec core.DBTX, p InsertInventoryParam
 		return Inventory{}, err
 	}
 	if len(us) == 0 {
-		return Inventory{}, core.ErrNotFound
+		return Inventory{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
@@ -183,7 +184,7 @@ const insertInventorysSQL = "INSERT INTO public.inventory (item_id, qty, updated
 
 // InsertInventorys inserts a whole batch in one round trip via
 // unnest and returns every inserted row.
-func InsertInventorys(ctx context.Context, exec core.DBTX, ps []InsertInventoryParams) ([]Inventory, error) {
+func InsertInventorys(ctx context.Context, exec pgb.DBTX, ps []InsertInventoryParams) ([]Inventory, error) {
 	if len(ps) == 0 {
 		return nil, nil
 	}
@@ -205,30 +206,30 @@ func InsertInventorys(ctx context.Context, exec core.DBTX, ps []InsertInventoryP
 }
 
 // UpdateInventory applies the non-zero fields of s to one row and
-// returns the updated row; core.ErrNotFound when absent.
-func UpdateInventory(ctx context.Context, exec core.DBTX, item_id int64, s InventorySet) (Inventory, error) {
+// returns the updated row; pgb.ErrNotFound when absent.
+func UpdateInventory(ctx context.Context, exec pgb.DBTX, item_id int64, s InventorySet) (Inventory, error) {
 	u := Inventorys.Update()
 	n := 0
 	if s.Qty.Valid {
 		n++
 		if s.Qty.Null {
-			u.Set("qty", core.Lit{V: nil})
+			u.Set("qty", pgb.Lit{V: nil})
 		} else {
-			u.Set("qty", core.Lit{V: s.Qty.V})
+			u.Set("qty", pgb.Lit{V: s.Qty.V})
 		}
 	}
 	if s.UpdatedAt.Valid {
 		n++
 		if s.UpdatedAt.Null {
-			u.Set("updated_at", core.Lit{V: nil})
+			u.Set("updated_at", pgb.Lit{V: nil})
 		} else {
-			u.Set("updated_at", core.Lit{V: s.UpdatedAt.V})
+			u.Set("updated_at", pgb.Lit{V: s.UpdatedAt.V})
 		}
 	}
 	if n == 0 {
 		return GetInventory(ctx, exec, item_id)
 	}
-	u.Where(Inventorys.ItemID().Eq(item_id)).Returning(core.Col{Table: "inventory", Name: "item_id"}, core.Col{Table: "inventory", Name: "qty"}, core.Col{Table: "inventory", Name: "updated_at"})
+	u.Where(Inventorys.ItemID().Eq(item_id)).Returning(pgb.Col{Table: "inventory", Name: "item_id"}, pgb.Col{Table: "inventory", Name: "qty"}, pgb.Col{Table: "inventory", Name: "updated_at"})
 	rows, err := u.Run(ctx, exec)
 	if err != nil {
 		return Inventory{}, err
@@ -238,38 +239,38 @@ func UpdateInventory(ctx context.Context, exec core.DBTX, item_id int64, s Inven
 		return Inventory{}, err
 	}
 	if len(us) == 0 {
-		return Inventory{}, core.ErrNotFound
+		return Inventory{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // UpdateInventorys applies s to every row matching where and
 // returns the affected count; an empty where is refused with
-// core.ErrNoWhere before any SQL is sent.
-func UpdateInventorys(ctx context.Context, exec core.DBTX, where []core.Expr, s InventorySet) (int64, error) {
+// pgb.ErrNoWhere before any SQL is sent.
+func UpdateInventorys(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, s InventorySet) (int64, error) {
 	u := Inventorys.Update()
 	n := 0
 	if s.Qty.Valid {
 		n++
 		if s.Qty.Null {
-			u.Set("qty", core.Lit{V: nil})
+			u.Set("qty", pgb.Lit{V: nil})
 		} else {
-			u.Set("qty", core.Lit{V: s.Qty.V})
+			u.Set("qty", pgb.Lit{V: s.Qty.V})
 		}
 	}
 	if s.UpdatedAt.Valid {
 		n++
 		if s.UpdatedAt.Null {
-			u.Set("updated_at", core.Lit{V: nil})
+			u.Set("updated_at", pgb.Lit{V: nil})
 		} else {
-			u.Set("updated_at", core.Lit{V: s.UpdatedAt.V})
+			u.Set("updated_at", pgb.Lit{V: s.UpdatedAt.V})
 		}
 	}
 	if n == 0 {
 		return 0, nil
 	}
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	u.Where(where...)
 	tag, err := u.Exec(ctx, exec)
@@ -281,18 +282,18 @@ func UpdateInventorys(ctx context.Context, exec core.DBTX, where []core.Expr, s 
 
 // UpsertInventory inserts p under item_id, or on conflict updates
 // every settable column from the proposed row (EXCLUDED.*) and returns
-// the resulting row; core.ErrNotFound when DO NOTHING matched.
-func UpsertInventory(ctx context.Context, exec core.DBTX, item_id int64, p InsertInventoryParams) (Inventory, error) {
-	rows, err := core.NewInsert("public.inventory",
+// the resulting row; pgb.ErrNotFound when DO NOTHING matched.
+func UpsertInventory(ctx context.Context, exec pgb.DBTX, item_id int64, p InsertInventoryParams) (Inventory, error) {
+	rows, err := pgb.NewInsert("public.inventory",
 		[]string{"item_id", "qty", "updated_at"},
-		[]core.Expr{core.Lit{V: item_id}, core.Lit{V: p.Qty}, core.Lit{V: p.UpdatedAt}},
-	).OnConflict(core.OnConflict{
+		[]pgb.Expr{pgb.Lit{V: item_id}, pgb.Lit{V: p.Qty}, pgb.Lit{V: p.UpdatedAt}},
+	).OnConflict(pgb.OnConflict{
 		Target: []string{"item_id"},
-		Sets: []core.SetClause{
-			{Col: "qty", E: core.Col{Table: "excluded", Name: "qty"}},
-			{Col: "updated_at", E: core.Col{Table: "excluded", Name: "updated_at"}},
+		Sets: []pgb.SetClause{
+			{Col: "qty", E: pgb.Col{Table: "excluded", Name: "qty"}},
+			{Col: "updated_at", E: pgb.Col{Table: "excluded", Name: "updated_at"}},
 		},
-	}).Returning(core.Col{Table: "inventory", Name: "item_id"}, core.Col{Table: "inventory", Name: "qty"}, core.Col{Table: "inventory", Name: "updated_at"}).Run(ctx, exec)
+	}).Returning(pgb.Col{Table: "inventory", Name: "item_id"}, pgb.Col{Table: "inventory", Name: "qty"}, pgb.Col{Table: "inventory", Name: "updated_at"}).Run(ctx, exec)
 	if err != nil {
 		return Inventory{}, err
 	}
@@ -301,22 +302,22 @@ func UpsertInventory(ctx context.Context, exec core.DBTX, item_id int64, p Inser
 		return Inventory{}, err
 	}
 	if len(us) == 0 {
-		return Inventory{}, core.ErrNotFound
+		return Inventory{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // DeleteInventory removes one row by item_id.
-func DeleteInventory(ctx context.Context, exec core.DBTX, item_id int64) error {
+func DeleteInventory(ctx context.Context, exec pgb.DBTX, item_id int64) error {
 	_, err := Inventorys.Delete().Where(Inventorys.ItemID().Eq(item_id)).Exec(ctx, exec)
 	return err
 }
 
 // DeleteInventorys removes every row matching where and returns the
-// affected count; an empty where is refused with core.ErrNoWhere.
-func DeleteInventorys(ctx context.Context, exec core.DBTX, where []core.Expr) (int64, error) {
+// affected count; an empty where is refused with pgb.ErrNoWhere.
+func DeleteInventorys(ctx context.Context, exec pgb.DBTX, where []pgb.Expr) (int64, error) {
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	tag, err := Inventorys.Delete().Where(where...).Exec(ctx, exec)
 	if err != nil {

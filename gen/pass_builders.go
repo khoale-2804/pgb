@@ -69,7 +69,7 @@ func assembleGoFile(opts Options, imports []string, body string) ([]byte, error)
 		out.WriteString("\nimport (\n")
 		for _, p := range paths {
 			if p == opts.Core {
-				out.WriteString("\t" + importQualifier(p) + " " + strconv.Quote(p) + "\n")
+				out.WriteString("\tpgb " + strconv.Quote(p) + "\n")
 				continue
 			}
 			out.WriteString("\t" + strconv.Quote(p) + "\n")
@@ -261,21 +261,21 @@ func inCast(c ir.Column, opts Options) string {
 	return base + "[]"
 }
 
-// litExpr renders a core.Lit expression for value v with the column's cast
+// litExpr renders a pgb.Lit expression for value v with the column's cast
 // hint applied — shared by the builder and statics emitters.
 func litExpr(c ir.Column, v string, opts Options) string {
 	if cast := litCast(c, opts); cast != "" {
-		return "core.Lit{V: " + v + ", Cast: " + strconv.Quote(cast) + "}"
+		return "pgb.Lit{V: " + v + ", Cast: " + strconv.Quote(cast) + "}"
 	}
-	return "core.Lit{V: " + v + "}"
+	return "pgb.Lit{V: " + v + "}"
 }
 
 // PassBuilders emits pass B: one "<table>.gen.go" per non-skip table with
-// the table descriptor (embedded core.TableMeta), typed column accessors,
+// the table descriptor (embedded pgb.TableMeta), typed column accessors,
 // predicate methods by type family, and the Select/Update/Delete entry
 // points. Ordering is catalog order and the file list is sorted; every
 // value stays a bound parameter. In renders as "col = ANY($1::base[])",
-// Between as "(col >= $1 AND col <= $2)" via core.And, KeyEq as a Raw with
+// Between as "(col >= $1 AND col <= $2)" via pgb.And, KeyEq as a Raw with
 // renumbered args, Contains as "col @> $1::base[]".
 func PassBuilders(sch ir.Schema, opts Options, dir DirectiveSet) ([]plugin.File, error) {
 	opts = normalizeOptions(sch, opts)
@@ -308,11 +308,11 @@ func accessorName(field string) string {
 	return field
 }
 
-// colLiteral renders a raw core.Col expression for one column — used in
+// colLiteral renders a raw pgb.Col expression for one column — used in
 // SELECT column lists and RETURNING clauses so they never depend on
 // accessor methods.
 func colLiteral(t ir.Table, c ir.Column) string {
-	return "core.Col{Table: " + strconv.Quote(t.Name) + ", Name: " + strconv.Quote(c.Name) + "}"
+	return "pgb.Col{Table: " + strconv.Quote(t.Name) + ", Name: " + strconv.Quote(c.Name) + "}"
 }
 
 // buildersFile emits the descriptor file for one table.
@@ -327,10 +327,10 @@ func buildersFile(sch ir.Schema, t ir.Table, opts Options, dir DirectiveSet) ([]
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "// %s is the table descriptor for %s; immutable, safe for\n// concurrent use.\n", tableVar, qname)
-	fmt.Fprintf(&b, "var %s = %s{core.NewTableMeta(%s, %s)}\n\n",
+	fmt.Fprintf(&b, "var %s = %s{pgb.NewTableMeta(%s, %s)}\n\n",
 		tableVar, tableType, strconv.Quote(t.Schema), strconv.Quote(t.Name))
 	fmt.Fprintf(&b, "// %s provides typed column accessors and statement entry points.\n", tableType)
-	fmt.Fprintf(&b, "type %s struct{ core.TableMeta }\n\n", tableType)
+	fmt.Fprintf(&b, "type %s struct{ pgb.TableMeta }\n\n", tableType)
 
 	for i, c := range t.Columns {
 		field := names[i]
@@ -342,10 +342,10 @@ func buildersFile(sch ir.Schema, t ir.Table, opts Options, dir DirectiveSet) ([]
 		}
 
 		fmt.Fprintf(&b, "// %s returns the typed accessor for column %s.\n", accessorName(field), c.Name)
-		fmt.Fprintf(&b, "func (t %s) %s() %s {\n\treturn %s{core.Col{Table: %s, Name: %s}}\n}\n\n",
+		fmt.Fprintf(&b, "func (t %s) %s() %s {\n\treturn %s{pgb.Col{Table: %s, Name: %s}}\n}\n\n",
 			tableType, accessorName(field), colType, colType, strconv.Quote(t.Name), strconv.Quote(c.Name))
 		fmt.Fprintf(&b, "// %s is the typed column %s.%s.\n", colType, t.Name, c.Name)
-		fmt.Fprintf(&b, "type %s struct{ core.Col }\n\n", colType)
+		fmt.Fprintf(&b, "type %s struct{ pgb.Col }\n\n", colType)
 
 		if !noFilter {
 			emitPredicates(&b, colType, c, typ, capsFor(c, typ, opts), opts)
@@ -357,13 +357,13 @@ func buildersFile(sch ir.Schema, t ir.Table, opts Options, dir DirectiveSet) ([]
 		cols[i] = colLiteral(t, t.Columns[i])
 	}
 	b.WriteString("// Select starts a SELECT of every column; chain Where/OrderBy/Limit/...\n// and terminate with Run (or a static function).\n")
-	fmt.Fprintf(&b, "func (t %s) Select() *core.Select {\n\treturn core.NewSelect(%s, %s)\n}\n\n",
+	fmt.Fprintf(&b, "func (t %s) Select() *pgb.Select {\n\treturn pgb.NewSelect(%s, %s)\n}\n\n",
 		tableType, strconv.Quote(qname), strings.Join(cols, ", "))
 	if !t.View {
-		b.WriteString("// Update starts an UPDATE; an empty WHERE fails with core.ErrNoWhere.\n")
-		fmt.Fprintf(&b, "func (t %s) Update() *core.Update { return core.NewUpdate(%s) }\n\n", tableType, strconv.Quote(qname))
-		b.WriteString("// Delete starts a DELETE; an empty WHERE fails with core.ErrNoWhere.\n")
-		fmt.Fprintf(&b, "func (t %s) Delete() *core.Delete { return core.NewDelete(%s) }\n", tableType, strconv.Quote(qname))
+		b.WriteString("// Update starts an UPDATE; an empty WHERE fails with pgb.ErrNoWhere.\n")
+		fmt.Fprintf(&b, "func (t %s) Update() *pgb.Update { return pgb.NewUpdate(%s) }\n\n", tableType, strconv.Quote(qname))
+		b.WriteString("// Delete starts a DELETE; an empty WHERE fails with pgb.ErrNoWhere.\n")
+		fmt.Fprintf(&b, "func (t %s) Delete() *pgb.Delete { return pgb.NewDelete(%s) }\n", tableType, strconv.Quote(qname))
 	}
 	return assembleGoFile(opts, imports, b.String())
 }
@@ -371,13 +371,13 @@ func buildersFile(sch ir.Schema, t ir.Table, opts Options, dir DirectiveSet) ([]
 // emitPredicates writes the predicate methods for one typed column, gated by
 // its capability set. Shapes follow docs/generated-code/builders: Eq/Ne bind
 // a Lit, In is "col = ANY($1::base[])", ordered comparisons are plain Bin,
-// Between wraps two comparisons in core.And, text predicates bind the
+// Between wraps two comparisons in pgb.And, text predicates bind the
 // pattern, KeyEq is a Raw ("col ->> $n = $m") whose args renumber, and
 // Contains is "col @> $1::base[]".
 func emitPredicates(b *strings.Builder, colType string, c ir.Column, goType string, caps colCaps, opts Options) {
 	lit := func(v string) string { return litExpr(c, v, opts) }
 	bin := func(name, op, param, val string) {
-		fmt.Fprintf(b, "func (c %[1]s) %[2]s(%[3]s) core.Expr {\n\treturn core.Bin{Op: %[4]s, L: c.Col, R: %[5]s}\n}\n\n",
+		fmt.Fprintf(b, "func (c %[1]s) %[2]s(%[3]s) pgb.Expr {\n\treturn pgb.Bin{Op: %[4]s, L: c.Col, R: %[5]s}\n}\n\n",
 			colType, name, param, strconv.Quote(op), val)
 	}
 
@@ -387,28 +387,28 @@ func emitPredicates(b *strings.Builder, colType string, c ir.Column, goType stri
 	}
 	if caps.in {
 		bin("In", "= ANY", "vs ..."+goType,
-			"core.Lit{V: vs, Cast: "+strconv.Quote(inCast(c, opts))+"}")
+			"pgb.Lit{V: vs, Cast: "+strconv.Quote(inCast(c, opts))+"}")
 	}
 	// IsNull/NotNull exist on every column, value or not.
-	fmt.Fprintf(b, "func (c %[1]s) IsNull() core.Expr {\n\treturn core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + \" IS NULL\"}\n}\n\n", colType)
-	fmt.Fprintf(b, "func (c %[1]s) NotNull() core.Expr {\n\treturn core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + \" IS NOT NULL\"}\n}\n\n", colType)
+	fmt.Fprintf(b, "func (c %[1]s) IsNull() pgb.Expr {\n\treturn pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + \" IS NULL\"}\n}\n\n", colType)
+	fmt.Fprintf(b, "func (c %[1]s) NotNull() pgb.Expr {\n\treturn pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + \" IS NOT NULL\"}\n}\n\n", colType)
 
 	if caps.ordered {
 		bin("Gt", ">", "v "+goType, lit("v"))
 		bin("Lt", "<", "v "+goType, lit("v"))
 		bin("Gte", ">=", "v "+goType, lit("v"))
 		bin("Lte", "<=", "v "+goType, lit("v"))
-		fmt.Fprintf(b, "func (c %[1]s) Between(a, b %[2]s) core.Expr {\n\treturn core.And{Parts: []core.Expr{\n\t\tcore.Bin{Op: \">=\", L: c.Col, R: %[3]s},\n\t\tcore.Bin{Op: \"<=\", L: c.Col, R: %[4]s},\n\t}}\n}\n\n",
+		fmt.Fprintf(b, "func (c %[1]s) Between(a, b %[2]s) pgb.Expr {\n\treturn pgb.And{Parts: []pgb.Expr{\n\t\tpgb.Bin{Op: \">=\", L: c.Col, R: %[3]s},\n\t\tpgb.Bin{Op: \"<=\", L: c.Col, R: %[4]s},\n\t}}\n}\n\n",
 			colType, goType, lit("a"), lit("b"))
 	}
 	if caps.text {
-		bin("Like", "LIKE", "p string", "core.Lit{V: p}")
-		bin("ILike", "ILIKE", "p string", "core.Lit{V: p}")
-		bin("NotLike", "NOT LIKE", "p string", "core.Lit{V: p}")
-		bin("NotILike", "NOT ILIKE", "p string", "core.Lit{V: p}")
+		bin("Like", "LIKE", "p string", "pgb.Lit{V: p}")
+		bin("ILike", "ILIKE", "p string", "pgb.Lit{V: p}")
+		bin("NotLike", "NOT LIKE", "p string", "pgb.Lit{V: p}")
+		bin("NotILike", "NOT ILIKE", "p string", "pgb.Lit{V: p}")
 	}
 	if caps.json {
-		fmt.Fprintf(b, "func (c %[1]s) KeyEq(path string, v any) core.Expr {\n\treturn core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + \" ->> ?\", Args: []any{path, v}}\n}\n\n", colType)
+		fmt.Fprintf(b, "func (c %[1]s) KeyEq(path string, v any) pgb.Expr {\n\treturn pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + \" ->> ?\", Args: []any{path, v}}\n}\n\n", colType)
 	}
 	if caps.contains {
 		bin("Contains", "@>", "v "+goType, lit("v"))

@@ -130,8 +130,35 @@ there) — `export PATH=$PATH:$HOME/go/bin`.
 - Full gate green: build/vet/test/validate/validate-plugin; emitted
   package compiles.
 
-## END CONDITION
+## ALREADY-DONE (2026-09-14 first cron shift)
 
-When backlog items 1–5 are all green and pushed: run one final full verify,
-update ALREADY-DONE with the completion note, push, and then STOP (the hourly
-cron will find no backlog and idle cleanly — leave a final status line here).
+- Backlog items 1–5 ALL COMPLETE (M3a/b/c + M1 + docs sync). Full gate green:
+  build/vet/test/validate/validate-plugin; emitted package compiles.
+- Emitted-code conventions now match the documented API exactly: generated
+  imports alias the runtime as `pgb` (pgb.DBTX/ErrNotFound/Expr/ListOpt);
+  core.ListOpt added (variadic ApplyList); List statics take
+  `opts ...pgb.ListOpt`. Fixed a real emitted-code bug the integration
+  compile check caught (view tables referenced `core.` without the import).
+
+## STATUS: v0.1 COMPLETE — continuing with phase 2 (below)
+
+## PHASE 2 BACKLOG (priority order; same verify gate + commit discipline)
+
+1. **M2 docker integration lane**: docker-compose (paradedb/paradedb on PG18
+   + postgres:19-beta) + a Go integration suite that executes every generated
+   function against the real servers (skippable via env when docker absent).
+2. **Keyset Page functions**: emit Page(ctx, exec, cursor, limit) per table
+   (single-col unique key) + score-ordered (score, id) variant for search
+   tables; cursor codec already in core/page.go.
+3. **pgb fmt (v0.2 preview)**: `cmd/pgb` with `fmt` subcommand formatting
+   schema.sql via the oliphant AST (parse -> deparse-canon), replacing the
+   sqlfluff interim; handles pg_search DDL the stock formatters cannot.
+4. **MERGE builder** (PG17+, gated by target): core stmt + generated
+   MergeTable statics behind `emit.merge`.
+5. **Temporal upsert** (PG18): WITHOUT OVERLAPS-aware upsert emission
+   (replaces the current Raw-refusal), gated target >= 18.
+
+## END CONDITION (phase 2)
+
+When phase-2 items 1–5 are green and pushed: final full verify, final status
+line here, then stop cleanly.

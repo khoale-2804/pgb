@@ -10,7 +10,7 @@ import (
 	"errors"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 )
 
 // CaseColFilter narrows ListCaseCols and CountCaseCols:
@@ -40,13 +40,13 @@ type CaseColFilter struct {
 	PlainColIn    []pgtype.Text
 	PlainColLike  *string
 	PlainColILike *string
-	Extra         []core.Expr
+	Extra         []pgb.Expr
 }
 
 // caseColsFilterWhere compiles f into the ANDed predicate list; an empty
 // filter yields an empty list (no WHERE).
-func caseColsFilterWhere(f CaseColFilter) []core.Expr {
-	var w []core.Expr
+func caseColsFilterWhere(f CaseColFilter) []pgb.Expr {
+	var w []pgb.Expr
 	if f.ID != nil {
 		w = append(w, CaseCols.ID().Eq(*f.ID))
 	}
@@ -152,15 +152,15 @@ func scanCaseCol(row pgx.CollectableRow) (CaseCol, error) {
 	return m, nil
 }
 
-// GetCaseCol returns one row by id; core.ErrNotFound when absent
+// GetCaseCol returns one row by id; pgb.ErrNotFound when absent
 // (pgx.ErrNoRows mapped — errors.Is keeps working for both).
-func GetCaseCol(ctx context.Context, exec core.DBTX, id int64) (CaseCol, error) {
+func GetCaseCol(ctx context.Context, exec pgb.DBTX, id int64) (CaseCol, error) {
 	sql, args := CaseCols.Select().Where(CaseCols.ID().Eq(id)).SQL()
 	var m CaseCol
 	err := exec.QueryRow(ctx, sql, args...).Scan(&m.ID, &m.Email, &m.Mixedcase, &m.Caf, &m.PlainCol)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return CaseCol{}, core.ErrNotFound
+			return CaseCol{}, pgb.ErrNotFound
 		}
 		return CaseCol{}, err
 	}
@@ -168,8 +168,9 @@ func GetCaseCol(ctx context.Context, exec core.DBTX, id int64) (CaseCol, error) 
 }
 
 // ListCaseCols returns the rows matching f; limit <= 0 means no LIMIT.
-func ListCaseCols(ctx context.Context, exec core.DBTX, f CaseColFilter, limit int) ([]CaseCol, error) {
-	rows, err := CaseCols.Select().Where(caseColsFilterWhere(f)...).Limit(limit).Run(ctx, exec)
+func ListCaseCols(ctx context.Context, exec pgb.DBTX, f CaseColFilter, opts ...pgb.ListOpt) ([]CaseCol, error) {
+	sel := CaseCols.Select().Where(caseColsFilterWhere(f)...).ApplyList(opts...)
+	rows, err := sel.Run(ctx, exec)
 	if err != nil {
 		return nil, err
 	}
@@ -177,8 +178,8 @@ func ListCaseCols(ctx context.Context, exec core.DBTX, f CaseColFilter, limit in
 }
 
 // CountCaseCols counts the rows matching f.
-func CountCaseCols(ctx context.Context, exec core.DBTX, f CaseColFilter) (int64, error) {
-	sql, args := core.NewSelect("public.case_cols", core.Raw{SQL: "count(*)"}).Where(caseColsFilterWhere(f)...).SQL()
+func CountCaseCols(ctx context.Context, exec pgb.DBTX, f CaseColFilter) (int64, error) {
+	sql, args := pgb.NewSelect("public.case_cols", pgb.Raw{SQL: "count(*)"}).Where(caseColsFilterWhere(f)...).SQL()
 	var n int64
 	if err := exec.QueryRow(ctx, sql, args...).Scan(&n); err != nil {
 		return 0, err
@@ -188,11 +189,11 @@ func CountCaseCols(ctx context.Context, exec core.DBTX, f CaseColFilter) (int64,
 
 // InsertCaseCol inserts one row and returns it (RETURNING every
 // column, defaults included).
-func InsertCaseCol(ctx context.Context, exec core.DBTX, p InsertCaseColParams) (CaseCol, error) {
-	rows, err := core.NewInsert("public.case_cols",
+func InsertCaseCol(ctx context.Context, exec pgb.DBTX, p InsertCaseColParams) (CaseCol, error) {
+	rows, err := pgb.NewInsert("public.case_cols",
 		[]string{"Email", "mixedcase", "café", "plain_col"},
-		[]core.Expr{core.Lit{V: p.Email}, core.Lit{V: p.Mixedcase}, core.Lit{V: p.Caf}, core.Lit{V: p.PlainCol}},
-	).Returning(core.Col{Table: "case_cols", Name: "id"}, core.Col{Table: "case_cols", Name: "Email"}, core.Col{Table: "case_cols", Name: "mixedcase"}, core.Col{Table: "case_cols", Name: "café"}, core.Col{Table: "case_cols", Name: "plain_col"}).Run(ctx, exec)
+		[]pgb.Expr{pgb.Lit{V: p.Email}, pgb.Lit{V: p.Mixedcase}, pgb.Lit{V: p.Caf}, pgb.Lit{V: p.PlainCol}},
+	).Returning(pgb.Col{Table: "case_cols", Name: "id"}, pgb.Col{Table: "case_cols", Name: "Email"}, pgb.Col{Table: "case_cols", Name: "mixedcase"}, pgb.Col{Table: "case_cols", Name: "café"}, pgb.Col{Table: "case_cols", Name: "plain_col"}).Run(ctx, exec)
 	if err != nil {
 		return CaseCol{}, err
 	}
@@ -201,7 +202,7 @@ func InsertCaseCol(ctx context.Context, exec core.DBTX, p InsertCaseColParams) (
 		return CaseCol{}, err
 	}
 	if len(us) == 0 {
-		return CaseCol{}, core.ErrNotFound
+		return CaseCol{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
@@ -210,7 +211,7 @@ const insertCaseColsSQL = "INSERT INTO public.case_cols (\"Email\", mixedcase, \
 
 // InsertCaseCols inserts a whole batch in one round trip via
 // unnest and returns every inserted row.
-func InsertCaseCols(ctx context.Context, exec core.DBTX, ps []InsertCaseColParams) ([]CaseCol, error) {
+func InsertCaseCols(ctx context.Context, exec pgb.DBTX, ps []InsertCaseColParams) ([]CaseCol, error) {
 	if len(ps) == 0 {
 		return nil, nil
 	}
@@ -234,46 +235,46 @@ func InsertCaseCols(ctx context.Context, exec core.DBTX, ps []InsertCaseColParam
 }
 
 // UpdateCaseCol applies the non-zero fields of s to one row and
-// returns the updated row; core.ErrNotFound when absent.
-func UpdateCaseCol(ctx context.Context, exec core.DBTX, id int64, s CaseColSet) (CaseCol, error) {
+// returns the updated row; pgb.ErrNotFound when absent.
+func UpdateCaseCol(ctx context.Context, exec pgb.DBTX, id int64, s CaseColSet) (CaseCol, error) {
 	u := CaseCols.Update()
 	n := 0
 	if s.Email.Valid {
 		n++
 		if s.Email.Null {
-			u.Set("Email", core.Lit{V: nil})
+			u.Set("Email", pgb.Lit{V: nil})
 		} else {
-			u.Set("Email", core.Lit{V: s.Email.V})
+			u.Set("Email", pgb.Lit{V: s.Email.V})
 		}
 	}
 	if s.Mixedcase.Valid {
 		n++
 		if s.Mixedcase.Null {
-			u.Set("mixedcase", core.Lit{V: nil})
+			u.Set("mixedcase", pgb.Lit{V: nil})
 		} else {
-			u.Set("mixedcase", core.Lit{V: s.Mixedcase.V})
+			u.Set("mixedcase", pgb.Lit{V: s.Mixedcase.V})
 		}
 	}
 	if s.Caf.Valid {
 		n++
 		if s.Caf.Null {
-			u.Set("café", core.Lit{V: nil})
+			u.Set("café", pgb.Lit{V: nil})
 		} else {
-			u.Set("café", core.Lit{V: s.Caf.V})
+			u.Set("café", pgb.Lit{V: s.Caf.V})
 		}
 	}
 	if s.PlainCol.Valid {
 		n++
 		if s.PlainCol.Null {
-			u.Set("plain_col", core.Lit{V: nil})
+			u.Set("plain_col", pgb.Lit{V: nil})
 		} else {
-			u.Set("plain_col", core.Lit{V: s.PlainCol.V})
+			u.Set("plain_col", pgb.Lit{V: s.PlainCol.V})
 		}
 	}
 	if n == 0 {
 		return GetCaseCol(ctx, exec, id)
 	}
-	u.Where(CaseCols.ID().Eq(id)).Returning(core.Col{Table: "case_cols", Name: "id"}, core.Col{Table: "case_cols", Name: "Email"}, core.Col{Table: "case_cols", Name: "mixedcase"}, core.Col{Table: "case_cols", Name: "café"}, core.Col{Table: "case_cols", Name: "plain_col"})
+	u.Where(CaseCols.ID().Eq(id)).Returning(pgb.Col{Table: "case_cols", Name: "id"}, pgb.Col{Table: "case_cols", Name: "Email"}, pgb.Col{Table: "case_cols", Name: "mixedcase"}, pgb.Col{Table: "case_cols", Name: "café"}, pgb.Col{Table: "case_cols", Name: "plain_col"})
 	rows, err := u.Run(ctx, exec)
 	if err != nil {
 		return CaseCol{}, err
@@ -283,54 +284,54 @@ func UpdateCaseCol(ctx context.Context, exec core.DBTX, id int64, s CaseColSet) 
 		return CaseCol{}, err
 	}
 	if len(us) == 0 {
-		return CaseCol{}, core.ErrNotFound
+		return CaseCol{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // UpdateCaseCols applies s to every row matching where and
 // returns the affected count; an empty where is refused with
-// core.ErrNoWhere before any SQL is sent.
-func UpdateCaseCols(ctx context.Context, exec core.DBTX, where []core.Expr, s CaseColSet) (int64, error) {
+// pgb.ErrNoWhere before any SQL is sent.
+func UpdateCaseCols(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, s CaseColSet) (int64, error) {
 	u := CaseCols.Update()
 	n := 0
 	if s.Email.Valid {
 		n++
 		if s.Email.Null {
-			u.Set("Email", core.Lit{V: nil})
+			u.Set("Email", pgb.Lit{V: nil})
 		} else {
-			u.Set("Email", core.Lit{V: s.Email.V})
+			u.Set("Email", pgb.Lit{V: s.Email.V})
 		}
 	}
 	if s.Mixedcase.Valid {
 		n++
 		if s.Mixedcase.Null {
-			u.Set("mixedcase", core.Lit{V: nil})
+			u.Set("mixedcase", pgb.Lit{V: nil})
 		} else {
-			u.Set("mixedcase", core.Lit{V: s.Mixedcase.V})
+			u.Set("mixedcase", pgb.Lit{V: s.Mixedcase.V})
 		}
 	}
 	if s.Caf.Valid {
 		n++
 		if s.Caf.Null {
-			u.Set("café", core.Lit{V: nil})
+			u.Set("café", pgb.Lit{V: nil})
 		} else {
-			u.Set("café", core.Lit{V: s.Caf.V})
+			u.Set("café", pgb.Lit{V: s.Caf.V})
 		}
 	}
 	if s.PlainCol.Valid {
 		n++
 		if s.PlainCol.Null {
-			u.Set("plain_col", core.Lit{V: nil})
+			u.Set("plain_col", pgb.Lit{V: nil})
 		} else {
-			u.Set("plain_col", core.Lit{V: s.PlainCol.V})
+			u.Set("plain_col", pgb.Lit{V: s.PlainCol.V})
 		}
 	}
 	if n == 0 {
 		return 0, nil
 	}
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	u.Where(where...)
 	tag, err := u.Exec(ctx, exec)
@@ -342,20 +343,20 @@ func UpdateCaseCols(ctx context.Context, exec core.DBTX, where []core.Expr, s Ca
 
 // UpsertCaseCol inserts p under id, or on conflict updates
 // every settable column from the proposed row (EXCLUDED.*) and returns
-// the resulting row; core.ErrNotFound when DO NOTHING matched.
-func UpsertCaseCol(ctx context.Context, exec core.DBTX, id int64, p InsertCaseColParams) (CaseCol, error) {
-	rows, err := core.NewInsert("public.case_cols",
+// the resulting row; pgb.ErrNotFound when DO NOTHING matched.
+func UpsertCaseCol(ctx context.Context, exec pgb.DBTX, id int64, p InsertCaseColParams) (CaseCol, error) {
+	rows, err := pgb.NewInsert("public.case_cols",
 		[]string{"id", "Email", "mixedcase", "café", "plain_col"},
-		[]core.Expr{core.Lit{V: id}, core.Lit{V: p.Email}, core.Lit{V: p.Mixedcase}, core.Lit{V: p.Caf}, core.Lit{V: p.PlainCol}},
-	).OnConflict(core.OnConflict{
+		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.Email}, pgb.Lit{V: p.Mixedcase}, pgb.Lit{V: p.Caf}, pgb.Lit{V: p.PlainCol}},
+	).OnConflict(pgb.OnConflict{
 		Target: []string{"id"},
-		Sets: []core.SetClause{
-			{Col: "Email", E: core.Col{Table: "excluded", Name: "Email"}},
-			{Col: "mixedcase", E: core.Col{Table: "excluded", Name: "mixedcase"}},
-			{Col: "café", E: core.Col{Table: "excluded", Name: "café"}},
-			{Col: "plain_col", E: core.Col{Table: "excluded", Name: "plain_col"}},
+		Sets: []pgb.SetClause{
+			{Col: "Email", E: pgb.Col{Table: "excluded", Name: "Email"}},
+			{Col: "mixedcase", E: pgb.Col{Table: "excluded", Name: "mixedcase"}},
+			{Col: "café", E: pgb.Col{Table: "excluded", Name: "café"}},
+			{Col: "plain_col", E: pgb.Col{Table: "excluded", Name: "plain_col"}},
 		},
-	}).Returning(core.Col{Table: "case_cols", Name: "id"}, core.Col{Table: "case_cols", Name: "Email"}, core.Col{Table: "case_cols", Name: "mixedcase"}, core.Col{Table: "case_cols", Name: "café"}, core.Col{Table: "case_cols", Name: "plain_col"}).Run(ctx, exec)
+	}).Returning(pgb.Col{Table: "case_cols", Name: "id"}, pgb.Col{Table: "case_cols", Name: "Email"}, pgb.Col{Table: "case_cols", Name: "mixedcase"}, pgb.Col{Table: "case_cols", Name: "café"}, pgb.Col{Table: "case_cols", Name: "plain_col"}).Run(ctx, exec)
 	if err != nil {
 		return CaseCol{}, err
 	}
@@ -364,22 +365,22 @@ func UpsertCaseCol(ctx context.Context, exec core.DBTX, id int64, p InsertCaseCo
 		return CaseCol{}, err
 	}
 	if len(us) == 0 {
-		return CaseCol{}, core.ErrNotFound
+		return CaseCol{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // DeleteCaseCol removes one row by id.
-func DeleteCaseCol(ctx context.Context, exec core.DBTX, id int64) error {
+func DeleteCaseCol(ctx context.Context, exec pgb.DBTX, id int64) error {
 	_, err := CaseCols.Delete().Where(CaseCols.ID().Eq(id)).Exec(ctx, exec)
 	return err
 }
 
 // DeleteCaseCols removes every row matching where and returns the
-// affected count; an empty where is refused with core.ErrNoWhere.
-func DeleteCaseCols(ctx context.Context, exec core.DBTX, where []core.Expr) (int64, error) {
+// affected count; an empty where is refused with pgb.ErrNoWhere.
+func DeleteCaseCols(ctx context.Context, exec pgb.DBTX, where []pgb.Expr) (int64, error) {
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	tag, err := CaseCols.Delete().Where(where...).Exec(ctx, exec)
 	if err != nil {

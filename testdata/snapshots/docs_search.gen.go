@@ -9,7 +9,7 @@ import (
 	"context"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 )
 
 // Search surface for public.docs (index docs_search, key field id): predicate methods only
@@ -17,148 +17,148 @@ import (
 // query. Every value stays a bound parameter; operator shapes live in
 // core/search.go (the pg_search canon).
 // Score ranks by the index key field: pdb.score(docs.id).
-func (t DocTable) Score() core.Expr {
-	return core.Score(core.Col{Table: "docs", Name: "id"})
+func (t DocTable) Score() pgb.Expr {
+	return pgb.Score(pgb.Col{Table: "docs", Name: "id"})
 }
 
-func (c DocIDCol) Match(q string) core.Expr {
-	return core.Match(c.Col, q)
+func (c DocIDCol) Match(q string) pgb.Expr {
+	return pgb.Match(c.Col, q)
 }
 
-func (c DocIDCol) MatchAll(q string) core.Expr {
-	return core.MatchAll(c.Col, q)
+func (c DocIDCol) MatchAll(q string) pgb.Expr {
+	return pgb.MatchAll(c.Col, q)
 }
 
-func (c DocIDCol) Phrase(q string, slop int) core.Expr {
-	return core.Phrase(c.Col, q, slop)
+func (c DocIDCol) Phrase(q string, slop int) pgb.Expr {
+	return pgb.Phrase(c.Col, q, slop)
 }
 
-func (c DocIDCol) Exact(v any) core.Expr {
-	return core.Exact(c.Col, v)
+func (c DocIDCol) Exact(v any) pgb.Expr {
+	return pgb.Exact(c.Col, v)
 }
 
-func (c DocIDCol) Fuzzy(q string, dist int, prefix bool) core.Expr {
-	return core.Fuzzy(c.Col, q, dist, prefix)
+func (c DocIDCol) Fuzzy(q string, dist int, prefix bool) pgb.Expr {
+	return pgb.Fuzzy(c.Col, q, dist, prefix)
 }
 
-func (c DocIDCol) Regex(pattern string) core.Expr {
-	return core.Regex(c.Col, pattern)
+func (c DocIDCol) Regex(pattern string) pgb.Expr {
+	return pgb.Regex(c.Col, pattern)
 }
 
-func (c DocIDCol) Parse(q string) core.Expr {
-	return core.Parse(c.Col, q, false)
+func (c DocIDCol) Parse(q string) pgb.Expr {
+	return pgb.Parse(c.Col, q, false)
 }
 
-func (c DocIDCol) MatchB(q string, b float64) core.Expr {
-	return core.Boost(core.Match(c.Col, q), b)
+func (c DocIDCol) MatchB(q string, b float64) pgb.Expr {
+	return pgb.Boost(pgb.Match(c.Col, q), b)
 }
 
-func (c DocIDCol) Snippet(startTag, endTag string, maxChars int) core.Expr {
-	return core.Snippet(c.Col, startTag, endTag, maxChars)
+func (c DocIDCol) Snippet(startTag, endTag string, maxChars int) pgb.Expr {
+	return pgb.Snippet(c.Col, startTag, endTag, maxChars)
 }
 
-func (c DocIDCol) Snippets(limitN, offsetN int, sortBy string) core.Expr {
-	return core.Snippets(c.Col, limitN, offsetN, sortBy)
+func (c DocIDCol) Snippets(limitN, offsetN int, sortBy string) pgb.Expr {
+	return pgb.Snippets(c.Col, limitN, offsetN, sortBy)
 }
 
-func (c DocIDCol) Highlight() core.Expr {
-	return core.Highlight(c.Col)
+func (c DocIDCol) Highlight() pgb.Expr {
+	return pgb.Highlight(c.Col)
 }
 
-func (c DocTitleCol) Match(q string) core.Expr {
-	return core.Match(c.Col, q)
+func (c DocTitleCol) Match(q string) pgb.Expr {
+	return pgb.Match(c.Col, q)
 }
 
-func (c DocTitleCol) MatchAll(q string) core.Expr {
-	return core.MatchAll(c.Col, q)
+func (c DocTitleCol) MatchAll(q string) pgb.Expr {
+	return pgb.MatchAll(c.Col, q)
 }
 
-func (c DocTitleCol) Phrase(q string, slop int) core.Expr {
-	return core.Phrase(c.Col, q, slop)
+func (c DocTitleCol) Phrase(q string, slop int) pgb.Expr {
+	return pgb.Phrase(c.Col, q, slop)
 }
 
-func (c DocTitleCol) Exact(v any) core.Expr {
-	return core.Exact(c.Col, v)
+func (c DocTitleCol) Exact(v any) pgb.Expr {
+	return pgb.Exact(c.Col, v)
 }
 
-func (c DocTitleCol) ExactAny(vs []string) core.Expr {
-	return core.ExactAny(c.Col, vs, "text")
+func (c DocTitleCol) ExactAny(vs []string) pgb.Expr {
+	return pgb.ExactAny(c.Col, vs, "text")
 }
 
-func (c DocTitleCol) Fuzzy(q string, dist int, prefix bool) core.Expr {
-	return core.Fuzzy(c.Col, q, dist, prefix)
+func (c DocTitleCol) Fuzzy(q string, dist int, prefix bool) pgb.Expr {
+	return pgb.Fuzzy(c.Col, q, dist, prefix)
 }
 
-func (c DocTitleCol) Regex(pattern string) core.Expr {
-	return core.Regex(c.Col, pattern)
+func (c DocTitleCol) Regex(pattern string) pgb.Expr {
+	return pgb.Regex(c.Col, pattern)
 }
 
-func (c DocTitleCol) Parse(q string) core.Expr {
-	return core.Parse(c.Col, q, false)
+func (c DocTitleCol) Parse(q string) pgb.Expr {
+	return pgb.Parse(c.Col, q, false)
 }
 
-func (c DocTitleCol) MatchB(q string, b float64) core.Expr {
-	return core.Boost(core.Match(c.Col, q), b)
+func (c DocTitleCol) MatchB(q string, b float64) pgb.Expr {
+	return pgb.Boost(pgb.Match(c.Col, q), b)
 }
 
-func (c DocTitleCol) Snippet(startTag, endTag string, maxChars int) core.Expr {
-	return core.Snippet(c.Col, startTag, endTag, maxChars)
+func (c DocTitleCol) Snippet(startTag, endTag string, maxChars int) pgb.Expr {
+	return pgb.Snippet(c.Col, startTag, endTag, maxChars)
 }
 
-func (c DocTitleCol) Snippets(limitN, offsetN int, sortBy string) core.Expr {
-	return core.Snippets(c.Col, limitN, offsetN, sortBy)
+func (c DocTitleCol) Snippets(limitN, offsetN int, sortBy string) pgb.Expr {
+	return pgb.Snippets(c.Col, limitN, offsetN, sortBy)
 }
 
-func (c DocTitleCol) Highlight() core.Expr {
-	return core.Highlight(c.Col)
+func (c DocTitleCol) Highlight() pgb.Expr {
+	return pgb.Highlight(c.Col)
 }
 
-func (c DocBodyCol) Match(q string) core.Expr {
-	return core.Match(c.Col, q)
+func (c DocBodyCol) Match(q string) pgb.Expr {
+	return pgb.Match(c.Col, q)
 }
 
-func (c DocBodyCol) MatchAll(q string) core.Expr {
-	return core.MatchAll(c.Col, q)
+func (c DocBodyCol) MatchAll(q string) pgb.Expr {
+	return pgb.MatchAll(c.Col, q)
 }
 
-func (c DocBodyCol) Phrase(q string, slop int) core.Expr {
-	return core.Phrase(c.Col, q, slop)
+func (c DocBodyCol) Phrase(q string, slop int) pgb.Expr {
+	return pgb.Phrase(c.Col, q, slop)
 }
 
-func (c DocBodyCol) Exact(v any) core.Expr {
-	return core.Exact(c.Col, v)
+func (c DocBodyCol) Exact(v any) pgb.Expr {
+	return pgb.Exact(c.Col, v)
 }
 
-func (c DocBodyCol) ExactAny(vs []string) core.Expr {
-	return core.ExactAny(c.Col, vs, "text")
+func (c DocBodyCol) ExactAny(vs []string) pgb.Expr {
+	return pgb.ExactAny(c.Col, vs, "text")
 }
 
-func (c DocBodyCol) Fuzzy(q string, dist int, prefix bool) core.Expr {
-	return core.Fuzzy(c.Col, q, dist, prefix)
+func (c DocBodyCol) Fuzzy(q string, dist int, prefix bool) pgb.Expr {
+	return pgb.Fuzzy(c.Col, q, dist, prefix)
 }
 
-func (c DocBodyCol) Regex(pattern string) core.Expr {
-	return core.Regex(c.Col, pattern)
+func (c DocBodyCol) Regex(pattern string) pgb.Expr {
+	return pgb.Regex(c.Col, pattern)
 }
 
-func (c DocBodyCol) Parse(q string) core.Expr {
-	return core.Parse(c.Col, q, false)
+func (c DocBodyCol) Parse(q string) pgb.Expr {
+	return pgb.Parse(c.Col, q, false)
 }
 
-func (c DocBodyCol) MatchB(q string, b float64) core.Expr {
-	return core.Boost(core.Match(c.Col, q), b)
+func (c DocBodyCol) MatchB(q string, b float64) pgb.Expr {
+	return pgb.Boost(pgb.Match(c.Col, q), b)
 }
 
-func (c DocBodyCol) Snippet(startTag, endTag string, maxChars int) core.Expr {
-	return core.Snippet(c.Col, startTag, endTag, maxChars)
+func (c DocBodyCol) Snippet(startTag, endTag string, maxChars int) pgb.Expr {
+	return pgb.Snippet(c.Col, startTag, endTag, maxChars)
 }
 
-func (c DocBodyCol) Snippets(limitN, offsetN int, sortBy string) core.Expr {
-	return core.Snippets(c.Col, limitN, offsetN, sortBy)
+func (c DocBodyCol) Snippets(limitN, offsetN int, sortBy string) pgb.Expr {
+	return pgb.Snippets(c.Col, limitN, offsetN, sortBy)
 }
 
-func (c DocBodyCol) Highlight() core.Expr {
-	return core.Highlight(c.Col)
+func (c DocBodyCol) Highlight() pgb.Expr {
+	return pgb.Highlight(c.Col)
 }
 
 // SearchDocsOpts keeps the search entry surface small: Limit caps the
@@ -180,7 +180,7 @@ type DocHit struct {
 }
 
 // ScanDocs scans one SearchDocs row positionally: every docs column
-// in catalog order, then the score. Rows requested with a snippet
+// in catalog order, then the spgb. Rows requested with a snippet
 // projection carry one extra trailing column — SearchDocs scans those
 // rows itself.
 func ScanDocs(row pgx.CollectableRow) (DocHit, error) {
@@ -198,19 +198,19 @@ func ScanDocs(row pgx.CollectableRow) (DocHit, error) {
 // query-string syntax — selecting every column plus pdb.score(id),
 // optionally one pdb.snippet fragment, ordered pdb.score(id) DESC,
 // id ASC and LIMIT-bounded.
-func SearchDocs(ctx context.Context, exec core.DBTX, q string, o SearchDocsOpts) ([]DocHit, error) {
+func SearchDocs(ctx context.Context, exec pgb.DBTX, q string, o SearchDocsOpts) ([]DocHit, error) {
 	limit := o.Limit
 	if limit <= 0 {
 		limit = 20
 	}
-	key := core.Col{Table: "docs", Name: "id"}
-	cols := []core.Expr{core.Col{Table: "docs", Name: "id"}, core.Col{Table: "docs", Name: "title"}, core.Col{Table: "docs", Name: "body"}, core.Score(key)}
+	key := pgb.Col{Table: "docs", Name: "id"}
+	cols := []pgb.Expr{pgb.Col{Table: "docs", Name: "id"}, pgb.Col{Table: "docs", Name: "title"}, pgb.Col{Table: "docs", Name: "body"}, pgb.Score(key)}
 	if o.SnippetCol != "" {
-		cols = append(cols, core.Snippet(core.Col{Table: "docs", Name: o.SnippetCol}, "", "", 0))
+		cols = append(cols, pgb.Snippet(pgb.Col{Table: "docs", Name: o.SnippetCol}, "", "", 0))
 	}
-	rows, err := core.NewSelect("public.docs", cols...).
-		WhereExpr(core.Parse(key, q, false)).
-		OrderBy(core.Desc(core.Score(key)), core.Asc(key)).
+	rows, err := pgb.NewSelect("public.docs", cols...).
+		WhereExpr(pgb.Parse(key, q, false)).
+		OrderBy(pgb.Desc(pgb.Score(key)), pgb.Asc(key)).
 		Limit(limit).
 		Run(ctx, exec)
 	if err != nil {

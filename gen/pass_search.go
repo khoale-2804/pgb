@@ -18,12 +18,12 @@ import (
 //   - search predicate methods on the indexed columns' typed column types
 //     (the pass-B <Table><Field>Col structs — methods may live in a second
 //     file of the same package): Match/MatchAll/Phrase/Exact/Fuzzy/Regex/
-//     Parse via the core/search.go constructors, MatchB as core.Boost
+//     Parse via the core/search.go constructors, MatchB as pgb.Boost
 //     composition, ExactAny on text fields (array right-hand side),
 //     RangeTerm on range-castable fields, and the Snippet/Snippets/Highlight
 //     projections;
 //   - a wrapper type per indexed JSON path with the path re-emitted exactly
-//     as indexed, through core.Raw (no Boost composition or snippets there);
+//     as indexed, through pgb.Raw (no Boost composition or snippets there);
 //   - the table-level Score() (pdb.score over the index key field) and the
 //     Search<Table> static: WHERE key @@@ pdb.parse($1), selected and ordered
 //     by pdb.score(key) DESC, key ASC, always LIMIT-bounded (Top-K pushdown).
@@ -135,7 +135,7 @@ func searchFile(sch ir.Schema, t ir.Table, opts Options) ([]byte, error) {
 	}
 
 	keyField := si.KeyField
-	keyCol := "core.Col{Table: " + strconv.Quote(t.Name) + ", Name: " + strconv.Quote(keyField) + "}"
+	keyCol := "pgb.Col{Table: " + strconv.Quote(t.Name) + ", Name: " + strconv.Quote(keyField) + "}"
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "// Search surface for %s (index %s, key field %s): predicate methods only\n// on the columns the USING %s index covers, plus the scored document\n// query. Every value stays a bound parameter; operator shapes live in\n// core/search.go (the pg_search canon).\n",
@@ -143,7 +143,7 @@ func searchFile(sch ir.Schema, t ir.Table, opts Options) ([]byte, error) {
 
 	if keyField != "" && !scoreTaken {
 		fmt.Fprintf(&b, "// Score ranks by the index key field: pdb.score(%s.%s).\n", t.Name, keyField)
-		fmt.Fprintf(&b, "func (t %s) Score() core.Expr {\n\treturn core.Score(%s)\n}\n\n", tableType, keyCol)
+		fmt.Fprintf(&b, "func (t %s) Score() pgb.Expr {\n\treturn pgb.Score(%s)\n}\n\n", tableType, keyCol)
 	}
 
 	for _, f := range fields {
@@ -173,23 +173,23 @@ func emitColSearch(b *strings.Builder, colType string, f ir.SearchField) {
 	m := func(sig, body string) {
 		fmt.Fprintf(b, "func (c %s) %s {\n\treturn %s\n}\n\n", colType, sig, body)
 	}
-	m("Match(q string) core.Expr", "core.Match(c.Col, q)")
-	m("MatchAll(q string) core.Expr", "core.MatchAll(c.Col, q)")
-	m("Phrase(q string, slop int) core.Expr", "core.Phrase(c.Col, q, slop)")
-	m("Exact(v any) core.Expr", "core.Exact(c.Col, v)")
+	m("Match(q string) pgb.Expr", "pgb.Match(c.Col, q)")
+	m("MatchAll(q string) pgb.Expr", "pgb.MatchAll(c.Col, q)")
+	m("Phrase(q string, slop int) pgb.Expr", "pgb.Phrase(c.Col, q, slop)")
+	m("Exact(v any) pgb.Expr", "pgb.Exact(c.Col, v)")
 	if textTypes[strings.ToLower(f.PGType)] {
-		m("ExactAny(vs []string) core.Expr", `core.ExactAny(c.Col, vs, "text")`)
+		m("ExactAny(vs []string) pgb.Expr", `pgb.ExactAny(c.Col, vs, "text")`)
 	}
-	m("Fuzzy(q string, dist int, prefix bool) core.Expr", "core.Fuzzy(c.Col, q, dist, prefix)")
-	m("Regex(pattern string) core.Expr", "core.Regex(c.Col, pattern)")
-	m("Parse(q string) core.Expr", "core.Parse(c.Col, q, false)")
-	m("MatchB(q string, b float64) core.Expr", "core.Boost(core.Match(c.Col, q), b)")
+	m("Fuzzy(q string, dist int, prefix bool) pgb.Expr", "pgb.Fuzzy(c.Col, q, dist, prefix)")
+	m("Regex(pattern string) pgb.Expr", "pgb.Regex(c.Col, pattern)")
+	m("Parse(q string) pgb.Expr", "pgb.Parse(c.Col, q, false)")
+	m("MatchB(q string, b float64) pgb.Expr", "pgb.Boost(pgb.Match(c.Col, q), b)")
 	if cast := rangeCastFor(f.PGType); cast != "" {
-		m("RangeTerm(r any, mode string) core.Expr", fmt.Sprintf("core.RangeTerm(c.Col, r, %q, mode)", cast))
+		m("RangeTerm(r any, mode string) pgb.Expr", fmt.Sprintf("pgb.RangeTerm(c.Col, r, %q, mode)", cast))
 	}
-	m("Snippet(startTag, endTag string, maxChars int) core.Expr", "core.Snippet(c.Col, startTag, endTag, maxChars)")
-	m("Snippets(limitN, offsetN int, sortBy string) core.Expr", "core.Snippets(c.Col, limitN, offsetN, sortBy)")
-	m("Highlight() core.Expr", "core.Highlight(c.Col)")
+	m("Snippet(startTag, endTag string, maxChars int) pgb.Expr", "pgb.Snippet(c.Col, startTag, endTag, maxChars)")
+	m("Snippets(limitN, offsetN int, sortBy string) pgb.Expr", "pgb.Snippets(c.Col, limitN, offsetN, sortBy)")
+	m("Highlight() pgb.Expr", "pgb.Highlight(c.Col)")
 }
 
 // pathWrapperName derives the wrapper type for an indexed JSON path: from
@@ -213,28 +213,28 @@ func pathWrapperName(base string, f ir.SearchField, taken map[string]bool) strin
 
 // emitPathSearch writes the wrapper type and predicate methods for an
 // indexed JSON path. The path expression is re-emitted exactly as indexed
-// (qualified by the table name) via core.Raw, so predicates match what the
+// (qualified by the table name) via pgb.Raw, so predicates match what the
 // index covers. Boost composition (MatchB) and snippet projections are not
 // available on path fields.
 func emitPathSearch(b *strings.Builder, t ir.Table, f ir.SearchField, base string, taken map[string]bool) {
 	colType := pathWrapperName(base, f, taken)
 	qualified := core.QuoteIdent(t.Name) + "." + f.Path
 	if f.Alias != "" {
-		fmt.Fprintf(b, "// %s carries the pg_search surface for the indexed JSON path\n// %s (index alias %s): the path is re-emitted exactly as indexed,\n// through core.Raw. No Boost composition (MatchB) or snippets on path\n// fields.\n", colType, qualified, f.Alias)
+		fmt.Fprintf(b, "// %s carries the pg_search surface for the indexed JSON path\n// %s (index alias %s): the path is re-emitted exactly as indexed,\n// through pgb.Raw. No Boost composition (MatchB) or snippets on path\n// fields.\n", colType, qualified, f.Alias)
 	} else {
-		fmt.Fprintf(b, "// %s carries the pg_search surface for the indexed JSON path\n// %s: the path is re-emitted exactly as indexed, through core.Raw.\n// No Boost composition (MatchB) or snippets on path fields.\n", colType, qualified)
+		fmt.Fprintf(b, "// %s carries the pg_search surface for the indexed JSON path\n// %s: the path is re-emitted exactly as indexed, through pgb.Raw.\n// No Boost composition (MatchB) or snippets on path fields.\n", colType, qualified)
 	}
-	fmt.Fprintf(b, "type %s struct{ core.Col }\n\n", colType)
+	fmt.Fprintf(b, "type %s struct{ pgb.Col }\n\n", colType)
 	raw := func(sig, op, arg string) {
-		fmt.Fprintf(b, "func (c %[1]s) %[2]s {\n\treturn core.Raw{SQL: %[3]s, Args: []any{%[4]s}}\n}\n\n",
+		fmt.Fprintf(b, "func (c %[1]s) %[2]s {\n\treturn pgb.Raw{SQL: %[3]s, Args: []any{%[4]s}}\n}\n\n",
 			colType, sig, strconv.Quote(qualified+op), arg)
 	}
-	raw("Match(q string) core.Expr", " ||| ?", "q")
-	raw("MatchAll(q string) core.Expr", " &&& ?", "q")
-	raw("Exact(v any) core.Expr", " === ?", "v")
-	raw("ExactAny(vs []string) core.Expr", " === ?::text[]", "vs")
-	raw("Regex(pattern string) core.Expr", " @@@ pdb.regex(?)", "pattern")
-	raw("Parse(q string) core.Expr", " @@@ pdb.parse(?)", "q")
+	raw("Match(q string) pgb.Expr", " ||| ?", "q")
+	raw("MatchAll(q string) pgb.Expr", " &&& ?", "q")
+	raw("Exact(v any) pgb.Expr", " === ?", "v")
+	raw("ExactAny(vs []string) pgb.Expr", " === ?::text[]", "vs")
+	raw("Regex(pattern string) pgb.Expr", " @@@ pdb.regex(?)", "pattern")
+	raw("Parse(q string) pgb.Expr", " @@@ pdb.parse(?)", "q")
 }
 
 // emitSearchStatic writes SearchProductsOpts, the hit type, the positional
@@ -250,7 +250,7 @@ func emitSearchStatic(b *strings.Builder, t ir.Table, tableVar, model, tableType
 	fmt.Fprintf(b, "// %sHit is one Search%s result row: the full model, the BM25 score,\n// and the snippet fragment (populated only when Search%sOpts.SnippetCol\n// selected one, NULL/zero otherwise).\n", model, tableVar, tableVar)
 	fmt.Fprintf(b, "type %sHit struct {\n\tProduct %s\n\tScore   float64\n\tSnippet pgtype.Text\n}\n\n", model, model)
 
-	fmt.Fprintf(b, "// Scan%s scans one Search%s row positionally: every %s column\n// in catalog order, then the score. Rows requested with a snippet\n// projection carry one extra trailing column — Search%s scans those\n// rows itself.\n", tableVar, tableVar, t.Name, tableVar)
+	fmt.Fprintf(b, "// Scan%s scans one Search%s row positionally: every %s column\n// in catalog order, then the spgb. Rows requested with a snippet\n// projection carry one extra trailing column — Search%s scans those\n// rows itself.\n", tableVar, tableVar, t.Name, tableVar)
 	fmt.Fprintf(b, "func Scan%s(row pgx.CollectableRow) (%sHit, error) {\n\tvar h %sHit\n\tvar p %s\n", tableVar, model, model, model)
 	dests := make([]string, 0, len(t.Columns)+1)
 	for _, n := range names {
@@ -260,20 +260,20 @@ func emitSearchStatic(b *strings.Builder, t ir.Table, tableVar, model, tableType
 	fmt.Fprintf(b, "\tif err := row.Scan(%s); err != nil {\n\t\treturn %sHit{}, err\n\t}\n\th.Product = p\n\treturn h, nil\n}\n\n", strings.Join(dests, ", "), model)
 
 	fmt.Fprintf(b, "// Search%s runs the generic document query against the index key\n// field: WHERE %s @@@ pdb.parse($1) — pdb.parse carries ParadeDB's full\n// query-string syntax — selecting every column plus pdb.score(%s),\n// optionally one pdb.snippet fragment, ordered pdb.score(%s) DESC,\n// %s ASC and LIMIT-bounded.\n", tableVar, keyField, keyField, keyField, keyField)
-	fmt.Fprintf(b, "func Search%s(ctx context.Context, exec core.DBTX, q string, o Search%sOpts) ([]%sHit, error) {\n", tableVar, tableVar, model)
+	fmt.Fprintf(b, "func Search%s(ctx context.Context, exec pgb.DBTX, q string, o Search%sOpts) ([]%sHit, error) {\n", tableVar, tableVar, model)
 	b.WriteString("\tlimit := o.Limit\n\tif limit <= 0 {\n\t\tlimit = 20\n\t}\n")
 	fmt.Fprintf(b, "\tkey := %s\n", keyCol)
 	cols := make([]string, 0, len(t.Columns)+2)
 	for i := range t.Columns {
 		cols = append(cols, colLiteral(t, t.Columns[i]))
 	}
-	cols = append(cols, "core.Score(key)")
-	fmt.Fprintf(b, "\tcols := []core.Expr{%s}\n", strings.Join(cols, ", "))
+	cols = append(cols, "pgb.Score(key)")
+	fmt.Fprintf(b, "\tcols := []pgb.Expr{%s}\n", strings.Join(cols, ", "))
 	b.WriteString("\tif o.SnippetCol != \"\" {\n")
-	b.WriteString("\t\tcols = append(cols, core.Snippet(core.Col{Table: " + strconv.Quote(t.Name) + ", Name: o.SnippetCol}, \"\", \"\", 0))\n\t}\n")
-	fmt.Fprintf(b, "\trows, err := core.NewSelect(%s, cols...).\n", strconv.Quote(qname))
-	b.WriteString("\t\tWhereExpr(core.Parse(key, q, false)).\n")
-	b.WriteString("\t\tOrderBy(core.Desc(core.Score(key)), core.Asc(key)).\n")
+	b.WriteString("\t\tcols = append(cols, pgb.Snippet(pgb.Col{Table: " + strconv.Quote(t.Name) + ", Name: o.SnippetCol}, \"\", \"\", 0))\n\t}\n")
+	fmt.Fprintf(b, "\trows, err := pgb.NewSelect(%s, cols...).\n", strconv.Quote(qname))
+	b.WriteString("\t\tWhereExpr(pgb.Parse(key, q, false)).\n")
+	b.WriteString("\t\tOrderBy(pgb.Desc(pgb.Score(key)), pgb.Asc(key)).\n")
 	b.WriteString("\t\tLimit(limit).\n\t\tRun(ctx, exec)\n")
 	b.WriteString("\tif err != nil {\n\t\treturn nil, err\n\t}\n")
 	b.WriteString("\tif o.SnippetCol == \"\" {\n")

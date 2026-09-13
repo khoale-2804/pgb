@@ -10,7 +10,7 @@ import (
 	"errors"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 )
 
 // AppUserFilter narrows ListAppUsers and CountAppUsers:
@@ -36,13 +36,13 @@ type AppUserFilter struct {
 	DisplayIn    []pgtype.Text
 	DisplayLike  *string
 	DisplayILike *string
-	Extra        []core.Expr
+	Extra        []pgb.Expr
 }
 
 // appUsersFilterWhere compiles f into the ANDed predicate list; an empty
 // filter yields an empty list (no WHERE).
-func appUsersFilterWhere(f AppUserFilter) []core.Expr {
-	var w []core.Expr
+func appUsersFilterWhere(f AppUserFilter) []pgb.Expr {
+	var w []pgb.Expr
 	if f.ID != nil {
 		w = append(w, AppUsers.ID().Eq(*f.ID))
 	}
@@ -134,15 +134,15 @@ func scanAppUser(row pgx.CollectableRow) (AppUser, error) {
 	return m, nil
 }
 
-// GetAppUser returns one row by id; core.ErrNotFound when absent
+// GetAppUser returns one row by id; pgb.ErrNotFound when absent
 // (pgx.ErrNoRows mapped — errors.Is keeps working for both).
-func GetAppUser(ctx context.Context, exec core.DBTX, id int64) (AppUser, error) {
+func GetAppUser(ctx context.Context, exec pgb.DBTX, id int64) (AppUser, error) {
 	sql, args := AppUsers.Select().Where(AppUsers.ID().Eq(id)).SQL()
 	var m AppUser
 	err := exec.QueryRow(ctx, sql, args...).Scan(&m.ID, &m.Login, &m.PersonID, &m.Display)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return AppUser{}, core.ErrNotFound
+			return AppUser{}, pgb.ErrNotFound
 		}
 		return AppUser{}, err
 	}
@@ -150,8 +150,9 @@ func GetAppUser(ctx context.Context, exec core.DBTX, id int64) (AppUser, error) 
 }
 
 // ListAppUsers returns the rows matching f; limit <= 0 means no LIMIT.
-func ListAppUsers(ctx context.Context, exec core.DBTX, f AppUserFilter, limit int) ([]AppUser, error) {
-	rows, err := AppUsers.Select().Where(appUsersFilterWhere(f)...).Limit(limit).Run(ctx, exec)
+func ListAppUsers(ctx context.Context, exec pgb.DBTX, f AppUserFilter, opts ...pgb.ListOpt) ([]AppUser, error) {
+	sel := AppUsers.Select().Where(appUsersFilterWhere(f)...).ApplyList(opts...)
+	rows, err := sel.Run(ctx, exec)
 	if err != nil {
 		return nil, err
 	}
@@ -159,8 +160,8 @@ func ListAppUsers(ctx context.Context, exec core.DBTX, f AppUserFilter, limit in
 }
 
 // CountAppUsers counts the rows matching f.
-func CountAppUsers(ctx context.Context, exec core.DBTX, f AppUserFilter) (int64, error) {
-	sql, args := core.NewSelect("app.users", core.Raw{SQL: "count(*)"}).Where(appUsersFilterWhere(f)...).SQL()
+func CountAppUsers(ctx context.Context, exec pgb.DBTX, f AppUserFilter) (int64, error) {
+	sql, args := pgb.NewSelect("app.users", pgb.Raw{SQL: "count(*)"}).Where(appUsersFilterWhere(f)...).SQL()
 	var n int64
 	if err := exec.QueryRow(ctx, sql, args...).Scan(&n); err != nil {
 		return 0, err
@@ -170,11 +171,11 @@ func CountAppUsers(ctx context.Context, exec core.DBTX, f AppUserFilter) (int64,
 
 // InsertAppUser inserts one row and returns it (RETURNING every
 // column, defaults included).
-func InsertAppUser(ctx context.Context, exec core.DBTX, p InsertAppUserParams) (AppUser, error) {
-	rows, err := core.NewInsert("app.users",
+func InsertAppUser(ctx context.Context, exec pgb.DBTX, p InsertAppUserParams) (AppUser, error) {
+	rows, err := pgb.NewInsert("app.users",
 		[]string{"login", "person_id", "display"},
-		[]core.Expr{core.Lit{V: p.Login}, core.Lit{V: p.PersonID}, core.Lit{V: p.Display}},
-	).Returning(core.Col{Table: "users", Name: "id"}, core.Col{Table: "users", Name: "login"}, core.Col{Table: "users", Name: "person_id"}, core.Col{Table: "users", Name: "display"}).Run(ctx, exec)
+		[]pgb.Expr{pgb.Lit{V: p.Login}, pgb.Lit{V: p.PersonID}, pgb.Lit{V: p.Display}},
+	).Returning(pgb.Col{Table: "users", Name: "id"}, pgb.Col{Table: "users", Name: "login"}, pgb.Col{Table: "users", Name: "person_id"}, pgb.Col{Table: "users", Name: "display"}).Run(ctx, exec)
 	if err != nil {
 		return AppUser{}, err
 	}
@@ -183,7 +184,7 @@ func InsertAppUser(ctx context.Context, exec core.DBTX, p InsertAppUserParams) (
 		return AppUser{}, err
 	}
 	if len(us) == 0 {
-		return AppUser{}, core.ErrNotFound
+		return AppUser{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
@@ -192,7 +193,7 @@ const insertAppUsersSQL = "INSERT INTO app.users (login, person_id, display) SEL
 
 // InsertAppUsers inserts a whole batch in one round trip via
 // unnest and returns every inserted row.
-func InsertAppUsers(ctx context.Context, exec core.DBTX, ps []InsertAppUserParams) ([]AppUser, error) {
+func InsertAppUsers(ctx context.Context, exec pgb.DBTX, ps []InsertAppUserParams) ([]AppUser, error) {
 	if len(ps) == 0 {
 		return nil, nil
 	}
@@ -214,38 +215,38 @@ func InsertAppUsers(ctx context.Context, exec core.DBTX, ps []InsertAppUserParam
 }
 
 // UpdateAppUser applies the non-zero fields of s to one row and
-// returns the updated row; core.ErrNotFound when absent.
-func UpdateAppUser(ctx context.Context, exec core.DBTX, id int64, s AppUserSet) (AppUser, error) {
+// returns the updated row; pgb.ErrNotFound when absent.
+func UpdateAppUser(ctx context.Context, exec pgb.DBTX, id int64, s AppUserSet) (AppUser, error) {
 	u := AppUsers.Update()
 	n := 0
 	if s.Login.Valid {
 		n++
 		if s.Login.Null {
-			u.Set("login", core.Lit{V: nil})
+			u.Set("login", pgb.Lit{V: nil})
 		} else {
-			u.Set("login", core.Lit{V: s.Login.V})
+			u.Set("login", pgb.Lit{V: s.Login.V})
 		}
 	}
 	if s.PersonID.Valid {
 		n++
 		if s.PersonID.Null {
-			u.Set("person_id", core.Lit{V: nil})
+			u.Set("person_id", pgb.Lit{V: nil})
 		} else {
-			u.Set("person_id", core.Lit{V: s.PersonID.V})
+			u.Set("person_id", pgb.Lit{V: s.PersonID.V})
 		}
 	}
 	if s.Display.Valid {
 		n++
 		if s.Display.Null {
-			u.Set("display", core.Lit{V: nil})
+			u.Set("display", pgb.Lit{V: nil})
 		} else {
-			u.Set("display", core.Lit{V: s.Display.V})
+			u.Set("display", pgb.Lit{V: s.Display.V})
 		}
 	}
 	if n == 0 {
 		return GetAppUser(ctx, exec, id)
 	}
-	u.Where(AppUsers.ID().Eq(id)).Returning(core.Col{Table: "users", Name: "id"}, core.Col{Table: "users", Name: "login"}, core.Col{Table: "users", Name: "person_id"}, core.Col{Table: "users", Name: "display"})
+	u.Where(AppUsers.ID().Eq(id)).Returning(pgb.Col{Table: "users", Name: "id"}, pgb.Col{Table: "users", Name: "login"}, pgb.Col{Table: "users", Name: "person_id"}, pgb.Col{Table: "users", Name: "display"})
 	rows, err := u.Run(ctx, exec)
 	if err != nil {
 		return AppUser{}, err
@@ -255,46 +256,46 @@ func UpdateAppUser(ctx context.Context, exec core.DBTX, id int64, s AppUserSet) 
 		return AppUser{}, err
 	}
 	if len(us) == 0 {
-		return AppUser{}, core.ErrNotFound
+		return AppUser{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // UpdateAppUsers applies s to every row matching where and
 // returns the affected count; an empty where is refused with
-// core.ErrNoWhere before any SQL is sent.
-func UpdateAppUsers(ctx context.Context, exec core.DBTX, where []core.Expr, s AppUserSet) (int64, error) {
+// pgb.ErrNoWhere before any SQL is sent.
+func UpdateAppUsers(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, s AppUserSet) (int64, error) {
 	u := AppUsers.Update()
 	n := 0
 	if s.Login.Valid {
 		n++
 		if s.Login.Null {
-			u.Set("login", core.Lit{V: nil})
+			u.Set("login", pgb.Lit{V: nil})
 		} else {
-			u.Set("login", core.Lit{V: s.Login.V})
+			u.Set("login", pgb.Lit{V: s.Login.V})
 		}
 	}
 	if s.PersonID.Valid {
 		n++
 		if s.PersonID.Null {
-			u.Set("person_id", core.Lit{V: nil})
+			u.Set("person_id", pgb.Lit{V: nil})
 		} else {
-			u.Set("person_id", core.Lit{V: s.PersonID.V})
+			u.Set("person_id", pgb.Lit{V: s.PersonID.V})
 		}
 	}
 	if s.Display.Valid {
 		n++
 		if s.Display.Null {
-			u.Set("display", core.Lit{V: nil})
+			u.Set("display", pgb.Lit{V: nil})
 		} else {
-			u.Set("display", core.Lit{V: s.Display.V})
+			u.Set("display", pgb.Lit{V: s.Display.V})
 		}
 	}
 	if n == 0 {
 		return 0, nil
 	}
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	u.Where(where...)
 	tag, err := u.Exec(ctx, exec)
@@ -306,19 +307,19 @@ func UpdateAppUsers(ctx context.Context, exec core.DBTX, where []core.Expr, s Ap
 
 // UpsertAppUser inserts p under id, or on conflict updates
 // every settable column from the proposed row (EXCLUDED.*) and returns
-// the resulting row; core.ErrNotFound when DO NOTHING matched.
-func UpsertAppUser(ctx context.Context, exec core.DBTX, id int64, p InsertAppUserParams) (AppUser, error) {
-	rows, err := core.NewInsert("app.users",
+// the resulting row; pgb.ErrNotFound when DO NOTHING matched.
+func UpsertAppUser(ctx context.Context, exec pgb.DBTX, id int64, p InsertAppUserParams) (AppUser, error) {
+	rows, err := pgb.NewInsert("app.users",
 		[]string{"id", "login", "person_id", "display"},
-		[]core.Expr{core.Lit{V: id}, core.Lit{V: p.Login}, core.Lit{V: p.PersonID}, core.Lit{V: p.Display}},
-	).OnConflict(core.OnConflict{
+		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.Login}, pgb.Lit{V: p.PersonID}, pgb.Lit{V: p.Display}},
+	).OnConflict(pgb.OnConflict{
 		Target: []string{"id"},
-		Sets: []core.SetClause{
-			{Col: "login", E: core.Col{Table: "excluded", Name: "login"}},
-			{Col: "person_id", E: core.Col{Table: "excluded", Name: "person_id"}},
-			{Col: "display", E: core.Col{Table: "excluded", Name: "display"}},
+		Sets: []pgb.SetClause{
+			{Col: "login", E: pgb.Col{Table: "excluded", Name: "login"}},
+			{Col: "person_id", E: pgb.Col{Table: "excluded", Name: "person_id"}},
+			{Col: "display", E: pgb.Col{Table: "excluded", Name: "display"}},
 		},
-	}).Returning(core.Col{Table: "users", Name: "id"}, core.Col{Table: "users", Name: "login"}, core.Col{Table: "users", Name: "person_id"}, core.Col{Table: "users", Name: "display"}).Run(ctx, exec)
+	}).Returning(pgb.Col{Table: "users", Name: "id"}, pgb.Col{Table: "users", Name: "login"}, pgb.Col{Table: "users", Name: "person_id"}, pgb.Col{Table: "users", Name: "display"}).Run(ctx, exec)
 	if err != nil {
 		return AppUser{}, err
 	}
@@ -327,22 +328,22 @@ func UpsertAppUser(ctx context.Context, exec core.DBTX, id int64, p InsertAppUse
 		return AppUser{}, err
 	}
 	if len(us) == 0 {
-		return AppUser{}, core.ErrNotFound
+		return AppUser{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // DeleteAppUser removes one row by id.
-func DeleteAppUser(ctx context.Context, exec core.DBTX, id int64) error {
+func DeleteAppUser(ctx context.Context, exec pgb.DBTX, id int64) error {
 	_, err := AppUsers.Delete().Where(AppUsers.ID().Eq(id)).Exec(ctx, exec)
 	return err
 }
 
 // DeleteAppUsers removes every row matching where and returns the
-// affected count; an empty where is refused with core.ErrNoWhere.
-func DeleteAppUsers(ctx context.Context, exec core.DBTX, where []core.Expr) (int64, error) {
+// affected count; an empty where is refused with pgb.ErrNoWhere.
+func DeleteAppUsers(ctx context.Context, exec pgb.DBTX, where []pgb.Expr) (int64, error) {
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	tag, err := AppUsers.Delete().Where(where...).Exec(ctx, exec)
 	if err != nil {

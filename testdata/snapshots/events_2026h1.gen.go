@@ -7,249 +7,249 @@ package db
 
 import (
 	"github.com/jackc/pgx/v5/pgtype"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 )
 
 // EventsV2026H1s is the table descriptor for public.events_2026h1; immutable, safe for
 // concurrent use.
-var EventsV2026H1s = EventsV2026H1Table{core.NewTableMeta("public", "events_2026h1")}
+var EventsV2026H1s = EventsV2026H1Table{pgb.NewTableMeta("public", "events_2026h1")}
 
 // EventsV2026H1Table provides typed column accessors and statement entry points.
-type EventsV2026H1Table struct{ core.TableMeta }
+type EventsV2026H1Table struct{ pgb.TableMeta }
 
 // ID returns the typed accessor for column id.
 func (t EventsV2026H1Table) ID() EventsV2026H1IDCol {
-	return EventsV2026H1IDCol{core.Col{Table: "events_2026h1", Name: "id"}}
+	return EventsV2026H1IDCol{pgb.Col{Table: "events_2026h1", Name: "id"}}
 }
 
 // EventsV2026H1IDCol is the typed column events_2026h1.id.
-type EventsV2026H1IDCol struct{ core.Col }
+type EventsV2026H1IDCol struct{ pgb.Col }
 
-func (c EventsV2026H1IDCol) Eq(v int64) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c EventsV2026H1IDCol) Eq(v int64) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c EventsV2026H1IDCol) Ne(v int64) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c EventsV2026H1IDCol) Ne(v int64) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c EventsV2026H1IDCol) In(vs ...int64) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "bigserial[]"}}
+func (c EventsV2026H1IDCol) In(vs ...int64) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "bigserial[]"}}
 }
 
-func (c EventsV2026H1IDCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c EventsV2026H1IDCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c EventsV2026H1IDCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c EventsV2026H1IDCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c EventsV2026H1IDCol) Gt(v int64) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c EventsV2026H1IDCol) Gt(v int64) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c EventsV2026H1IDCol) Lt(v int64) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c EventsV2026H1IDCol) Lt(v int64) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c EventsV2026H1IDCol) Gte(v int64) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c EventsV2026H1IDCol) Gte(v int64) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c EventsV2026H1IDCol) Lte(v int64) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c EventsV2026H1IDCol) Lte(v int64) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c EventsV2026H1IDCol) Between(a, b int64) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c EventsV2026H1IDCol) Between(a, b int64) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // UserID returns the typed accessor for column user_id.
 func (t EventsV2026H1Table) UserID() EventsV2026H1UserIDCol {
-	return EventsV2026H1UserIDCol{core.Col{Table: "events_2026h1", Name: "user_id"}}
+	return EventsV2026H1UserIDCol{pgb.Col{Table: "events_2026h1", Name: "user_id"}}
 }
 
 // EventsV2026H1UserIDCol is the typed column events_2026h1.user_id.
-type EventsV2026H1UserIDCol struct{ core.Col }
+type EventsV2026H1UserIDCol struct{ pgb.Col }
 
-func (c EventsV2026H1UserIDCol) Eq(v int64) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c EventsV2026H1UserIDCol) Eq(v int64) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c EventsV2026H1UserIDCol) Ne(v int64) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c EventsV2026H1UserIDCol) Ne(v int64) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c EventsV2026H1UserIDCol) In(vs ...int64) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "int8[]"}}
+func (c EventsV2026H1UserIDCol) In(vs ...int64) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int8[]"}}
 }
 
-func (c EventsV2026H1UserIDCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c EventsV2026H1UserIDCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c EventsV2026H1UserIDCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c EventsV2026H1UserIDCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c EventsV2026H1UserIDCol) Gt(v int64) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c EventsV2026H1UserIDCol) Gt(v int64) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c EventsV2026H1UserIDCol) Lt(v int64) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c EventsV2026H1UserIDCol) Lt(v int64) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c EventsV2026H1UserIDCol) Gte(v int64) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c EventsV2026H1UserIDCol) Gte(v int64) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c EventsV2026H1UserIDCol) Lte(v int64) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c EventsV2026H1UserIDCol) Lte(v int64) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c EventsV2026H1UserIDCol) Between(a, b int64) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c EventsV2026H1UserIDCol) Between(a, b int64) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // Kind returns the typed accessor for column kind.
 func (t EventsV2026H1Table) Kind() EventsV2026H1KindCol {
-	return EventsV2026H1KindCol{core.Col{Table: "events_2026h1", Name: "kind"}}
+	return EventsV2026H1KindCol{pgb.Col{Table: "events_2026h1", Name: "kind"}}
 }
 
 // EventsV2026H1KindCol is the typed column events_2026h1.kind.
-type EventsV2026H1KindCol struct{ core.Col }
+type EventsV2026H1KindCol struct{ pgb.Col }
 
-func (c EventsV2026H1KindCol) Eq(v string) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c EventsV2026H1KindCol) Eq(v string) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c EventsV2026H1KindCol) Ne(v string) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c EventsV2026H1KindCol) Ne(v string) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c EventsV2026H1KindCol) In(vs ...string) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "text[]"}}
+func (c EventsV2026H1KindCol) In(vs ...string) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
 }
 
-func (c EventsV2026H1KindCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c EventsV2026H1KindCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c EventsV2026H1KindCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c EventsV2026H1KindCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c EventsV2026H1KindCol) Like(p string) core.Expr {
-	return core.Bin{Op: "LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c EventsV2026H1KindCol) Like(p string) pgb.Expr {
+	return pgb.Bin{Op: "LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c EventsV2026H1KindCol) ILike(p string) core.Expr {
-	return core.Bin{Op: "ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c EventsV2026H1KindCol) ILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c EventsV2026H1KindCol) NotLike(p string) core.Expr {
-	return core.Bin{Op: "NOT LIKE", L: c.Col, R: core.Lit{V: p}}
+func (c EventsV2026H1KindCol) NotLike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT LIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
-func (c EventsV2026H1KindCol) NotILike(p string) core.Expr {
-	return core.Bin{Op: "NOT ILIKE", L: c.Col, R: core.Lit{V: p}}
+func (c EventsV2026H1KindCol) NotILike(p string) pgb.Expr {
+	return pgb.Bin{Op: "NOT ILIKE", L: c.Col, R: pgb.Lit{V: p}}
 }
 
 // Payload returns the typed accessor for column payload.
 func (t EventsV2026H1Table) Payload() EventsV2026H1PayloadCol {
-	return EventsV2026H1PayloadCol{core.Col{Table: "events_2026h1", Name: "payload"}}
+	return EventsV2026H1PayloadCol{pgb.Col{Table: "events_2026h1", Name: "payload"}}
 }
 
 // EventsV2026H1PayloadCol is the typed column events_2026h1.payload.
-type EventsV2026H1PayloadCol struct{ core.Col }
+type EventsV2026H1PayloadCol struct{ pgb.Col }
 
-func (c EventsV2026H1PayloadCol) Eq(v []byte) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v, Cast: "jsonb"}}
+func (c EventsV2026H1PayloadCol) Eq(v []byte) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v, Cast: "jsonb"}}
 }
 
-func (c EventsV2026H1PayloadCol) Ne(v []byte) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v, Cast: "jsonb"}}
+func (c EventsV2026H1PayloadCol) Ne(v []byte) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v, Cast: "jsonb"}}
 }
 
-func (c EventsV2026H1PayloadCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c EventsV2026H1PayloadCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c EventsV2026H1PayloadCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c EventsV2026H1PayloadCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c EventsV2026H1PayloadCol) KeyEq(path string, v any) core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " ->> ?", Args: []any{path, v}}
+func (c EventsV2026H1PayloadCol) KeyEq(path string, v any) pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " ->> ?", Args: []any{path, v}}
 }
 
 // OccurredAt returns the typed accessor for column occurred_at.
 func (t EventsV2026H1Table) OccurredAt() EventsV2026H1OccurredAtCol {
-	return EventsV2026H1OccurredAtCol{core.Col{Table: "events_2026h1", Name: "occurred_at"}}
+	return EventsV2026H1OccurredAtCol{pgb.Col{Table: "events_2026h1", Name: "occurred_at"}}
 }
 
 // EventsV2026H1OccurredAtCol is the typed column events_2026h1.occurred_at.
-type EventsV2026H1OccurredAtCol struct{ core.Col }
+type EventsV2026H1OccurredAtCol struct{ pgb.Col }
 
-func (c EventsV2026H1OccurredAtCol) Eq(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "=", L: c.Col, R: core.Lit{V: v}}
+func (c EventsV2026H1OccurredAtCol) Eq(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c EventsV2026H1OccurredAtCol) Ne(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "!=", L: c.Col, R: core.Lit{V: v}}
+func (c EventsV2026H1OccurredAtCol) Ne(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "!=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c EventsV2026H1OccurredAtCol) In(vs ...pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "= ANY", L: c.Col, R: core.Lit{V: vs, Cast: "timestamptz[]"}}
+func (c EventsV2026H1OccurredAtCol) In(vs ...pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "timestamptz[]"}}
 }
 
-func (c EventsV2026H1OccurredAtCol) IsNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
+func (c EventsV2026H1OccurredAtCol) IsNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NULL"}
 }
 
-func (c EventsV2026H1OccurredAtCol) NotNull() core.Expr {
-	return core.Raw{SQL: core.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
+func (c EventsV2026H1OccurredAtCol) NotNull() pgb.Expr {
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " IS NOT NULL"}
 }
 
-func (c EventsV2026H1OccurredAtCol) Gt(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: ">", L: c.Col, R: core.Lit{V: v}}
+func (c EventsV2026H1OccurredAtCol) Gt(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: ">", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c EventsV2026H1OccurredAtCol) Lt(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "<", L: c.Col, R: core.Lit{V: v}}
+func (c EventsV2026H1OccurredAtCol) Lt(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "<", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c EventsV2026H1OccurredAtCol) Gte(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: v}}
+func (c EventsV2026H1OccurredAtCol) Gte(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c EventsV2026H1OccurredAtCol) Lte(v pgtype.Timestamptz) core.Expr {
-	return core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: v}}
+func (c EventsV2026H1OccurredAtCol) Lte(v pgtype.Timestamptz) pgb.Expr {
+	return pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: v}}
 }
 
-func (c EventsV2026H1OccurredAtCol) Between(a, b pgtype.Timestamptz) core.Expr {
-	return core.And{Parts: []core.Expr{
-		core.Bin{Op: ">=", L: c.Col, R: core.Lit{V: a}},
-		core.Bin{Op: "<=", L: c.Col, R: core.Lit{V: b}},
+func (c EventsV2026H1OccurredAtCol) Between(a, b pgtype.Timestamptz) pgb.Expr {
+	return pgb.And{Parts: []pgb.Expr{
+		pgb.Bin{Op: ">=", L: c.Col, R: pgb.Lit{V: a}},
+		pgb.Bin{Op: "<=", L: c.Col, R: pgb.Lit{V: b}},
 	}}
 }
 
 // Select starts a SELECT of every column; chain Where/OrderBy/Limit/...
 // and terminate with Run (or a static function).
-func (t EventsV2026H1Table) Select() *core.Select {
-	return core.NewSelect("public.events_2026h1", core.Col{Table: "events_2026h1", Name: "id"}, core.Col{Table: "events_2026h1", Name: "user_id"}, core.Col{Table: "events_2026h1", Name: "kind"}, core.Col{Table: "events_2026h1", Name: "payload"}, core.Col{Table: "events_2026h1", Name: "occurred_at"})
+func (t EventsV2026H1Table) Select() *pgb.Select {
+	return pgb.NewSelect("public.events_2026h1", pgb.Col{Table: "events_2026h1", Name: "id"}, pgb.Col{Table: "events_2026h1", Name: "user_id"}, pgb.Col{Table: "events_2026h1", Name: "kind"}, pgb.Col{Table: "events_2026h1", Name: "payload"}, pgb.Col{Table: "events_2026h1", Name: "occurred_at"})
 }
 
-// Update starts an UPDATE; an empty WHERE fails with core.ErrNoWhere.
-func (t EventsV2026H1Table) Update() *core.Update { return core.NewUpdate("public.events_2026h1") }
+// Update starts an UPDATE; an empty WHERE fails with pgb.ErrNoWhere.
+func (t EventsV2026H1Table) Update() *pgb.Update { return pgb.NewUpdate("public.events_2026h1") }
 
-// Delete starts a DELETE; an empty WHERE fails with core.ErrNoWhere.
-func (t EventsV2026H1Table) Delete() *core.Delete { return core.NewDelete("public.events_2026h1") }
+// Delete starts a DELETE; an empty WHERE fails with pgb.ErrNoWhere.
+func (t EventsV2026H1Table) Delete() *pgb.Delete { return pgb.NewDelete("public.events_2026h1") }

@@ -10,7 +10,7 @@ import (
 	"errors"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 	"github.com/pgvector/pgvector-go"
 )
 
@@ -61,13 +61,13 @@ type ProductFilter struct {
 	CreatedAtLt      *pgtype.Timestamptz
 	CreatedAtGte     *pgtype.Timestamptz
 	CreatedAtLte     *pgtype.Timestamptz
-	Extra            []core.Expr
+	Extra            []pgb.Expr
 }
 
 // productsFilterWhere compiles f into the ANDed predicate list; an empty
 // filter yields an empty list (no WHERE).
-func productsFilterWhere(f ProductFilter) []core.Expr {
-	var w []core.Expr
+func productsFilterWhere(f ProductFilter) []pgb.Expr {
+	var w []pgb.Expr
 	if f.ID != nil {
 		w = append(w, Products.ID().Eq(*f.ID))
 	}
@@ -245,15 +245,15 @@ func scanProduct(row pgx.CollectableRow) (Product, error) {
 	return m, nil
 }
 
-// GetProduct returns one row by id; core.ErrNotFound when absent
+// GetProduct returns one row by id; pgb.ErrNotFound when absent
 // (pgx.ErrNoRows mapped — errors.Is keeps working for both).
-func GetProduct(ctx context.Context, exec core.DBTX, id int64) (Product, error) {
+func GetProduct(ctx context.Context, exec pgb.DBTX, id int64) (Product, error) {
 	sql, args := Products.Select().Where(Products.ID().Eq(id)).SQL()
 	var m Product
 	err := exec.QueryRow(ctx, sql, args...).Scan(&m.ID, &m.Sku, &m.Title, &m.Description, &m.Category, &m.Rating, &m.Price, &m.InStock, &m.Metadata, &m.Embedding, &m.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Product{}, core.ErrNotFound
+			return Product{}, pgb.ErrNotFound
 		}
 		return Product{}, err
 	}
@@ -261,8 +261,9 @@ func GetProduct(ctx context.Context, exec core.DBTX, id int64) (Product, error) 
 }
 
 // ListProducts returns the rows matching f; limit <= 0 means no LIMIT.
-func ListProducts(ctx context.Context, exec core.DBTX, f ProductFilter, limit int) ([]Product, error) {
-	rows, err := Products.Select().Where(productsFilterWhere(f)...).Limit(limit).Run(ctx, exec)
+func ListProducts(ctx context.Context, exec pgb.DBTX, f ProductFilter, opts ...pgb.ListOpt) ([]Product, error) {
+	sel := Products.Select().Where(productsFilterWhere(f)...).ApplyList(opts...)
+	rows, err := sel.Run(ctx, exec)
 	if err != nil {
 		return nil, err
 	}
@@ -270,8 +271,8 @@ func ListProducts(ctx context.Context, exec core.DBTX, f ProductFilter, limit in
 }
 
 // CountProducts counts the rows matching f.
-func CountProducts(ctx context.Context, exec core.DBTX, f ProductFilter) (int64, error) {
-	sql, args := core.NewSelect("public.products", core.Raw{SQL: "count(*)"}).Where(productsFilterWhere(f)...).SQL()
+func CountProducts(ctx context.Context, exec pgb.DBTX, f ProductFilter) (int64, error) {
+	sql, args := pgb.NewSelect("public.products", pgb.Raw{SQL: "count(*)"}).Where(productsFilterWhere(f)...).SQL()
 	var n int64
 	if err := exec.QueryRow(ctx, sql, args...).Scan(&n); err != nil {
 		return 0, err
@@ -281,11 +282,11 @@ func CountProducts(ctx context.Context, exec core.DBTX, f ProductFilter) (int64,
 
 // InsertProduct inserts one row and returns it (RETURNING every
 // column, defaults included).
-func InsertProduct(ctx context.Context, exec core.DBTX, p InsertProductParams) (Product, error) {
-	rows, err := core.NewInsert("public.products",
+func InsertProduct(ctx context.Context, exec pgb.DBTX, p InsertProductParams) (Product, error) {
+	rows, err := pgb.NewInsert("public.products",
 		[]string{"sku", "title", "description", "category", "rating", "price", "in_stock", "metadata", "embedding", "created_at"},
-		[]core.Expr{core.Lit{V: p.Sku}, core.Lit{V: p.Title}, core.Lit{V: p.Description}, core.Lit{V: p.Category}, core.Lit{V: p.Rating}, core.Lit{V: p.Price}, core.Lit{V: p.InStock}, core.Lit{V: p.Metadata, Cast: "jsonb"}, core.Lit{V: p.Embedding}, core.Lit{V: p.CreatedAt}},
-	).Returning(core.Col{Table: "products", Name: "id"}, core.Col{Table: "products", Name: "sku"}, core.Col{Table: "products", Name: "title"}, core.Col{Table: "products", Name: "description"}, core.Col{Table: "products", Name: "category"}, core.Col{Table: "products", Name: "rating"}, core.Col{Table: "products", Name: "price"}, core.Col{Table: "products", Name: "in_stock"}, core.Col{Table: "products", Name: "metadata"}, core.Col{Table: "products", Name: "embedding"}, core.Col{Table: "products", Name: "created_at"}).Run(ctx, exec)
+		[]pgb.Expr{pgb.Lit{V: p.Sku}, pgb.Lit{V: p.Title}, pgb.Lit{V: p.Description}, pgb.Lit{V: p.Category}, pgb.Lit{V: p.Rating}, pgb.Lit{V: p.Price}, pgb.Lit{V: p.InStock}, pgb.Lit{V: p.Metadata, Cast: "jsonb"}, pgb.Lit{V: p.Embedding}, pgb.Lit{V: p.CreatedAt}},
+	).Returning(pgb.Col{Table: "products", Name: "id"}, pgb.Col{Table: "products", Name: "sku"}, pgb.Col{Table: "products", Name: "title"}, pgb.Col{Table: "products", Name: "description"}, pgb.Col{Table: "products", Name: "category"}, pgb.Col{Table: "products", Name: "rating"}, pgb.Col{Table: "products", Name: "price"}, pgb.Col{Table: "products", Name: "in_stock"}, pgb.Col{Table: "products", Name: "metadata"}, pgb.Col{Table: "products", Name: "embedding"}, pgb.Col{Table: "products", Name: "created_at"}).Run(ctx, exec)
 	if err != nil {
 		return Product{}, err
 	}
@@ -294,7 +295,7 @@ func InsertProduct(ctx context.Context, exec core.DBTX, p InsertProductParams) (
 		return Product{}, err
 	}
 	if len(us) == 0 {
-		return Product{}, core.ErrNotFound
+		return Product{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
@@ -303,7 +304,7 @@ const insertProductsSQL = "INSERT INTO public.products (sku, title, description,
 
 // InsertProducts inserts a whole batch in one round trip via
 // unnest and returns every inserted row.
-func InsertProducts(ctx context.Context, exec core.DBTX, ps []InsertProductParams) ([]Product, error) {
+func InsertProducts(ctx context.Context, exec pgb.DBTX, ps []InsertProductParams) ([]Product, error) {
 	if len(ps) == 0 {
 		return nil, nil
 	}
@@ -339,94 +340,94 @@ func InsertProducts(ctx context.Context, exec core.DBTX, ps []InsertProductParam
 }
 
 // UpdateProduct applies the non-zero fields of s to one row and
-// returns the updated row; core.ErrNotFound when absent.
-func UpdateProduct(ctx context.Context, exec core.DBTX, id int64, s ProductSet) (Product, error) {
+// returns the updated row; pgb.ErrNotFound when absent.
+func UpdateProduct(ctx context.Context, exec pgb.DBTX, id int64, s ProductSet) (Product, error) {
 	u := Products.Update()
 	n := 0
 	if s.Sku.Valid {
 		n++
 		if s.Sku.Null {
-			u.Set("sku", core.Lit{V: nil})
+			u.Set("sku", pgb.Lit{V: nil})
 		} else {
-			u.Set("sku", core.Lit{V: s.Sku.V})
+			u.Set("sku", pgb.Lit{V: s.Sku.V})
 		}
 	}
 	if s.Title.Valid {
 		n++
 		if s.Title.Null {
-			u.Set("title", core.Lit{V: nil})
+			u.Set("title", pgb.Lit{V: nil})
 		} else {
-			u.Set("title", core.Lit{V: s.Title.V})
+			u.Set("title", pgb.Lit{V: s.Title.V})
 		}
 	}
 	if s.Description.Valid {
 		n++
 		if s.Description.Null {
-			u.Set("description", core.Lit{V: nil})
+			u.Set("description", pgb.Lit{V: nil})
 		} else {
-			u.Set("description", core.Lit{V: s.Description.V})
+			u.Set("description", pgb.Lit{V: s.Description.V})
 		}
 	}
 	if s.Category.Valid {
 		n++
 		if s.Category.Null {
-			u.Set("category", core.Lit{V: nil})
+			u.Set("category", pgb.Lit{V: nil})
 		} else {
-			u.Set("category", core.Lit{V: s.Category.V})
+			u.Set("category", pgb.Lit{V: s.Category.V})
 		}
 	}
 	if s.Rating.Valid {
 		n++
 		if s.Rating.Null {
-			u.Set("rating", core.Lit{V: nil})
+			u.Set("rating", pgb.Lit{V: nil})
 		} else {
-			u.Set("rating", core.Lit{V: s.Rating.V})
+			u.Set("rating", pgb.Lit{V: s.Rating.V})
 		}
 	}
 	if s.Price.Valid {
 		n++
 		if s.Price.Null {
-			u.Set("price", core.Lit{V: nil})
+			u.Set("price", pgb.Lit{V: nil})
 		} else {
-			u.Set("price", core.Lit{V: s.Price.V})
+			u.Set("price", pgb.Lit{V: s.Price.V})
 		}
 	}
 	if s.InStock.Valid {
 		n++
 		if s.InStock.Null {
-			u.Set("in_stock", core.Lit{V: nil})
+			u.Set("in_stock", pgb.Lit{V: nil})
 		} else {
-			u.Set("in_stock", core.Lit{V: s.InStock.V})
+			u.Set("in_stock", pgb.Lit{V: s.InStock.V})
 		}
 	}
 	if s.Metadata.Valid {
 		n++
 		if s.Metadata.Null {
-			u.Set("metadata", core.Lit{V: nil})
+			u.Set("metadata", pgb.Lit{V: nil})
 		} else {
-			u.Set("metadata", core.Lit{V: s.Metadata.V, Cast: "jsonb"})
+			u.Set("metadata", pgb.Lit{V: s.Metadata.V, Cast: "jsonb"})
 		}
 	}
 	if s.Embedding.Valid {
 		n++
 		if s.Embedding.Null {
-			u.Set("embedding", core.Lit{V: nil})
+			u.Set("embedding", pgb.Lit{V: nil})
 		} else {
-			u.Set("embedding", core.Lit{V: s.Embedding.V})
+			u.Set("embedding", pgb.Lit{V: s.Embedding.V})
 		}
 	}
 	if s.CreatedAt.Valid {
 		n++
 		if s.CreatedAt.Null {
-			u.Set("created_at", core.Lit{V: nil})
+			u.Set("created_at", pgb.Lit{V: nil})
 		} else {
-			u.Set("created_at", core.Lit{V: s.CreatedAt.V})
+			u.Set("created_at", pgb.Lit{V: s.CreatedAt.V})
 		}
 	}
 	if n == 0 {
 		return GetProduct(ctx, exec, id)
 	}
-	u.Where(Products.ID().Eq(id)).Returning(core.Col{Table: "products", Name: "id"}, core.Col{Table: "products", Name: "sku"}, core.Col{Table: "products", Name: "title"}, core.Col{Table: "products", Name: "description"}, core.Col{Table: "products", Name: "category"}, core.Col{Table: "products", Name: "rating"}, core.Col{Table: "products", Name: "price"}, core.Col{Table: "products", Name: "in_stock"}, core.Col{Table: "products", Name: "metadata"}, core.Col{Table: "products", Name: "embedding"}, core.Col{Table: "products", Name: "created_at"})
+	u.Where(Products.ID().Eq(id)).Returning(pgb.Col{Table: "products", Name: "id"}, pgb.Col{Table: "products", Name: "sku"}, pgb.Col{Table: "products", Name: "title"}, pgb.Col{Table: "products", Name: "description"}, pgb.Col{Table: "products", Name: "category"}, pgb.Col{Table: "products", Name: "rating"}, pgb.Col{Table: "products", Name: "price"}, pgb.Col{Table: "products", Name: "in_stock"}, pgb.Col{Table: "products", Name: "metadata"}, pgb.Col{Table: "products", Name: "embedding"}, pgb.Col{Table: "products", Name: "created_at"})
 	rows, err := u.Run(ctx, exec)
 	if err != nil {
 		return Product{}, err
@@ -436,102 +437,102 @@ func UpdateProduct(ctx context.Context, exec core.DBTX, id int64, s ProductSet) 
 		return Product{}, err
 	}
 	if len(us) == 0 {
-		return Product{}, core.ErrNotFound
+		return Product{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // UpdateProducts applies s to every row matching where and
 // returns the affected count; an empty where is refused with
-// core.ErrNoWhere before any SQL is sent.
-func UpdateProducts(ctx context.Context, exec core.DBTX, where []core.Expr, s ProductSet) (int64, error) {
+// pgb.ErrNoWhere before any SQL is sent.
+func UpdateProducts(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, s ProductSet) (int64, error) {
 	u := Products.Update()
 	n := 0
 	if s.Sku.Valid {
 		n++
 		if s.Sku.Null {
-			u.Set("sku", core.Lit{V: nil})
+			u.Set("sku", pgb.Lit{V: nil})
 		} else {
-			u.Set("sku", core.Lit{V: s.Sku.V})
+			u.Set("sku", pgb.Lit{V: s.Sku.V})
 		}
 	}
 	if s.Title.Valid {
 		n++
 		if s.Title.Null {
-			u.Set("title", core.Lit{V: nil})
+			u.Set("title", pgb.Lit{V: nil})
 		} else {
-			u.Set("title", core.Lit{V: s.Title.V})
+			u.Set("title", pgb.Lit{V: s.Title.V})
 		}
 	}
 	if s.Description.Valid {
 		n++
 		if s.Description.Null {
-			u.Set("description", core.Lit{V: nil})
+			u.Set("description", pgb.Lit{V: nil})
 		} else {
-			u.Set("description", core.Lit{V: s.Description.V})
+			u.Set("description", pgb.Lit{V: s.Description.V})
 		}
 	}
 	if s.Category.Valid {
 		n++
 		if s.Category.Null {
-			u.Set("category", core.Lit{V: nil})
+			u.Set("category", pgb.Lit{V: nil})
 		} else {
-			u.Set("category", core.Lit{V: s.Category.V})
+			u.Set("category", pgb.Lit{V: s.Category.V})
 		}
 	}
 	if s.Rating.Valid {
 		n++
 		if s.Rating.Null {
-			u.Set("rating", core.Lit{V: nil})
+			u.Set("rating", pgb.Lit{V: nil})
 		} else {
-			u.Set("rating", core.Lit{V: s.Rating.V})
+			u.Set("rating", pgb.Lit{V: s.Rating.V})
 		}
 	}
 	if s.Price.Valid {
 		n++
 		if s.Price.Null {
-			u.Set("price", core.Lit{V: nil})
+			u.Set("price", pgb.Lit{V: nil})
 		} else {
-			u.Set("price", core.Lit{V: s.Price.V})
+			u.Set("price", pgb.Lit{V: s.Price.V})
 		}
 	}
 	if s.InStock.Valid {
 		n++
 		if s.InStock.Null {
-			u.Set("in_stock", core.Lit{V: nil})
+			u.Set("in_stock", pgb.Lit{V: nil})
 		} else {
-			u.Set("in_stock", core.Lit{V: s.InStock.V})
+			u.Set("in_stock", pgb.Lit{V: s.InStock.V})
 		}
 	}
 	if s.Metadata.Valid {
 		n++
 		if s.Metadata.Null {
-			u.Set("metadata", core.Lit{V: nil})
+			u.Set("metadata", pgb.Lit{V: nil})
 		} else {
-			u.Set("metadata", core.Lit{V: s.Metadata.V, Cast: "jsonb"})
+			u.Set("metadata", pgb.Lit{V: s.Metadata.V, Cast: "jsonb"})
 		}
 	}
 	if s.Embedding.Valid {
 		n++
 		if s.Embedding.Null {
-			u.Set("embedding", core.Lit{V: nil})
+			u.Set("embedding", pgb.Lit{V: nil})
 		} else {
-			u.Set("embedding", core.Lit{V: s.Embedding.V})
+			u.Set("embedding", pgb.Lit{V: s.Embedding.V})
 		}
 	}
 	if s.CreatedAt.Valid {
 		n++
 		if s.CreatedAt.Null {
-			u.Set("created_at", core.Lit{V: nil})
+			u.Set("created_at", pgb.Lit{V: nil})
 		} else {
-			u.Set("created_at", core.Lit{V: s.CreatedAt.V})
+			u.Set("created_at", pgb.Lit{V: s.CreatedAt.V})
 		}
 	}
 	if n == 0 {
 		return 0, nil
 	}
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	u.Where(where...)
 	tag, err := u.Exec(ctx, exec)
@@ -543,26 +544,26 @@ func UpdateProducts(ctx context.Context, exec core.DBTX, where []core.Expr, s Pr
 
 // UpsertProduct inserts p under id, or on conflict updates
 // every settable column from the proposed row (EXCLUDED.*) and returns
-// the resulting row; core.ErrNotFound when DO NOTHING matched.
-func UpsertProduct(ctx context.Context, exec core.DBTX, id int64, p InsertProductParams) (Product, error) {
-	rows, err := core.NewInsert("public.products",
+// the resulting row; pgb.ErrNotFound when DO NOTHING matched.
+func UpsertProduct(ctx context.Context, exec pgb.DBTX, id int64, p InsertProductParams) (Product, error) {
+	rows, err := pgb.NewInsert("public.products",
 		[]string{"id", "sku", "title", "description", "category", "rating", "price", "in_stock", "metadata", "embedding", "created_at"},
-		[]core.Expr{core.Lit{V: id}, core.Lit{V: p.Sku}, core.Lit{V: p.Title}, core.Lit{V: p.Description}, core.Lit{V: p.Category}, core.Lit{V: p.Rating}, core.Lit{V: p.Price}, core.Lit{V: p.InStock}, core.Lit{V: p.Metadata, Cast: "jsonb"}, core.Lit{V: p.Embedding}, core.Lit{V: p.CreatedAt}},
-	).OnConflict(core.OnConflict{
+		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.Sku}, pgb.Lit{V: p.Title}, pgb.Lit{V: p.Description}, pgb.Lit{V: p.Category}, pgb.Lit{V: p.Rating}, pgb.Lit{V: p.Price}, pgb.Lit{V: p.InStock}, pgb.Lit{V: p.Metadata, Cast: "jsonb"}, pgb.Lit{V: p.Embedding}, pgb.Lit{V: p.CreatedAt}},
+	).OnConflict(pgb.OnConflict{
 		Target: []string{"id"},
-		Sets: []core.SetClause{
-			{Col: "sku", E: core.Col{Table: "excluded", Name: "sku"}},
-			{Col: "title", E: core.Col{Table: "excluded", Name: "title"}},
-			{Col: "description", E: core.Col{Table: "excluded", Name: "description"}},
-			{Col: "category", E: core.Col{Table: "excluded", Name: "category"}},
-			{Col: "rating", E: core.Col{Table: "excluded", Name: "rating"}},
-			{Col: "price", E: core.Col{Table: "excluded", Name: "price"}},
-			{Col: "in_stock", E: core.Col{Table: "excluded", Name: "in_stock"}},
-			{Col: "metadata", E: core.Col{Table: "excluded", Name: "metadata"}},
-			{Col: "embedding", E: core.Col{Table: "excluded", Name: "embedding"}},
-			{Col: "created_at", E: core.Col{Table: "excluded", Name: "created_at"}},
+		Sets: []pgb.SetClause{
+			{Col: "sku", E: pgb.Col{Table: "excluded", Name: "sku"}},
+			{Col: "title", E: pgb.Col{Table: "excluded", Name: "title"}},
+			{Col: "description", E: pgb.Col{Table: "excluded", Name: "description"}},
+			{Col: "category", E: pgb.Col{Table: "excluded", Name: "category"}},
+			{Col: "rating", E: pgb.Col{Table: "excluded", Name: "rating"}},
+			{Col: "price", E: pgb.Col{Table: "excluded", Name: "price"}},
+			{Col: "in_stock", E: pgb.Col{Table: "excluded", Name: "in_stock"}},
+			{Col: "metadata", E: pgb.Col{Table: "excluded", Name: "metadata"}},
+			{Col: "embedding", E: pgb.Col{Table: "excluded", Name: "embedding"}},
+			{Col: "created_at", E: pgb.Col{Table: "excluded", Name: "created_at"}},
 		},
-	}).Returning(core.Col{Table: "products", Name: "id"}, core.Col{Table: "products", Name: "sku"}, core.Col{Table: "products", Name: "title"}, core.Col{Table: "products", Name: "description"}, core.Col{Table: "products", Name: "category"}, core.Col{Table: "products", Name: "rating"}, core.Col{Table: "products", Name: "price"}, core.Col{Table: "products", Name: "in_stock"}, core.Col{Table: "products", Name: "metadata"}, core.Col{Table: "products", Name: "embedding"}, core.Col{Table: "products", Name: "created_at"}).Run(ctx, exec)
+	}).Returning(pgb.Col{Table: "products", Name: "id"}, pgb.Col{Table: "products", Name: "sku"}, pgb.Col{Table: "products", Name: "title"}, pgb.Col{Table: "products", Name: "description"}, pgb.Col{Table: "products", Name: "category"}, pgb.Col{Table: "products", Name: "rating"}, pgb.Col{Table: "products", Name: "price"}, pgb.Col{Table: "products", Name: "in_stock"}, pgb.Col{Table: "products", Name: "metadata"}, pgb.Col{Table: "products", Name: "embedding"}, pgb.Col{Table: "products", Name: "created_at"}).Run(ctx, exec)
 	if err != nil {
 		return Product{}, err
 	}
@@ -571,22 +572,22 @@ func UpsertProduct(ctx context.Context, exec core.DBTX, id int64, p InsertProduc
 		return Product{}, err
 	}
 	if len(us) == 0 {
-		return Product{}, core.ErrNotFound
+		return Product{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // DeleteProduct removes one row by id.
-func DeleteProduct(ctx context.Context, exec core.DBTX, id int64) error {
+func DeleteProduct(ctx context.Context, exec pgb.DBTX, id int64) error {
 	_, err := Products.Delete().Where(Products.ID().Eq(id)).Exec(ctx, exec)
 	return err
 }
 
 // DeleteProducts removes every row matching where and returns the
-// affected count; an empty where is refused with core.ErrNoWhere.
-func DeleteProducts(ctx context.Context, exec core.DBTX, where []core.Expr) (int64, error) {
+// affected count; an empty where is refused with pgb.ErrNoWhere.
+func DeleteProducts(ctx context.Context, exec pgb.DBTX, where []pgb.Expr) (int64, error) {
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	tag, err := Products.Delete().Where(where...).Exec(ctx, exec)
 	if err != nil {

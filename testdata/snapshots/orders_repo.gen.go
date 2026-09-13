@@ -9,7 +9,7 @@ import (
 	"context"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	core "github.com/khoale-2804/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 )
 
 // OrderFilter narrows ListOrders and CountOrders:
@@ -52,13 +52,13 @@ type OrderFilter struct {
 	NotesIn     []pgtype.Text
 	NotesLike   *string
 	NotesILike  *string
-	Extra       []core.Expr
+	Extra       []pgb.Expr
 }
 
 // ordersFilterWhere compiles f into the ANDed predicate list; an empty
 // filter yields an empty list (no WHERE).
-func ordersFilterWhere(f OrderFilter) []core.Expr {
-	var w []core.Expr
+func ordersFilterWhere(f OrderFilter) []pgb.Expr {
+	var w []pgb.Expr
 	if f.ID != nil {
 		w = append(w, Orders.ID().Eq(*f.ID))
 	}
@@ -214,8 +214,9 @@ func scanOrder(row pgx.CollectableRow) (Order, error) {
 }
 
 // ListOrders returns the rows matching f; limit <= 0 means no LIMIT.
-func ListOrders(ctx context.Context, exec core.DBTX, f OrderFilter, limit int) ([]Order, error) {
-	rows, err := Orders.Select().Where(ordersFilterWhere(f)...).Limit(limit).Run(ctx, exec)
+func ListOrders(ctx context.Context, exec pgb.DBTX, f OrderFilter, opts ...pgb.ListOpt) ([]Order, error) {
+	sel := Orders.Select().Where(ordersFilterWhere(f)...).ApplyList(opts...)
+	rows, err := sel.Run(ctx, exec)
 	if err != nil {
 		return nil, err
 	}
@@ -223,8 +224,8 @@ func ListOrders(ctx context.Context, exec core.DBTX, f OrderFilter, limit int) (
 }
 
 // CountOrders counts the rows matching f.
-func CountOrders(ctx context.Context, exec core.DBTX, f OrderFilter) (int64, error) {
-	sql, args := core.NewSelect("public.orders", core.Raw{SQL: "count(*)"}).Where(ordersFilterWhere(f)...).SQL()
+func CountOrders(ctx context.Context, exec pgb.DBTX, f OrderFilter) (int64, error) {
+	sql, args := pgb.NewSelect("public.orders", pgb.Raw{SQL: "count(*)"}).Where(ordersFilterWhere(f)...).SQL()
 	var n int64
 	if err := exec.QueryRow(ctx, sql, args...).Scan(&n); err != nil {
 		return 0, err
@@ -234,11 +235,11 @@ func CountOrders(ctx context.Context, exec core.DBTX, f OrderFilter) (int64, err
 
 // InsertOrder inserts one row and returns it (RETURNING every
 // column, defaults included).
-func InsertOrder(ctx context.Context, exec core.DBTX, p InsertOrderParams) (Order, error) {
-	rows, err := core.NewInsert("public.orders",
+func InsertOrder(ctx context.Context, exec pgb.DBTX, p InsertOrderParams) (Order, error) {
+	rows, err := pgb.NewInsert("public.orders",
 		[]string{"id", "shop_id", "user_id", "channel", "total", "placed_at", "ship_window", "schedule", "notes"},
-		[]core.Expr{core.Lit{V: p.ID}, core.Lit{V: p.ShopID}, core.Lit{V: p.UserID}, core.Lit{V: p.Channel, Cast: "order_channel"}, core.Lit{V: p.Total}, core.Lit{V: p.PlacedAt}, core.Lit{V: p.ShipWindow}, core.Lit{V: p.Schedule}, core.Lit{V: p.Notes}},
-	).Returning(core.Col{Table: "orders", Name: "id"}, core.Col{Table: "orders", Name: "shop_id"}, core.Col{Table: "orders", Name: "user_id"}, core.Col{Table: "orders", Name: "channel"}, core.Col{Table: "orders", Name: "total"}, core.Col{Table: "orders", Name: "placed_at"}, core.Col{Table: "orders", Name: "ship_window"}, core.Col{Table: "orders", Name: "schedule"}, core.Col{Table: "orders", Name: "notes"}).Run(ctx, exec)
+		[]pgb.Expr{pgb.Lit{V: p.ID}, pgb.Lit{V: p.ShopID}, pgb.Lit{V: p.UserID}, pgb.Lit{V: p.Channel, Cast: "order_channel"}, pgb.Lit{V: p.Total}, pgb.Lit{V: p.PlacedAt}, pgb.Lit{V: p.ShipWindow}, pgb.Lit{V: p.Schedule}, pgb.Lit{V: p.Notes}},
+	).Returning(pgb.Col{Table: "orders", Name: "id"}, pgb.Col{Table: "orders", Name: "shop_id"}, pgb.Col{Table: "orders", Name: "user_id"}, pgb.Col{Table: "orders", Name: "channel"}, pgb.Col{Table: "orders", Name: "total"}, pgb.Col{Table: "orders", Name: "placed_at"}, pgb.Col{Table: "orders", Name: "ship_window"}, pgb.Col{Table: "orders", Name: "schedule"}, pgb.Col{Table: "orders", Name: "notes"}).Run(ctx, exec)
 	if err != nil {
 		return Order{}, err
 	}
@@ -247,94 +248,94 @@ func InsertOrder(ctx context.Context, exec core.DBTX, p InsertOrderParams) (Orde
 		return Order{}, err
 	}
 	if len(us) == 0 {
-		return Order{}, core.ErrNotFound
+		return Order{}, pgb.ErrNotFound
 	}
 	return us[0], nil
 }
 
 // UpdateOrders applies s to every row matching where and
 // returns the affected count; an empty where is refused with
-// core.ErrNoWhere before any SQL is sent.
-func UpdateOrders(ctx context.Context, exec core.DBTX, where []core.Expr, s OrderSet) (int64, error) {
+// pgb.ErrNoWhere before any SQL is sent.
+func UpdateOrders(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, s OrderSet) (int64, error) {
 	u := Orders.Update()
 	n := 0
 	if s.ID.Valid {
 		n++
 		if s.ID.Null {
-			u.Set("id", core.Lit{V: nil})
+			u.Set("id", pgb.Lit{V: nil})
 		} else {
-			u.Set("id", core.Lit{V: s.ID.V})
+			u.Set("id", pgb.Lit{V: s.ID.V})
 		}
 	}
 	if s.ShopID.Valid {
 		n++
 		if s.ShopID.Null {
-			u.Set("shop_id", core.Lit{V: nil})
+			u.Set("shop_id", pgb.Lit{V: nil})
 		} else {
-			u.Set("shop_id", core.Lit{V: s.ShopID.V})
+			u.Set("shop_id", pgb.Lit{V: s.ShopID.V})
 		}
 	}
 	if s.UserID.Valid {
 		n++
 		if s.UserID.Null {
-			u.Set("user_id", core.Lit{V: nil})
+			u.Set("user_id", pgb.Lit{V: nil})
 		} else {
-			u.Set("user_id", core.Lit{V: s.UserID.V})
+			u.Set("user_id", pgb.Lit{V: s.UserID.V})
 		}
 	}
 	if s.Channel.Valid {
 		n++
 		if s.Channel.Null {
-			u.Set("channel", core.Lit{V: nil})
+			u.Set("channel", pgb.Lit{V: nil})
 		} else {
-			u.Set("channel", core.Lit{V: s.Channel.V, Cast: "order_channel"})
+			u.Set("channel", pgb.Lit{V: s.Channel.V, Cast: "order_channel"})
 		}
 	}
 	if s.Total.Valid {
 		n++
 		if s.Total.Null {
-			u.Set("total", core.Lit{V: nil})
+			u.Set("total", pgb.Lit{V: nil})
 		} else {
-			u.Set("total", core.Lit{V: s.Total.V})
+			u.Set("total", pgb.Lit{V: s.Total.V})
 		}
 	}
 	if s.PlacedAt.Valid {
 		n++
 		if s.PlacedAt.Null {
-			u.Set("placed_at", core.Lit{V: nil})
+			u.Set("placed_at", pgb.Lit{V: nil})
 		} else {
-			u.Set("placed_at", core.Lit{V: s.PlacedAt.V})
+			u.Set("placed_at", pgb.Lit{V: s.PlacedAt.V})
 		}
 	}
 	if s.ShipWindow.Valid {
 		n++
 		if s.ShipWindow.Null {
-			u.Set("ship_window", core.Lit{V: nil})
+			u.Set("ship_window", pgb.Lit{V: nil})
 		} else {
-			u.Set("ship_window", core.Lit{V: s.ShipWindow.V})
+			u.Set("ship_window", pgb.Lit{V: s.ShipWindow.V})
 		}
 	}
 	if s.Schedule.Valid {
 		n++
 		if s.Schedule.Null {
-			u.Set("schedule", core.Lit{V: nil})
+			u.Set("schedule", pgb.Lit{V: nil})
 		} else {
-			u.Set("schedule", core.Lit{V: s.Schedule.V})
+			u.Set("schedule", pgb.Lit{V: s.Schedule.V})
 		}
 	}
 	if s.Notes.Valid {
 		n++
 		if s.Notes.Null {
-			u.Set("notes", core.Lit{V: nil})
+			u.Set("notes", pgb.Lit{V: nil})
 		} else {
-			u.Set("notes", core.Lit{V: s.Notes.V})
+			u.Set("notes", pgb.Lit{V: s.Notes.V})
 		}
 	}
 	if n == 0 {
 		return 0, nil
 	}
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	u.Where(where...)
 	tag, err := u.Exec(ctx, exec)
@@ -345,10 +346,10 @@ func UpdateOrders(ctx context.Context, exec core.DBTX, where []core.Expr, s Orde
 }
 
 // DeleteOrders removes every row matching where and returns the
-// affected count; an empty where is refused with core.ErrNoWhere.
-func DeleteOrders(ctx context.Context, exec core.DBTX, where []core.Expr) (int64, error) {
+// affected count; an empty where is refused with pgb.ErrNoWhere.
+func DeleteOrders(ctx context.Context, exec pgb.DBTX, where []pgb.Expr) (int64, error) {
 	if len(where) == 0 {
-		return 0, core.ErrNoWhere
+		return 0, pgb.ErrNoWhere
 	}
 	tag, err := Orders.Delete().Where(where...).Exec(ctx, exec)
 	if err != nil {

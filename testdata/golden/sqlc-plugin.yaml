@@ -1,0 +1,23 @@
+version: '2'
+sql:
+  - engine: postgresql
+    schema: schema.sql
+    queries: queries.sql
+    codegen:
+      - out: gen-plugin
+        plugin: pgb
+        options:
+          package: db
+          core: github.com/khoale-2804/pgb/core
+          target: "18"
+plugins:
+  - name: pgb
+    process:
+      cmd: "sqlc-gen-pgb"
+# NOTE: no gen:go block — the pgb plugin replaces stock sqlc-gen-go output.
+# sqlc-plugin.yaml is the checked-in plugin golden config; the integration
+# test (gen/integration_test.go) writes a sqlc-plugin.gen.yaml variant whose
+# plugin cmd points at a freshly built binary and runs it via `sqlc generate`.
+
+# NOTE: process plugin cmd must be an executable PATH (sqlc does not run
+# shell commands). Build it first: make plugin (emits bin/sqlc-gen-pgb).

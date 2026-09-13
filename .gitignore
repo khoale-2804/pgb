@@ -4,3 +4,9 @@ node_modules/
 dist/
 .DS_Store
 gen/
+
+# pgb plugin build + integration test artifacts
+bin/
+testdata/golden/gen-plugin/
+testdata/golden/sqlc-plugin.gen.yaml
+gen-plugin/

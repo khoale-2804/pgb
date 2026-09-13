@@ -329,6 +329,8 @@ CREATE TABLE skippable_partner (
   label text NOT NULL
 );
 
+COMMENT ON TABLE skippable_partner IS 'pgb:skip';
+
 -- ============================================================================
 -- M. docs — second pg_search shape: uuid key_field, edge_ngram tokenizer,
 --    aliased double-indexed column, stemming

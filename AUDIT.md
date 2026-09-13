@@ -29,20 +29,23 @@ rest are recorded here as the known-issues ledger, priority-ordered.
 
 ### P1
 
-1. **heuristicPK fails soft** — gen/pass_statics.go: `heuristicPK` falls back
+1. **heuristicPK fails soft** — PARTIALLY FIXED (shift of 2026-09-14):
+   ALTER TABLE ADD CONSTRAINT keys are now extracted (kills the main
+   silent-wrong path) and a stderr warning fires when the id heuristic keys
+   the statics. The "skip the statics" option remains open for debate. — gen/pass_statics.go: `heuristicPK` falls back
    to "single NOT NULL id column" and `load_ddl.Enrich` swallows parse
    errors, so an unparseable schema silently keys Get/Update/Upsert/Delete on
    a possibly non-unique `id` (wrong-row reads; `ON CONFLICT (id)` → 42P10).
    Fix direction: log a warning to stderr and skip key-based statics when the
    heuristic fires.
-2. **ALTER TABLE ADD PRIMARY KEY not supported** — sqlc's catalog proto and
-   gen/load_ddl.go both ignore it (verified empirically, testdata/edge/NOTES.md
-   item E11); combined with (1) this generates `id`-keyed statics for a table
-   whose real PK is declared via ALTER.
-3. **Reserved-word quoting list is incomplete** — core/emit.go's keyword list
-   misses common keywords (DEFAULT, CHECK, HAVING, CASE, UNION, ON, NULL,
-   LIKE, DISTINCT…); a lowercase column named `default` emits unquoted SQL
-   that fails to parse. Fix: quote against the full Postgres keyword table.
+2. **ALTER TABLE ADD PRIMARY KEY not supported** — FIXED (6bb99b9):
+   gen/load_ddl.go extracts ADD CONSTRAINT ... PRIMARY KEY|UNIQUE; sqlc's own
+   catalog proto still ignores them (upstream), which is exactly why the DDL
+   pass exists.
+3. **Reserved-word quoting list is incomplete** — FIXED (513fb52):
+   core/keywords.go generated from pg_get_keywords() on the pinned PG18
+   server (494 words, all classes); QuoteIdent quotes any collision
+   defensively. Regeneration one-liner in the file header.
 4. **Column overrides match by name suffix only** — gen/maptype.go:
    `products.embedding` matches every table's `embedding`. Resolve overrides
    with full schema.table.column context.
@@ -52,9 +55,8 @@ rest are recorded here as the known-issues ledger, priority-ordered.
    the server default (23502 on NOT NULL defaults). Needs a semantic decision
    (three-state params for defaulted columns vs omit from INSERT list) before
    implementation — CONTRACTS.md-relevant.
-6. **Hit struct hardcodes `Product` field** — every `Search<T>Hit` embeds the
-   model as `Product` regardless of table (pass_search.go). Public API before
-   v1; rename to `Row` or the model name.
+6. **Hit struct hardcodes `Product` field** — FIXED (c1a5d78): the field is
+   `Row` on every `Search<T>Hit`; docs and both DB-backed suites updated.
 
 ### P2
 

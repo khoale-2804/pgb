@@ -130,6 +130,24 @@ there) — `export PATH=$PATH:$HOME/go/bin`.
 - Full gate green: build/vet/test/validate/validate-plugin; emitted
   package compiles.
 
+## ALREADY-DONE (2026-09-14 audit-cleanup shift)
+
+- AUDIT.md P1 sweep: 5 of 6 fixed, each committed green separately —
+  6bb99b9 ALTER TABLE ADD CONSTRAINT PK/UNIQUE now extracted (P1 #2) +
+  stderr warning when the id heuristic keys the statics (P1 #1 warn half;
+  "skip statics" option left open); 513fb52 core/keywords.go generated from
+  pg_get_keywords() on the pinned PG18 server (494 words) — QuoteIdent
+  quotes any keyword collision defensively (P1 #3); 8e34a4c GoTypeFor(t,
+  col, opts) exact tiered override resolution, table-aware passes switched,
+  GoType legacy suffix behavior documented (P1 #4); c1a5d78 <Table>Hit field
+  Product → Row, docs + suites updated (P1 #6). P1 #5 (plain DEFAULT
+  extraction) stays open: needs a CONTRACTS-relevant semantic decision
+  (three-state params vs omit from INSERT).
+- P2 #6 ("then the spgb." typo) fixed in the validation round already.
+- Full gate green after every milestone: build/vet/gofmt/unit/validate/
+  validate-plugin/integration 8/8 + realworld smoke 4/4 + edge build.
+- Remaining open work: AUDIT.md P1 #5 + P2 items 7–15.
+
 ## ALREADY-DONE (2026-09-14 real-world validation shift)
 
 - Real-world validation round (cbdba03): 3-builder fan-out (realworld e2e +

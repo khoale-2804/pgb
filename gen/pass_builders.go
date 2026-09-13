@@ -97,7 +97,7 @@ func resolveColType(t ir.Table, c ir.Column, opts Options, dir DirectiveSet) (st
 		}
 		return typ, imp
 	}
-	typ, imp := GoType(c, opts)
+	typ, imp := GoTypeFor(t, c, opts)
 	if typ == "" {
 		typ = "any"
 	}

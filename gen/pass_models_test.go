@@ -271,3 +271,55 @@ func TestSingularize(t *testing.T) {
 		}
 	}
 }
+
+// TestGoTypeForScoping pins the exact, tiered column-override resolution:
+// a table-qualified key must not leak onto another table's same-named
+// column (the GoType suffix-match flaw), schema-qualified keys beat bare
+// table keys, and a bare column key still matches any table.
+func TestGoTypeForScoping(t *testing.T) {
+	opts := Options{Overrides: []TypeOverride{
+		{Column: "public.products.embedding", Type: "a"},
+		{Column: "products.embedding", Type: "b"},
+		{Column: "embedding", Type: "c"},
+	}}
+	products := ir.Table{Schema: "public", Name: "products"}
+	widgets := ir.Table{Schema: "public", Name: "widgets"}
+	otherSchema := ir.Table{Schema: "app", Name: "products"}
+	col := ir.Column{Name: "embedding", PGType: "vector", NotNull: true}
+
+	cases := []struct {
+		name string
+		t    ir.Table
+		want string
+	}{
+		{"schema.table.column wins", products, "a"},
+		{"other table falls to bare column", widgets, "c"},
+		{"table key matches same table name in any schema", otherSchema, "b"},
+	}
+	for _, tc := range cases {
+		if got, _ := GoTypeFor(tc.t, col, opts); got != tc.want {
+			t.Errorf("%s: got %q, want %q", tc.name, got, tc.want)
+		}
+	}
+
+	// Table-qualified keys must NOT match other tables at all — widgets has
+	// no matching key of any tier, so it keeps the base resolution ("any"
+	// here: vector is not a builtin, the pgvector mapping is a config
+	// default injected by ParseOptions, absent in this raw Options).
+	o2 := Options{Overrides: []TypeOverride{{Column: "products.embedding", Type: "map[string]any"}}}
+	if got, _ := GoTypeFor(widgets, col, o2); got != "any" {
+		t.Errorf("leak: widgets.embedding got %q, want base resolution (any)", got)
+	}
+
+	// Bare-key match inside GoTypeFor precedes DBType overrides.
+	o3 := Options{Overrides: []TypeOverride{
+		{DBType: "vector", Type: "dbtype"},
+		{Column: "embedding", Type: "col"},
+	}}
+	if got, _ := GoTypeFor(products, col, o3); got != "col" {
+		t.Errorf("column vs dbtype precedence: got %q, want col", got)
+	}
+	if got, _ := GoTypeFor(widgets, ir.Column{Name: "sku", PGType: "vector", NotNull: true}, o3); got != "dbtype" {
+		t.Errorf("dbtype fallback: got %q, want dbtype", got)
+	}
+}

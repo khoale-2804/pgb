@@ -77,7 +77,7 @@ func PassModels(sch ir.Schema, opts Options, dir DirectiveSet) ([]byte, error) {
 			if d := dir.Column(t.Schema, t.Name, c.Name); d.TypeOverride != "" {
 				typ, imp = applyOverride(parseGoType(d.TypeOverride))
 			} else {
-				typ, imp = GoType(c, opts)
+				typ, imp = GoTypeFor(t, c, opts)
 			}
 			addImports(imp)
 			fields = append(fields, field{name: name, typ: typ, tag: fmt.Sprintf(" `json:%q`", c.Name)})

@@ -135,13 +135,38 @@ var arrayAny = map[string]bool{
 	"circle":   true,
 }
 
+// GoTypeFor maps one column of a KNOWN table to its Go type — the preferred
+// entry point wherever the table is at hand. Column-keyed overrides resolve
+// by exact match against "schema.table.column", then "table.column", then a
+// bare "column" (first config-order win within a tier); a table-qualified
+// key therefore never leaks onto a different table's same-named column —
+// the suffix-match flaw in GoType (AUDIT.md P1 #4). DBType overrides, the
+// builtin table, and enums behave exactly as in GoType.
+func GoTypeFor(t ir.Table, c ir.Column, opts Options) (string, []string) {
+	keys := []string{c.Name}
+	if t.Name != "" {
+		keys = []string{t.Name + "." + c.Name, c.Name}
+		if t.Schema != "" {
+			keys = []string{t.Schema + "." + t.Name + "." + c.Name, t.Name + "." + c.Name, c.Name}
+		}
+	}
+	for _, key := range keys {
+		for _, o := range opts.Overrides {
+			if o.Column == key {
+				return applyOverride(o)
+			}
+		}
+	}
+	return goTypeBase(c, opts)
+}
+
 // GoType maps one column to its Go type per the CONTRACTS table, returning
 // the type expression and the import paths it needs. Resolution order:
 //
-//  1. config overrides with a Column match ("table.column" or
-//     "schema.table.column" — matched by name suffix because ir.Column has
-//     no table context; callers with full context should resolve exact
-//     matches first),
+//  1. config overrides with a Column match — matched by name suffix because
+//     ir.Column alone carries no table context ("products.embedding" matches
+//     EVERY table's embedding column); callers holding the table must use
+//     GoTypeFor instead,
 //  2. config overrides with a DBType match,
 //  3. the builtin table above (NOT NULL strips the pgtype wrapper where a
 //     bare value type exists),
@@ -153,6 +178,12 @@ func GoType(c ir.Column, opts Options) (string, []string) {
 			return applyOverride(o)
 		}
 	}
+	return goTypeBase(c, opts)
+}
+
+// goTypeBase is the table-agnostic half of type resolution: DBType
+// overrides, then the builtin table, then enums, then "any".
+func goTypeBase(c ir.Column, opts Options) (string, []string) {
 	for _, o := range opts.Overrides {
 		if o.DBType != "" && strings.EqualFold(o.DBType, c.PGType) {
 			return applyOverride(o)

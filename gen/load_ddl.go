@@ -381,6 +381,19 @@ func enrichCreate(sch *ir.Schema, st *ast.CreateStmt) {
 					}
 					continue
 				}
+				if con.GetContype() == ast.ConstrType_CONSTR_DEFAULT {
+					// A plain DEFAULT clause: the server fills the column
+					// when the INSERT list omits it, so HasDefault lets
+					// insertableIdx drop it (unless include_defaults keeps
+					// it bindable). Previously only identity columns set
+					// this, so every defaulted column was bound explicitly
+					// and Go zero values reached the server as NULL,
+					// overriding the server default (AUDIT.md P1 #5).
+					if c := findColumn(t, cd.GetColname()); c != nil {
+						c.HasDefault = true
+					}
+					continue
+				}
 				applyConstraint(t, con, cd.GetColname())
 			}
 		case *ast.Node_Constraint:

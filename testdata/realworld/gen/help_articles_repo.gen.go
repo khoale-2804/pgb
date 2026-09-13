@@ -135,13 +135,9 @@ type HelpArticleSet struct {
 // and serial columns are out, default-bearing columns join only with
 // the include_defaults option.
 type InsertHelpArticleParams struct {
-	ID        uuid.UUID
-	Slug      string
-	Title     string
-	Body      string
-	Tags      []string
-	Published bool
-	UpdatedAt pgtype.Timestamptz
+	Slug  string
+	Title string
+	Body  string
 }
 
 // scanHelpArticle scans one row positionally over every column in
@@ -193,8 +189,8 @@ func CountHelpArticles(ctx context.Context, exec pgb.DBTX, f HelpArticleFilter) 
 // column, defaults included).
 func InsertHelpArticle(ctx context.Context, exec pgb.DBTX, p InsertHelpArticleParams) (HelpArticle, error) {
 	rows, err := pgb.NewInsert("public.help_articles",
-		[]string{"id", "slug", "title", "body", "tags", "published", "updated_at"},
-		[]pgb.Expr{pgb.Lit{V: p.ID}, pgb.Lit{V: p.Slug}, pgb.Lit{V: p.Title}, pgb.Lit{V: p.Body}, pgb.Lit{V: p.Tags, Cast: "text[]"}, pgb.Lit{V: p.Published}, pgb.Lit{V: p.UpdatedAt}},
+		[]string{"slug", "title", "body"},
+		[]pgb.Expr{pgb.Lit{V: p.Slug}, pgb.Lit{V: p.Title}, pgb.Lit{V: p.Body}},
 	).Returning(pgb.Col{Table: "help_articles", Name: "id"}, pgb.Col{Table: "help_articles", Name: "slug"}, pgb.Col{Table: "help_articles", Name: "title"}, pgb.Col{Table: "help_articles", Name: "body"}, pgb.Col{Table: "help_articles", Name: "tags"}, pgb.Col{Table: "help_articles", Name: "published"}, pgb.Col{Table: "help_articles", Name: "updated_at"}).Run(ctx, exec)
 	if err != nil {
 		return HelpArticle{}, err
@@ -207,6 +203,31 @@ func InsertHelpArticle(ctx context.Context, exec pgb.DBTX, p InsertHelpArticlePa
 		return HelpArticle{}, pgb.ErrNotFound
 	}
 	return us[0], nil
+}
+
+const insertHelpArticlesSQL = "INSERT INTO public.help_articles (slug, title, body) SELECT * FROM unnest($1::text[], $2::text[], $3::text[]) RETURNING id, slug, title, body, tags, published, updated_at"
+
+// InsertHelpArticles inserts a whole batch in one round trip via
+// unnest and returns every inserted row.
+func InsertHelpArticles(ctx context.Context, exec pgb.DBTX, ps []InsertHelpArticleParams) ([]HelpArticle, error) {
+	if len(ps) == 0 {
+		return nil, nil
+	}
+	colSlug := make([]string, len(ps))
+	colTitle := make([]string, len(ps))
+	colBody := make([]string, len(ps))
+	for i, p := range ps {
+		colSlug[i] = p.Slug
+		colTitle[i] = p.Title
+		colBody[i] = p.Body
+	}
+	args := make([]any, 0, 3*len(ps))
+	args = append(args, colSlug, colTitle, colBody)
+	rows, err := exec.Query(ctx, insertHelpArticlesSQL, args...)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, scanHelpArticle)
 }
 
 // UpdateHelpArticle applies the non-zero fields of s to one row and
@@ -353,8 +374,8 @@ func UpdateHelpArticles(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, s 
 // the resulting row; pgb.ErrNotFound when DO NOTHING matched.
 func UpsertHelpArticle(ctx context.Context, exec pgb.DBTX, id uuid.UUID, p InsertHelpArticleParams) (HelpArticle, error) {
 	rows, err := pgb.NewInsert("public.help_articles",
-		[]string{"id", "slug", "title", "body", "tags", "published", "updated_at"},
-		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.Slug}, pgb.Lit{V: p.Title}, pgb.Lit{V: p.Body}, pgb.Lit{V: p.Tags, Cast: "text[]"}, pgb.Lit{V: p.Published}, pgb.Lit{V: p.UpdatedAt}},
+		[]string{"id", "slug", "title", "body"},
+		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.Slug}, pgb.Lit{V: p.Title}, pgb.Lit{V: p.Body}},
 	).OnConflict(pgb.OnConflict{
 		Target: []string{"id"},
 		Sets: []pgb.SetClause{

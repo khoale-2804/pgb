@@ -106,14 +106,6 @@ type InventorySet struct {
 	UpdatedAt Set[pgtype.Timestamptz]
 }
 
-// InsertInventoryParams carries the INSERT column values: generated
-// and serial columns are out, default-bearing columns join only with
-// the include_defaults option.
-type InsertInventoryParams struct {
-	Qty       int32
-	UpdatedAt pgtype.Timestamptz
-}
-
 // scanInventory scans one row positionally over every column in
 // catalog order — the single scan path for all generated reads.
 func scanInventory(row pgx.CollectableRow) (Inventory, error) {
@@ -157,49 +149,6 @@ func CountInventorys(ctx context.Context, exec pgb.DBTX, f InventoryFilter) (int
 		return 0, err
 	}
 	return n, nil
-}
-
-// InsertInventory inserts one row and returns it (RETURNING every
-// column, defaults included).
-func InsertInventory(ctx context.Context, exec pgb.DBTX, p InsertInventoryParams) (Inventory, error) {
-	rows, err := pgb.NewInsert("public.inventory",
-		[]string{"qty", "updated_at"},
-		[]pgb.Expr{pgb.Lit{V: p.Qty}, pgb.Lit{V: p.UpdatedAt}},
-	).Returning(pgb.Col{Table: "inventory", Name: "item_id"}, pgb.Col{Table: "inventory", Name: "qty"}, pgb.Col{Table: "inventory", Name: "updated_at"}).Run(ctx, exec)
-	if err != nil {
-		return Inventory{}, err
-	}
-	us, err := pgx.CollectRows(rows, scanInventory)
-	if err != nil {
-		return Inventory{}, err
-	}
-	if len(us) == 0 {
-		return Inventory{}, pgb.ErrNotFound
-	}
-	return us[0], nil
-}
-
-const insertInventorysSQL = "INSERT INTO public.inventory (qty, updated_at) SELECT * FROM unnest($1::int4[], $2::timestamptz[]) RETURNING item_id, qty, updated_at"
-
-// InsertInventorys inserts a whole batch in one round trip via
-// unnest and returns every inserted row.
-func InsertInventorys(ctx context.Context, exec pgb.DBTX, ps []InsertInventoryParams) ([]Inventory, error) {
-	if len(ps) == 0 {
-		return nil, nil
-	}
-	colQty := make([]int32, len(ps))
-	colUpdatedAt := make([]pgtype.Timestamptz, len(ps))
-	for i, p := range ps {
-		colQty[i] = p.Qty
-		colUpdatedAt[i] = p.UpdatedAt
-	}
-	args := make([]any, 0, 2*len(ps))
-	args = append(args, colQty, colUpdatedAt)
-	rows, err := exec.Query(ctx, insertInventorysSQL, args...)
-	if err != nil {
-		return nil, err
-	}
-	return pgx.CollectRows(rows, scanInventory)
 }
 
 // UpdateInventory applies the non-zero fields of s to one row and
@@ -275,33 +224,6 @@ func UpdateInventorys(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, s In
 		return 0, err
 	}
 	return tag.RowsAffected(), nil
-}
-
-// UpsertInventory inserts p under item_id, or on conflict updates
-// every settable column from the proposed row (EXCLUDED.*) and returns
-// the resulting row; pgb.ErrNotFound when DO NOTHING matched.
-func UpsertInventory(ctx context.Context, exec pgb.DBTX, item_id int64, p InsertInventoryParams) (Inventory, error) {
-	rows, err := pgb.NewInsert("public.inventory",
-		[]string{"item_id", "qty", "updated_at"},
-		[]pgb.Expr{pgb.Lit{V: item_id}, pgb.Lit{V: p.Qty}, pgb.Lit{V: p.UpdatedAt}},
-	).OnConflict(pgb.OnConflict{
-		Target: []string{"item_id"},
-		Sets: []pgb.SetClause{
-			{Col: "qty", E: pgb.Col{Table: "excluded", Name: "qty"}},
-			{Col: "updated_at", E: pgb.Col{Table: "excluded", Name: "updated_at"}},
-		},
-	}).Returning(pgb.Col{Table: "inventory", Name: "item_id"}, pgb.Col{Table: "inventory", Name: "qty"}, pgb.Col{Table: "inventory", Name: "updated_at"}).Run(ctx, exec)
-	if err != nil {
-		return Inventory{}, err
-	}
-	us, err := pgx.CollectRows(rows, scanInventory)
-	if err != nil {
-		return Inventory{}, err
-	}
-	if len(us) == 0 {
-		return Inventory{}, pgb.ErrNotFound
-	}
-	return us[0], nil
 }
 
 // DeleteInventory removes one row by item_id.

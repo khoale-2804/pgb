@@ -208,29 +208,23 @@ func vec768(fill float32) pgvector.Vector {
 	return pgvector.NewVector(x)
 }
 
-// newUserParams fills every NOT NULL column of users. Only id (bigserial),
-// search_slug/name_upper (generated) are omitted by the generator; columns
-// with defaults are still bound, so their Go zero values must be valid.
+// newUserParams fills every bindable column of users. id (bigserial),
+// search_slug/name_upper (generated) are omitted by the generator, and
+// default-bearing columns (name, balance, is_active, created_at, metadata,
+// bitfield, tags, scores, cash, status) are omitted since the server fills
+// them — include_defaults would bring them back as bindable params.
 func newUserParams(t *testing.T, email string) db.InsertUserParams {
 	return db.InsertUserParams{
-		Email:     email,
-		Password:  "hunter2",
-		Name:      "Ada",
-		Balance:   num(t, "0"),
-		IsActive:  true,
-		CreatedAt: tsnow(),
-		Metadata:  []byte("{}"),
-		Bitfield:  pgtype.Bits{Bytes: []byte{0}, Len: 8, Valid: true},
-		Tags:      []string{},
-		Scores:    []int32{},
-		Cash:      num(t, "0"),
-		Status:    db.UserStatusActive,
-		LoginCi:   email,
+		Email:    email,
+		Password: "hunter2",
+		LoginCi:  email,
 	}
 }
 
-// newProductParams fills every NOT NULL column of products; the batch static
-// feeds unnest arrays, so embedding must be a valid vector(768) per row.
+// newProductParams fills every bindable column of products; in_stock,
+// metadata and created_at are server-defaulted and stay out of the INSERT.
+// The batch static feeds unnest arrays, so embedding must be a valid
+// vector(768) per row.
 func newProductParams(t *testing.T, sku, title, description, category string) db.InsertProductParams {
 	return db.InsertProductParams{
 		Sku:         sku,
@@ -238,10 +232,7 @@ func newProductParams(t *testing.T, sku, title, description, category string) db
 		Description: description,
 		Category:    category,
 		Price:       num(t, "9.99"),
-		InStock:     true,
-		Metadata:    []byte("{}"),
 		Embedding:   vec768(0.1),
-		CreatedAt:   tsnow(),
 	}
 }
 
@@ -290,11 +281,11 @@ func TestUserCRUD(t *testing.T) {
 		t.Fatalf("update semantics: %+v", up)
 	}
 
-	// upsert on the real primary key
+	// upsert on the real primary key: only bindable columns join the
+	// conflict update, so name keeps its server default 'unknown'
 	upsert := newUserParams(t, "new@example.com")
-	upsert.Name = "Ada II"
 	up2, err := db.UpsertUser(context.Background(), pool, u.ID, upsert)
-	if err != nil || up2.Name != "Ada II" {
+	if err != nil || up2.Name != "unknown" {
 		t.Fatalf("UpsertUser: %v %+v", err, up2)
 	}
 
@@ -308,9 +299,7 @@ func TestUserCRUD(t *testing.T) {
 }
 
 // TestOrderItemsBatchAndCount exercises the unnest batch lane on order_items,
-// the fixture's only all-scalar insertable table: products (jsonb/vector) and
-// users (text[]/enum) correctly get no batch static — array-of-array columns
-// have no pgx codec (42804).
+// an all-scalar insertable table.
 func TestOrderItemsBatchAndCount(t *testing.T) {
 	pool := setup(t)
 	truncate(t, pool, "users", "products", "orders", "order_items")
@@ -333,11 +322,10 @@ func TestOrderItemsBatchAndCount(t *testing.T) {
 	var orders []db.Order
 	for i := 0; i < 5; i++ {
 		o, err := db.InsertOrder(context.Background(), pool, db.InsertOrderParams{
-			ShopID:   1,
-			UserID:   u.ID,
-			Channel:  db.OrderChannelWeb,
-			Total:    num(t, "29.97"),
-			PlacedAt: tsnow(),
+			ShopID:  1,
+			UserID:  u.ID,
+			Channel: db.OrderChannelWeb,
+			Total:   num(t, "29.97"),
 		})
 		if err != nil {
 			t.Fatalf("seed order %d: %v", i, err)
@@ -354,7 +342,6 @@ func TestOrderItemsBatchAndCount(t *testing.T) {
 				ProductID:   p.ID,
 				Quantity:    1,
 				UnitPrice:   num(t, "9.99"),
-				GiftWrap:    false,
 			})
 		}
 	}
@@ -368,6 +355,36 @@ func TestOrderItemsBatchAndCount(t *testing.T) {
 	})
 	if err != nil || n != 5 {
 		t.Fatalf("CountOrderItems: %v (%d)", err, n)
+	}
+}
+
+// TestProductBatchAndCount proves the products batch lane: dropping the
+// defaulted jsonb column from the INSERT made products batchable again, and
+// the unnest cast list now includes vector[] — pgx must encode []pgvector.Vector.
+func TestProductBatchAndCount(t *testing.T) {
+	pool := setup(t)
+	truncate(t, pool, "products")
+
+	var params []db.InsertProductParams
+	for i := 0; i < 25; i++ {
+		params = append(params, newProductParams(t,
+			fmt.Sprintf("batch-%d", i),
+			fmt.Sprintf("Batch product %d", i),
+			"batch test product", "batch"))
+	}
+	inserted, err := db.InsertProducts(context.Background(), pool, params)
+	if err != nil || len(inserted) != 25 {
+		t.Fatalf("InsertProducts: %v (%d rows)", err, len(inserted))
+	}
+	if inserted[0].InStock != true {
+		t.Fatalf("server default in_stock: %+v", inserted[0])
+	}
+
+	n, err := db.CountProducts(context.Background(), pool, db.ProductFilter{
+		Category: db.Opt("batch"),
+	})
+	if err != nil || n != 25 {
+		t.Fatalf("CountProducts: %v (%d)", err, n)
 	}
 }
 
@@ -405,7 +422,8 @@ func TestSearch(t *testing.T) {
 	shoe.Price = num(t, "89.90")
 	hat := newProductParams(t, "hat-1", "Sun Hat", "wide brim summer hat", "hats")
 	hat.Price = num(t, "19.00")
-	hat.InStock = false
+	// in_stock is server-defaulted now (true); the hat keeps it — ranking
+	// below is driven by the query terms, not stock state
 	if _, err := db.InsertProduct(context.Background(), pool, shoe); err != nil {
 		t.Fatalf("InsertProduct shoe: %v", err)
 	}
@@ -471,11 +489,10 @@ func TestOrdersAndCompositeKeys(t *testing.T) {
 	// composite-PK table: single insert with RETURNING works, key-based
 	// statics are correctly absent
 	o, err := db.InsertOrder(context.Background(), pool, db.InsertOrderParams{
-		ShopID:   1,
-		UserID:   u.ID,
-		Channel:  db.OrderChannelWeb,
-		Total:    num(t, "42.50"),
-		PlacedAt: tsnow(),
+		ShopID:  1,
+		UserID:  u.ID,
+		Channel: db.OrderChannelWeb,
+		Total:   num(t, "42.50"),
 	})
 	if err != nil {
 		t.Fatalf("InsertOrder (composite PK table): %v", err)
@@ -520,9 +537,11 @@ func TestEmittedPredicateShapes(t *testing.T) {
 	pool := setup(t)
 	truncate(t, pool, "users")
 
+	// settings (jsonb, no default) is still bindable; metadata and tags
+	// carry server defaults now, so the KeyEq/Contains cases moved to the
+	// columns that remain in the INSERT list.
 	a := newUserParams(t, "a@example.com")
-	a.Metadata = []byte(`{"color":"red"}`)
-	a.Tags = []string{"vip", "beta"}
+	a.Settings = map[string]any{"color": "red"}
 	b := newUserParams(t, "b@example.com")
 	ua, err := db.InsertUser(context.Background(), pool, a)
 	if err != nil {
@@ -545,8 +564,7 @@ func TestEmittedPredicateShapes(t *testing.T) {
 		{"Gt/Lte pair", db.Users.ID().Gt(0), 2},
 		{"IsNull", db.Users.Bio().IsNull(), 2},
 		{"NotNull", db.Users.Bio().NotNull(), 0},
-		{"KeyEq jsonb path", db.Users.Metadata().KeyEq("color", "red"), 1},
-		{"Contains array", db.Users.Tags().Contains([]string{"vip"}), 1},
+		{"KeyEq jsonb path", db.Users.Settings().KeyEq("color", "red"), 1},
 		{"Between", db.Users.CreatedAt().Between(
 			pgtype.Timestamptz{Time: time.Now().Add(-time.Hour), Valid: true},
 			pgtype.Timestamptz{Time: time.Now().Add(time.Hour), Valid: true}), 2},

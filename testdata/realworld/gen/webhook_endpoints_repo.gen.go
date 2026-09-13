@@ -110,13 +110,9 @@ type WebhookEndpointSet struct {
 // and serial columns are out, default-bearing columns join only with
 // the include_defaults option.
 type InsertWebhookEndpointParams struct {
-	ID         uuid.UUID
 	MerchantID uuid.UUID
 	URL        string
 	Secret     string
-	Events     []string
-	Active     bool
-	CreatedAt  pgtype.Timestamptz
 }
 
 // scanWebhookEndpoint scans one row positionally over every column in
@@ -168,8 +164,8 @@ func CountWebhookEndpoints(ctx context.Context, exec pgb.DBTX, f WebhookEndpoint
 // column, defaults included).
 func InsertWebhookEndpoint(ctx context.Context, exec pgb.DBTX, p InsertWebhookEndpointParams) (WebhookEndpoint, error) {
 	rows, err := pgb.NewInsert("public.webhook_endpoints",
-		[]string{"id", "merchant_id", "url", "secret", "events", "active", "created_at"},
-		[]pgb.Expr{pgb.Lit{V: p.ID}, pgb.Lit{V: p.MerchantID}, pgb.Lit{V: p.URL}, pgb.Lit{V: p.Secret}, pgb.Lit{V: p.Events, Cast: "text[]"}, pgb.Lit{V: p.Active}, pgb.Lit{V: p.CreatedAt}},
+		[]string{"merchant_id", "url", "secret"},
+		[]pgb.Expr{pgb.Lit{V: p.MerchantID}, pgb.Lit{V: p.URL}, pgb.Lit{V: p.Secret}},
 	).Returning(pgb.Col{Table: "webhook_endpoints", Name: "id"}, pgb.Col{Table: "webhook_endpoints", Name: "merchant_id"}, pgb.Col{Table: "webhook_endpoints", Name: "url"}, pgb.Col{Table: "webhook_endpoints", Name: "secret"}, pgb.Col{Table: "webhook_endpoints", Name: "events"}, pgb.Col{Table: "webhook_endpoints", Name: "active"}, pgb.Col{Table: "webhook_endpoints", Name: "created_at"}).Run(ctx, exec)
 	if err != nil {
 		return WebhookEndpoint{}, err
@@ -182,6 +178,31 @@ func InsertWebhookEndpoint(ctx context.Context, exec pgb.DBTX, p InsertWebhookEn
 		return WebhookEndpoint{}, pgb.ErrNotFound
 	}
 	return us[0], nil
+}
+
+const insertWebhookEndpointsSQL = "INSERT INTO public.webhook_endpoints (merchant_id, url, secret) SELECT * FROM unnest($1::uuid[], $2::text[], $3::text[]) RETURNING id, merchant_id, url, secret, events, active, created_at"
+
+// InsertWebhookEndpoints inserts a whole batch in one round trip via
+// unnest and returns every inserted row.
+func InsertWebhookEndpoints(ctx context.Context, exec pgb.DBTX, ps []InsertWebhookEndpointParams) ([]WebhookEndpoint, error) {
+	if len(ps) == 0 {
+		return nil, nil
+	}
+	colMerchantID := make([]uuid.UUID, len(ps))
+	colURL := make([]string, len(ps))
+	colSecret := make([]string, len(ps))
+	for i, p := range ps {
+		colMerchantID[i] = p.MerchantID
+		colURL[i] = p.URL
+		colSecret[i] = p.Secret
+	}
+	args := make([]any, 0, 3*len(ps))
+	args = append(args, colMerchantID, colURL, colSecret)
+	rows, err := exec.Query(ctx, insertWebhookEndpointsSQL, args...)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, scanWebhookEndpoint)
 }
 
 // UpdateWebhookEndpoint applies the non-zero fields of s to one row and
@@ -312,8 +333,8 @@ func UpdateWebhookEndpoints(ctx context.Context, exec pgb.DBTX, where []pgb.Expr
 // the resulting row; pgb.ErrNotFound when DO NOTHING matched.
 func UpsertWebhookEndpoint(ctx context.Context, exec pgb.DBTX, id uuid.UUID, p InsertWebhookEndpointParams) (WebhookEndpoint, error) {
 	rows, err := pgb.NewInsert("public.webhook_endpoints",
-		[]string{"id", "merchant_id", "url", "secret", "events", "active", "created_at"},
-		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.MerchantID}, pgb.Lit{V: p.URL}, pgb.Lit{V: p.Secret}, pgb.Lit{V: p.Events, Cast: "text[]"}, pgb.Lit{V: p.Active}, pgb.Lit{V: p.CreatedAt}},
+		[]string{"id", "merchant_id", "url", "secret"},
+		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.MerchantID}, pgb.Lit{V: p.URL}, pgb.Lit{V: p.Secret}},
 	).OnConflict(pgb.OnConflict{
 		Target: []string{"id"},
 		Sets: []pgb.SetClause{

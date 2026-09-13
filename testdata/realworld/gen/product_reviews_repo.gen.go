@@ -179,13 +179,10 @@ type ProductReviewSet struct {
 // and serial columns are out, default-bearing columns join only with
 // the include_defaults option.
 type InsertProductReviewParams struct {
-	ID         uuid.UUID
 	ProductID  int64
 	CustomerID pgtype.Int8
 	Rating     int16
-	Title      string
 	Body       string
-	CreatedAt  pgtype.Timestamptz
 }
 
 // scanProductReview scans one row positionally over every column in
@@ -237,8 +234,8 @@ func CountProductReviews(ctx context.Context, exec pgb.DBTX, f ProductReviewFilt
 // column, defaults included).
 func InsertProductReview(ctx context.Context, exec pgb.DBTX, p InsertProductReviewParams) (ProductReview, error) {
 	rows, err := pgb.NewInsert("public.product_reviews",
-		[]string{"id", "product_id", "customer_id", "rating", "title", "body", "created_at"},
-		[]pgb.Expr{pgb.Lit{V: p.ID}, pgb.Lit{V: p.ProductID}, pgb.Lit{V: p.CustomerID}, pgb.Lit{V: p.Rating}, pgb.Lit{V: p.Title}, pgb.Lit{V: p.Body}, pgb.Lit{V: p.CreatedAt}},
+		[]string{"product_id", "customer_id", "rating", "body"},
+		[]pgb.Expr{pgb.Lit{V: p.ProductID}, pgb.Lit{V: p.CustomerID}, pgb.Lit{V: p.Rating}, pgb.Lit{V: p.Body}},
 	).Returning(pgb.Col{Table: "product_reviews", Name: "id"}, pgb.Col{Table: "product_reviews", Name: "product_id"}, pgb.Col{Table: "product_reviews", Name: "customer_id"}, pgb.Col{Table: "product_reviews", Name: "rating"}, pgb.Col{Table: "product_reviews", Name: "title"}, pgb.Col{Table: "product_reviews", Name: "body"}, pgb.Col{Table: "product_reviews", Name: "created_at"}).Run(ctx, exec)
 	if err != nil {
 		return ProductReview{}, err
@@ -253,7 +250,7 @@ func InsertProductReview(ctx context.Context, exec pgb.DBTX, p InsertProductRevi
 	return us[0], nil
 }
 
-const insertProductReviewsSQL = "INSERT INTO public.product_reviews (id, product_id, customer_id, rating, title, body, created_at) SELECT * FROM unnest($1::uuid[], $2::int8[], $3::int8[], $4::int2[], $5::text[], $6::text[], $7::timestamptz[]) RETURNING id, product_id, customer_id, rating, title, body, created_at"
+const insertProductReviewsSQL = "INSERT INTO public.product_reviews (product_id, customer_id, rating, body) SELECT * FROM unnest($1::int8[], $2::int8[], $3::int2[], $4::text[]) RETURNING id, product_id, customer_id, rating, title, body, created_at"
 
 // InsertProductReviews inserts a whole batch in one round trip via
 // unnest and returns every inserted row.
@@ -261,24 +258,18 @@ func InsertProductReviews(ctx context.Context, exec pgb.DBTX, ps []InsertProduct
 	if len(ps) == 0 {
 		return nil, nil
 	}
-	colID := make([]uuid.UUID, len(ps))
 	colProductID := make([]int64, len(ps))
 	colCustomerID := make([]pgtype.Int8, len(ps))
 	colRating := make([]int16, len(ps))
-	colTitle := make([]string, len(ps))
 	colBody := make([]string, len(ps))
-	colCreatedAt := make([]pgtype.Timestamptz, len(ps))
 	for i, p := range ps {
-		colID[i] = p.ID
 		colProductID[i] = p.ProductID
 		colCustomerID[i] = p.CustomerID
 		colRating[i] = p.Rating
-		colTitle[i] = p.Title
 		colBody[i] = p.Body
-		colCreatedAt[i] = p.CreatedAt
 	}
-	args := make([]any, 0, 7*len(ps))
-	args = append(args, colID, colProductID, colCustomerID, colRating, colTitle, colBody, colCreatedAt)
+	args := make([]any, 0, 4*len(ps))
+	args = append(args, colProductID, colCustomerID, colRating, colBody)
 	rows, err := exec.Query(ctx, insertProductReviewsSQL, args...)
 	if err != nil {
 		return nil, err
@@ -430,8 +421,8 @@ func UpdateProductReviews(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, 
 // the resulting row; pgb.ErrNotFound when DO NOTHING matched.
 func UpsertProductReview(ctx context.Context, exec pgb.DBTX, id uuid.UUID, p InsertProductReviewParams) (ProductReview, error) {
 	rows, err := pgb.NewInsert("public.product_reviews",
-		[]string{"id", "product_id", "customer_id", "rating", "title", "body", "created_at"},
-		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.ProductID}, pgb.Lit{V: p.CustomerID}, pgb.Lit{V: p.Rating}, pgb.Lit{V: p.Title}, pgb.Lit{V: p.Body}, pgb.Lit{V: p.CreatedAt}},
+		[]string{"id", "product_id", "customer_id", "rating", "body"},
+		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.ProductID}, pgb.Lit{V: p.CustomerID}, pgb.Lit{V: p.Rating}, pgb.Lit{V: p.Body}},
 	).OnConflict(pgb.OnConflict{
 		Target: []string{"id"},
 		Sets: []pgb.SetClause{

@@ -246,13 +246,7 @@ type CustomerSet struct {
 type InsertCustomerParams struct {
 	MerchantID      uuid.UUID
 	Email           string
-	FullName        string
-	Tier            CustomerTier
-	Tags            []string
 	ShippingAddress map[string]any
-	LoyaltyPoints   int32
-	LifetimeValue   pgtype.Numeric
-	SignupAt        pgtype.Timestamptz
 	LastLoginAt     pgtype.Timestamptz
 	DeletedAt       pgtype.Timestamptz
 }
@@ -306,8 +300,8 @@ func CountCustomers(ctx context.Context, exec pgb.DBTX, f CustomerFilter) (int64
 // column, defaults included).
 func InsertCustomer(ctx context.Context, exec pgb.DBTX, p InsertCustomerParams) (Customer, error) {
 	rows, err := pgb.NewInsert("public.customers",
-		[]string{"merchant_id", "email", "full_name", "tier", "tags", "shipping_address", "loyalty_points", "lifetime_value", "signup_at", "last_login_at", "deleted_at"},
-		[]pgb.Expr{pgb.Lit{V: p.MerchantID}, pgb.Lit{V: p.Email}, pgb.Lit{V: p.FullName}, pgb.Lit{V: p.Tier, Cast: "customer_tier"}, pgb.Lit{V: p.Tags, Cast: "text[]"}, pgb.Lit{V: p.ShippingAddress, Cast: "jsonb"}, pgb.Lit{V: p.LoyaltyPoints}, pgb.Lit{V: p.LifetimeValue}, pgb.Lit{V: p.SignupAt}, pgb.Lit{V: p.LastLoginAt}, pgb.Lit{V: p.DeletedAt}},
+		[]string{"merchant_id", "email", "shipping_address", "last_login_at", "deleted_at"},
+		[]pgb.Expr{pgb.Lit{V: p.MerchantID}, pgb.Lit{V: p.Email}, pgb.Lit{V: p.ShippingAddress, Cast: "jsonb"}, pgb.Lit{V: p.LastLoginAt}, pgb.Lit{V: p.DeletedAt}},
 	).Returning(pgb.Col{Table: "customers", Name: "id"}, pgb.Col{Table: "customers", Name: "merchant_id"}, pgb.Col{Table: "customers", Name: "email"}, pgb.Col{Table: "customers", Name: "full_name"}, pgb.Col{Table: "customers", Name: "tier"}, pgb.Col{Table: "customers", Name: "tags"}, pgb.Col{Table: "customers", Name: "shipping_address"}, pgb.Col{Table: "customers", Name: "loyalty_points"}, pgb.Col{Table: "customers", Name: "lifetime_value"}, pgb.Col{Table: "customers", Name: "signup_at"}, pgb.Col{Table: "customers", Name: "last_login_at"}, pgb.Col{Table: "customers", Name: "deleted_at"}).Run(ctx, exec)
 	if err != nil {
 		return Customer{}, err
@@ -320,6 +314,35 @@ func InsertCustomer(ctx context.Context, exec pgb.DBTX, p InsertCustomerParams) 
 		return Customer{}, pgb.ErrNotFound
 	}
 	return us[0], nil
+}
+
+const insertCustomersSQL = "INSERT INTO public.customers (merchant_id, email, shipping_address, last_login_at, deleted_at) SELECT * FROM unnest($1::uuid[], $2::text[], $3::jsonb[], $4::timestamptz[], $5::timestamptz[]) RETURNING id, merchant_id, email, full_name, tier, tags, shipping_address, loyalty_points, lifetime_value, signup_at, last_login_at, deleted_at"
+
+// InsertCustomers inserts a whole batch in one round trip via
+// unnest and returns every inserted row.
+func InsertCustomers(ctx context.Context, exec pgb.DBTX, ps []InsertCustomerParams) ([]Customer, error) {
+	if len(ps) == 0 {
+		return nil, nil
+	}
+	colMerchantID := make([]uuid.UUID, len(ps))
+	colEmail := make([]string, len(ps))
+	colShippingAddress := make([]map[string]any, len(ps))
+	colLastLoginAt := make([]pgtype.Timestamptz, len(ps))
+	colDeletedAt := make([]pgtype.Timestamptz, len(ps))
+	for i, p := range ps {
+		colMerchantID[i] = p.MerchantID
+		colEmail[i] = p.Email
+		colShippingAddress[i] = p.ShippingAddress
+		colLastLoginAt[i] = p.LastLoginAt
+		colDeletedAt[i] = p.DeletedAt
+	}
+	args := make([]any, 0, 5*len(ps))
+	args = append(args, colMerchantID, colEmail, colShippingAddress, colLastLoginAt, colDeletedAt)
+	rows, err := exec.Query(ctx, insertCustomersSQL, args...)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, scanCustomer)
 }
 
 // UpdateCustomer applies the non-zero fields of s to one row and
@@ -546,8 +569,8 @@ func UpdateCustomers(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, s Cus
 // the resulting row; pgb.ErrNotFound when DO NOTHING matched.
 func UpsertCustomer(ctx context.Context, exec pgb.DBTX, id int64, p InsertCustomerParams) (Customer, error) {
 	rows, err := pgb.NewInsert("public.customers",
-		[]string{"id", "merchant_id", "email", "full_name", "tier", "tags", "shipping_address", "loyalty_points", "lifetime_value", "signup_at", "last_login_at", "deleted_at"},
-		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.MerchantID}, pgb.Lit{V: p.Email}, pgb.Lit{V: p.FullName}, pgb.Lit{V: p.Tier, Cast: "customer_tier"}, pgb.Lit{V: p.Tags, Cast: "text[]"}, pgb.Lit{V: p.ShippingAddress, Cast: "jsonb"}, pgb.Lit{V: p.LoyaltyPoints}, pgb.Lit{V: p.LifetimeValue}, pgb.Lit{V: p.SignupAt}, pgb.Lit{V: p.LastLoginAt}, pgb.Lit{V: p.DeletedAt}},
+		[]string{"id", "merchant_id", "email", "shipping_address", "last_login_at", "deleted_at"},
+		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.MerchantID}, pgb.Lit{V: p.Email}, pgb.Lit{V: p.ShippingAddress, Cast: "jsonb"}, pgb.Lit{V: p.LastLoginAt}, pgb.Lit{V: p.DeletedAt}},
 	).OnConflict(pgb.OnConflict{
 		Target: []string{"id"},
 		Sets: []pgb.SetClause{

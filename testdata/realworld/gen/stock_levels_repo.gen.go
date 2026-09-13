@@ -129,7 +129,6 @@ type StockLevelSet struct {
 type InsertStockLevelParams struct {
 	ProductID int64
 	Warehouse string
-	QtyOnHand int32
 	RestockAt pgtype.Timestamptz
 }
 
@@ -167,8 +166,8 @@ func CountStockLevels(ctx context.Context, exec pgb.DBTX, f StockLevelFilter) (i
 // column, defaults included).
 func InsertStockLevel(ctx context.Context, exec pgb.DBTX, p InsertStockLevelParams) (StockLevel, error) {
 	rows, err := pgb.NewInsert("public.stock_levels",
-		[]string{"product_id", "warehouse", "qty_on_hand", "restock_at"},
-		[]pgb.Expr{pgb.Lit{V: p.ProductID}, pgb.Lit{V: p.Warehouse}, pgb.Lit{V: p.QtyOnHand}, pgb.Lit{V: p.RestockAt}},
+		[]string{"product_id", "warehouse", "restock_at"},
+		[]pgb.Expr{pgb.Lit{V: p.ProductID}, pgb.Lit{V: p.Warehouse}, pgb.Lit{V: p.RestockAt}},
 	).Returning(pgb.Col{Table: "stock_levels", Name: "product_id"}, pgb.Col{Table: "stock_levels", Name: "warehouse"}, pgb.Col{Table: "stock_levels", Name: "qty_on_hand"}, pgb.Col{Table: "stock_levels", Name: "restock_at"}).Run(ctx, exec)
 	if err != nil {
 		return StockLevel{}, err
@@ -183,7 +182,7 @@ func InsertStockLevel(ctx context.Context, exec pgb.DBTX, p InsertStockLevelPara
 	return us[0], nil
 }
 
-const insertStockLevelsSQL = "INSERT INTO public.stock_levels (product_id, warehouse, qty_on_hand, restock_at) SELECT * FROM unnest($1::int8[], $2::text[], $3::int4[], $4::timestamptz[]) RETURNING product_id, warehouse, qty_on_hand, restock_at"
+const insertStockLevelsSQL = "INSERT INTO public.stock_levels (product_id, warehouse, restock_at) SELECT * FROM unnest($1::int8[], $2::text[], $3::timestamptz[]) RETURNING product_id, warehouse, qty_on_hand, restock_at"
 
 // InsertStockLevels inserts a whole batch in one round trip via
 // unnest and returns every inserted row.
@@ -193,16 +192,14 @@ func InsertStockLevels(ctx context.Context, exec pgb.DBTX, ps []InsertStockLevel
 	}
 	colProductID := make([]int64, len(ps))
 	colWarehouse := make([]string, len(ps))
-	colQtyOnHand := make([]int32, len(ps))
 	colRestockAt := make([]pgtype.Timestamptz, len(ps))
 	for i, p := range ps {
 		colProductID[i] = p.ProductID
 		colWarehouse[i] = p.Warehouse
-		colQtyOnHand[i] = p.QtyOnHand
 		colRestockAt[i] = p.RestockAt
 	}
-	args := make([]any, 0, 4*len(ps))
-	args = append(args, colProductID, colWarehouse, colQtyOnHand, colRestockAt)
+	args := make([]any, 0, 3*len(ps))
+	args = append(args, colProductID, colWarehouse, colRestockAt)
 	rows, err := exec.Query(ctx, insertStockLevelsSQL, args...)
 	if err != nil {
 		return nil, err

@@ -108,12 +108,9 @@ func text(s string) pgtype.Text { return pgtype.Text{String: s, Valid: true} }
 func seedMerchant(t *testing.T, exec pgb.DBTX) db.Merchant {
 	t.Helper()
 	m, err := db.InsertMerchant(context.Background(), exec, db.InsertMerchantParams{
-		ID:           uuid.New(),
 		Slug:         "acme-" + uuid.NewString()[:8],
 		Name:         "Acme Co",
 		SupportEmail: text("help@acme.test"),
-		Settings:     []byte(`{"currency":"USD"}`),
-		CreatedAt:    tsNow(),
 	})
 	if err != nil {
 		t.Fatalf("InsertMerchant: %v", err)
@@ -121,20 +118,14 @@ func seedMerchant(t *testing.T, exec pgb.DBTX) db.Merchant {
 	return m
 }
 
-// seedCustomer inserts one customer. Tier and SignupAt are set explicitly:
-// the generated INSERT lists every non-identity column (pgb only strips
-// identity/serial columns), so a zero Tier or timestamp is sent as an
-// explicit value and overrides the column's server DEFAULT.
+// seedCustomer inserts one customer. Default-bearing columns (tier, tags,
+// lifetime_value, signup_at) are omitted from the generated INSERT — the
+// server defaults apply.
 func seedCustomer(t *testing.T, exec pgb.DBTX, merchantID uuid.UUID, email string) db.Customer {
 	t.Helper()
 	c, err := db.InsertCustomer(context.Background(), exec, db.InsertCustomerParams{
-		MerchantID:    merchantID,
-		Email:         email,
-		FullName:      "User",
-		Tier:          db.CustomerTierStandard,
-		Tags:          []string{},
-		LifetimeValue: num(t, "0"),
-		SignupAt:      tsNow(),
+		MerchantID: merchantID,
+		Email:      email,
 	})
 	if err != nil {
 		t.Fatalf("InsertCustomer %s: %v", email, err)
@@ -142,21 +133,25 @@ func seedCustomer(t *testing.T, exec pgb.DBTX, merchantID uuid.UUID, email strin
 	return c
 }
 
-// seedProduct inserts one product. Single-row statics are used throughout
-// the smoke flows because the unnest batch statics are runtime-broken for
-// array/jsonb columns (see NOTES.md: the generated unnest casts a text[]
-// column to $n::text[], so unnest yields scalar text rows).
+// seedProduct inserts one product. Default-bearing columns (description,
+// in_stock, attributes, tags, timestamps) are omitted from the generated
+// INSERT — the server defaults apply.
 func seedProduct(t *testing.T, exec pgb.DBTX, merchantID uuid.UUID, sku, title, description, category, price, attributes string) db.Product {
 	t.Helper()
 	p, err := db.InsertProduct(context.Background(), exec, db.InsertProductParams{
 		MerchantID: merchantID, Sku: sku, Title: title,
-		Description: description, Category: category,
-		Price: num(t, price), InStock: true,
-		Attributes: []byte(attributes), Tags: []string{},
-		CreatedAt: tsNow(), UpdatedAt: tsNow(),
+		Category: category, Price: num(t, price),
 	})
 	if err != nil {
 		t.Fatalf("InsertProduct %s: %v", sku, err)
+	}
+	// description and attributes carry server defaults, so the INSERT
+	// omits them — seed the search-relevant content via the update path
+	if _, err := db.UpdateProduct(context.Background(), exec, p.ID, db.ProductSet{
+		Description: db.SetOf(description),
+		Attributes:  db.SetOf([]byte(attributes)),
+	}); err != nil {
+		t.Fatalf("UpdateProduct %s (seed search content): %v", sku, err)
 	}
 	return p
 }
@@ -183,12 +178,7 @@ func TestCrudFKChain(t *testing.T) {
 	c, err := db.InsertCustomer(ctx, pool, db.InsertCustomerParams{
 		MerchantID:      m.ID,
 		Email:           "ada@acme.test",
-		FullName:        "Ada Lovelace",
-		Tier:            db.CustomerTierPremium,
-		Tags:            []string{"vip", "beta"},
 		ShippingAddress: map[string]any{"city": "London", "zip": "E1 6AN"},
-		LifetimeValue:   num(t, "0"),
-		SignupAt:        tsNow(),
 	})
 	if err != nil {
 		t.Fatalf("InsertCustomer: %v", err)
@@ -209,15 +199,17 @@ func TestCrudFKChain(t *testing.T) {
 	prods := []db.Product{grinder, tea, book}
 
 	order, err := db.InsertOrder(ctx, pool, db.InsertOrderParams{
-		MerchantID: m.ID, CustomerID: c.ID, Status: db.OrderStatusPending,
-		Currency: "USD", PromoCodes: []string{"WELCOME10"}, PlacedAt: tsNow(),
-		// money columns carry DEFAULT 0 in DDL, but the generated INSERT
-		// lists them anyway — a zero pgtype.Numeric is sent as NULL, so
-		// every default-bearing numeric must be set explicitly
-		Subtotal: num(t, "29.68"), TaxTotal: num(t, "2.29"), GrandTotal: num(t, "31.97"),
+		MerchantID: m.ID, CustomerID: c.ID,
 	})
 	if err != nil {
 		t.Fatalf("InsertOrder: %v", err)
+	}
+	// promo_codes is server-defaulted now, so the INSERT cannot seed it —
+	// set it through the generated three-state update path instead.
+	if _, err := db.UpdateOrders(ctx, pool, []pgb.Expr{
+		db.Orders.ID().Eq(order.ID),
+	}, db.OrderSet{PromoCodes: db.SetOf([]string{"WELCOME10"})}); err != nil {
+		t.Fatalf("seed promo_codes: %v", err)
 	}
 
 	items, err := db.InsertOrderItems(ctx, pool, []db.InsertOrderItemParams{
@@ -282,7 +274,13 @@ func TestCrudFKChain(t *testing.T) {
 		t.Fatalf("SetNull did not clear last_login_at: %+v", c2.LastLoginAt)
 	}
 
-	// filter + count surface
+	// filter + count surface: tier was defaulted at insert, promote this
+	// customer to premium through the generated three-state update
+	if _, err := db.UpdateCustomer(ctx, pool, c.ID, db.CustomerSet{
+		Tier: db.SetOf(db.CustomerTierPremium),
+	}); err != nil {
+		t.Fatalf("promote customer: %v", err)
+	}
 	n, err := db.CountCustomers(ctx, pool, db.CustomerFilter{Tier: db.Opt(db.CustomerTierPremium)})
 	if err != nil {
 		t.Fatalf("CountCustomers: %v", err)
@@ -314,9 +312,8 @@ func TestBM25SearchStatics(t *testing.T) {
 	book := seedProduct(t, pool, m.ID, "SKU-BOOK", "Coffee Table Book",
 		"Photographs of mountains", "books", "25.00", `{}`)
 	if _, err := db.InsertHelpArticle(ctx, pool, db.InsertHelpArticleParams{
-		ID: uuid.New(), Slug: "refunds", Title: "Refund policy explained",
+		Slug: "refunds", Title: "Refund policy explained",
 		Body: "We process refund requests within five business days.",
-		Tags: []string{"billing"}, Published: true, UpdatedAt: tsNow(),
 	}); err != nil {
 		t.Fatalf("InsertHelpArticle: %v", err)
 	}
@@ -466,13 +463,10 @@ func TestTransactionAndViews(t *testing.T) {
 	m := seedMerchant(t, pool)
 
 	// rollback path: the endpoint insert must not survive the failing tx.
-	// (The unnest batch static is avoided — see NOTES.md, text[] columns
-	// break its generated unnest casts.)
 	_, txErr := pgb.WithTx(ctx, pool, func(tx pgb.DBTX) (db.WebhookEndpoint, error) {
 		ep, err := db.InsertWebhookEndpoint(ctx, tx, db.InsertWebhookEndpointParams{
-			ID: uuid.New(), MerchantID: m.ID, URL: "https://acme.test/hook",
-			Secret: "s3cret", Events: []string{"order.created"}, Active: true,
-			CreatedAt: tsNow(),
+			MerchantID: m.ID, URL: "https://acme.test/hook",
+			Secret: "s3cret",
 		})
 		if err != nil {
 			return db.WebhookEndpoint{}, err
@@ -493,9 +487,8 @@ func TestTransactionAndViews(t *testing.T) {
 	// commit path
 	_, err = pgb.WithTx(ctx, pool, func(tx pgb.DBTX) (db.WebhookEndpoint, error) {
 		return db.InsertWebhookEndpoint(ctx, tx, db.InsertWebhookEndpointParams{
-			ID: uuid.New(), MerchantID: m.ID, URL: "https://acme.test/hook2",
-			Secret: "s3cret", Events: []string{"order.paid"}, Active: true,
-			CreatedAt: tsNow(),
+			MerchantID: m.ID, URL: "https://acme.test/hook2",
+			Secret: "s3cret",
 		})
 	})
 	if err != nil {
@@ -511,9 +504,7 @@ func TestTransactionAndViews(t *testing.T) {
 		t.Fatalf("empty customers should give empty overview, got %d", len(ov))
 	}
 	if _, err := db.InsertCustomer(ctx, pool, db.InsertCustomerParams{
-		MerchantID: m.ID, Email: "grace@acme.test", FullName: "Grace H",
-		Tier: db.CustomerTierFree, Tags: []string{},
-		LifetimeValue: num(t, "0"), SignupAt: tsNow(),
+		MerchantID: m.ID, Email: "grace@acme.test",
 	}); err != nil {
 		t.Fatalf("InsertCustomer: %v", err)
 	}
@@ -528,17 +519,13 @@ func TestTransactionAndViews(t *testing.T) {
 	// materialized view reader + refresh
 	p, err := db.InsertProduct(ctx, pool, db.InsertProductParams{
 		MerchantID: m.ID, Sku: "SKU-MV", Title: "Matview Widget",
-		Description: "widget", Category: "misc",
-		Price: num(t, "3.00"), InStock: true, Attributes: []byte(`{}`),
-		Tags: []string{}, CreatedAt: tsNow(), UpdatedAt: tsNow(),
+		Category: "misc", Price: num(t, "3.00"),
 	})
 	if err != nil {
 		t.Fatalf("InsertProduct: %v", err)
 	}
 	order, err := db.InsertOrder(ctx, pool, db.InsertOrderParams{
-		MerchantID: m.ID, CustomerID: ov[0].ID, Status: db.OrderStatusDelivered,
-		Currency: "USD", PlacedAt: tsNow(), PromoCodes: []string{},
-		Subtotal: num(t, "12.00"), TaxTotal: num(t, "0"), GrandTotal: num(t, "12.00"),
+		MerchantID: m.ID, CustomerID: ov[0].ID,
 	})
 	if err != nil {
 		t.Fatalf("InsertOrder: %v", err)

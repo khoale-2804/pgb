@@ -123,12 +123,6 @@ func productSalesFilterWhere(f ProductSaleFilter) []pgb.Expr {
 	return w
 }
 
-// InsertProductSaleParams carries the INSERT column values: generated
-// and serial columns are out, default-bearing columns join only with
-// the include_defaults option.
-type InsertProductSaleParams struct {
-}
-
 // scanProductSale scans one row positionally over every column in
 // catalog order — the single scan path for all generated reads.
 func scanProductSale(row pgx.CollectableRow) (ProductSale, error) {

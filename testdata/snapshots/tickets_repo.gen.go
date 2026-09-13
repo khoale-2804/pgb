@@ -161,11 +161,7 @@ type TicketSet struct {
 // and serial columns are out, default-bearing columns join only with
 // the include_defaults option.
 type InsertTicketParams struct {
-	Number    int64
-	Subject   string
-	Priority  string
-	Status    string
-	CreatedAt pgtype.Timestamptz
+	Subject string
 }
 
 // scanTicket scans one row positionally over every column in
@@ -217,8 +213,8 @@ func CountTickets(ctx context.Context, exec pgb.DBTX, f TicketFilter) (int64, er
 // column, defaults included).
 func InsertTicket(ctx context.Context, exec pgb.DBTX, p InsertTicketParams) (Ticket, error) {
 	rows, err := pgb.NewInsert("public.tickets",
-		[]string{"number", "subject", "priority", "status", "created_at"},
-		[]pgb.Expr{pgb.Lit{V: p.Number}, pgb.Lit{V: p.Subject}, pgb.Lit{V: p.Priority}, pgb.Lit{V: p.Status}, pgb.Lit{V: p.CreatedAt}},
+		[]string{"subject"},
+		[]pgb.Expr{pgb.Lit{V: p.Subject}},
 	).Returning(pgb.Col{Table: "tickets", Name: "id"}, pgb.Col{Table: "tickets", Name: "number"}, pgb.Col{Table: "tickets", Name: "subject"}, pgb.Col{Table: "tickets", Name: "priority"}, pgb.Col{Table: "tickets", Name: "status"}, pgb.Col{Table: "tickets", Name: "created_at"}).Run(ctx, exec)
 	if err != nil {
 		return Ticket{}, err
@@ -233,7 +229,7 @@ func InsertTicket(ctx context.Context, exec pgb.DBTX, p InsertTicketParams) (Tic
 	return us[0], nil
 }
 
-const insertTicketsSQL = "INSERT INTO public.tickets (number, subject, priority, status, created_at) SELECT * FROM unnest($1::int8[], $2::text[], $3::text[], $4::text[], $5::timestamptz[]) RETURNING id, number, subject, priority, status, created_at"
+const insertTicketsSQL = "INSERT INTO public.tickets (subject) SELECT * FROM unnest($1::text[]) RETURNING id, number, subject, priority, status, created_at"
 
 // InsertTickets inserts a whole batch in one round trip via
 // unnest and returns every inserted row.
@@ -241,20 +237,12 @@ func InsertTickets(ctx context.Context, exec pgb.DBTX, ps []InsertTicketParams) 
 	if len(ps) == 0 {
 		return nil, nil
 	}
-	colNumber := make([]int64, len(ps))
 	colSubject := make([]string, len(ps))
-	colPriority := make([]string, len(ps))
-	colStatus := make([]string, len(ps))
-	colCreatedAt := make([]pgtype.Timestamptz, len(ps))
 	for i, p := range ps {
-		colNumber[i] = p.Number
 		colSubject[i] = p.Subject
-		colPriority[i] = p.Priority
-		colStatus[i] = p.Status
-		colCreatedAt[i] = p.CreatedAt
 	}
-	args := make([]any, 0, 5*len(ps))
-	args = append(args, colNumber, colSubject, colPriority, colStatus, colCreatedAt)
+	args := make([]any, 0, 1*len(ps))
+	args = append(args, colSubject)
 	rows, err := exec.Query(ctx, insertTicketsSQL, args...)
 	if err != nil {
 		return nil, err
@@ -390,8 +378,8 @@ func UpdateTickets(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, s Ticke
 // the resulting row; pgb.ErrNotFound when DO NOTHING matched.
 func UpsertTicket(ctx context.Context, exec pgb.DBTX, id int64, p InsertTicketParams) (Ticket, error) {
 	rows, err := pgb.NewInsert("public.tickets",
-		[]string{"id", "number", "subject", "priority", "status", "created_at"},
-		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.Number}, pgb.Lit{V: p.Subject}, pgb.Lit{V: p.Priority}, pgb.Lit{V: p.Status}, pgb.Lit{V: p.CreatedAt}},
+		[]string{"id", "subject"},
+		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.Subject}},
 	).OnConflict(pgb.OnConflict{
 		Target: []string{"id"},
 		Sets: []pgb.SetClause{

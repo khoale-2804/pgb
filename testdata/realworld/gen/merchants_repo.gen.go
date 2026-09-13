@@ -151,12 +151,9 @@ type MerchantSet struct {
 // and serial columns are out, default-bearing columns join only with
 // the include_defaults option.
 type InsertMerchantParams struct {
-	ID            uuid.UUID
 	Slug          string
 	Name          string
 	SupportEmail  pgtype.Text
-	Settings      []byte
-	CreatedAt     pgtype.Timestamptz
 	DeactivatedAt pgtype.Timestamptz
 }
 
@@ -209,8 +206,8 @@ func CountMerchants(ctx context.Context, exec pgb.DBTX, f MerchantFilter) (int64
 // column, defaults included).
 func InsertMerchant(ctx context.Context, exec pgb.DBTX, p InsertMerchantParams) (Merchant, error) {
 	rows, err := pgb.NewInsert("public.merchants",
-		[]string{"id", "slug", "name", "support_email", "settings", "created_at", "deactivated_at"},
-		[]pgb.Expr{pgb.Lit{V: p.ID}, pgb.Lit{V: p.Slug}, pgb.Lit{V: p.Name}, pgb.Lit{V: p.SupportEmail}, pgb.Lit{V: p.Settings, Cast: "jsonb"}, pgb.Lit{V: p.CreatedAt}, pgb.Lit{V: p.DeactivatedAt}},
+		[]string{"slug", "name", "support_email", "deactivated_at"},
+		[]pgb.Expr{pgb.Lit{V: p.Slug}, pgb.Lit{V: p.Name}, pgb.Lit{V: p.SupportEmail}, pgb.Lit{V: p.DeactivatedAt}},
 	).Returning(pgb.Col{Table: "merchants", Name: "id"}, pgb.Col{Table: "merchants", Name: "slug"}, pgb.Col{Table: "merchants", Name: "name"}, pgb.Col{Table: "merchants", Name: "support_email"}, pgb.Col{Table: "merchants", Name: "settings"}, pgb.Col{Table: "merchants", Name: "created_at"}, pgb.Col{Table: "merchants", Name: "deactivated_at"}).Run(ctx, exec)
 	if err != nil {
 		return Merchant{}, err
@@ -223,6 +220,33 @@ func InsertMerchant(ctx context.Context, exec pgb.DBTX, p InsertMerchantParams) 
 		return Merchant{}, pgb.ErrNotFound
 	}
 	return us[0], nil
+}
+
+const insertMerchantsSQL = "INSERT INTO public.merchants (slug, \"name\", support_email, deactivated_at) SELECT * FROM unnest($1::text[], $2::text[], $3::text[], $4::timestamptz[]) RETURNING id, slug, \"name\", support_email, settings, created_at, deactivated_at"
+
+// InsertMerchants inserts a whole batch in one round trip via
+// unnest and returns every inserted row.
+func InsertMerchants(ctx context.Context, exec pgb.DBTX, ps []InsertMerchantParams) ([]Merchant, error) {
+	if len(ps) == 0 {
+		return nil, nil
+	}
+	colSlug := make([]string, len(ps))
+	colName := make([]string, len(ps))
+	colSupportEmail := make([]pgtype.Text, len(ps))
+	colDeactivatedAt := make([]pgtype.Timestamptz, len(ps))
+	for i, p := range ps {
+		colSlug[i] = p.Slug
+		colName[i] = p.Name
+		colSupportEmail[i] = p.SupportEmail
+		colDeactivatedAt[i] = p.DeactivatedAt
+	}
+	args := make([]any, 0, 4*len(ps))
+	args = append(args, colSlug, colName, colSupportEmail, colDeactivatedAt)
+	rows, err := exec.Query(ctx, insertMerchantsSQL, args...)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, scanMerchant)
 }
 
 // UpdateMerchant applies the non-zero fields of s to one row and
@@ -369,8 +393,8 @@ func UpdateMerchants(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, s Mer
 // the resulting row; pgb.ErrNotFound when DO NOTHING matched.
 func UpsertMerchant(ctx context.Context, exec pgb.DBTX, id uuid.UUID, p InsertMerchantParams) (Merchant, error) {
 	rows, err := pgb.NewInsert("public.merchants",
-		[]string{"id", "slug", "name", "support_email", "settings", "created_at", "deactivated_at"},
-		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.Slug}, pgb.Lit{V: p.Name}, pgb.Lit{V: p.SupportEmail}, pgb.Lit{V: p.Settings, Cast: "jsonb"}, pgb.Lit{V: p.CreatedAt}, pgb.Lit{V: p.DeactivatedAt}},
+		[]string{"id", "slug", "name", "support_email", "deactivated_at"},
+		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.Slug}, pgb.Lit{V: p.Name}, pgb.Lit{V: p.SupportEmail}, pgb.Lit{V: p.DeactivatedAt}},
 	).OnConflict(pgb.OnConflict{
 		Target: []string{"id"},
 		Sets: []pgb.SetClause{

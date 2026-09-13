@@ -266,13 +266,6 @@ type OrderSet struct {
 type InsertOrderParams struct {
 	MerchantID uuid.UUID
 	CustomerID int64
-	Status     OrderStatus
-	Currency   string
-	Subtotal   pgtype.Numeric
-	TaxTotal   pgtype.Numeric
-	GrandTotal pgtype.Numeric
-	PromoCodes []string
-	PlacedAt   pgtype.Timestamptz
 	ShippedAt  pgtype.Timestamptz
 	Notes      pgtype.Text
 }
@@ -326,8 +319,8 @@ func CountOrders(ctx context.Context, exec pgb.DBTX, f OrderFilter) (int64, erro
 // column, defaults included).
 func InsertOrder(ctx context.Context, exec pgb.DBTX, p InsertOrderParams) (Order, error) {
 	rows, err := pgb.NewInsert("public.orders",
-		[]string{"merchant_id", "customer_id", "status", "currency", "subtotal", "tax_total", "grand_total", "promo_codes", "placed_at", "shipped_at", "notes"},
-		[]pgb.Expr{pgb.Lit{V: p.MerchantID}, pgb.Lit{V: p.CustomerID}, pgb.Lit{V: p.Status, Cast: "order_status"}, pgb.Lit{V: p.Currency}, pgb.Lit{V: p.Subtotal}, pgb.Lit{V: p.TaxTotal}, pgb.Lit{V: p.GrandTotal}, pgb.Lit{V: p.PromoCodes, Cast: "text[]"}, pgb.Lit{V: p.PlacedAt}, pgb.Lit{V: p.ShippedAt}, pgb.Lit{V: p.Notes}},
+		[]string{"merchant_id", "customer_id", "shipped_at", "notes"},
+		[]pgb.Expr{pgb.Lit{V: p.MerchantID}, pgb.Lit{V: p.CustomerID}, pgb.Lit{V: p.ShippedAt}, pgb.Lit{V: p.Notes}},
 	).Returning(pgb.Col{Table: "orders", Name: "id"}, pgb.Col{Table: "orders", Name: "merchant_id"}, pgb.Col{Table: "orders", Name: "customer_id"}, pgb.Col{Table: "orders", Name: "status"}, pgb.Col{Table: "orders", Name: "currency"}, pgb.Col{Table: "orders", Name: "subtotal"}, pgb.Col{Table: "orders", Name: "tax_total"}, pgb.Col{Table: "orders", Name: "grand_total"}, pgb.Col{Table: "orders", Name: "promo_codes"}, pgb.Col{Table: "orders", Name: "placed_at"}, pgb.Col{Table: "orders", Name: "shipped_at"}, pgb.Col{Table: "orders", Name: "notes"}).Run(ctx, exec)
 	if err != nil {
 		return Order{}, err
@@ -340,6 +333,33 @@ func InsertOrder(ctx context.Context, exec pgb.DBTX, p InsertOrderParams) (Order
 		return Order{}, pgb.ErrNotFound
 	}
 	return us[0], nil
+}
+
+const insertOrdersSQL = "INSERT INTO public.orders (merchant_id, customer_id, shipped_at, notes) SELECT * FROM unnest($1::uuid[], $2::int8[], $3::timestamptz[], $4::text[]) RETURNING id, merchant_id, customer_id, status, currency, subtotal, tax_total, grand_total, promo_codes, placed_at, shipped_at, notes"
+
+// InsertOrders inserts a whole batch in one round trip via
+// unnest and returns every inserted row.
+func InsertOrders(ctx context.Context, exec pgb.DBTX, ps []InsertOrderParams) ([]Order, error) {
+	if len(ps) == 0 {
+		return nil, nil
+	}
+	colMerchantID := make([]uuid.UUID, len(ps))
+	colCustomerID := make([]int64, len(ps))
+	colShippedAt := make([]pgtype.Timestamptz, len(ps))
+	colNotes := make([]pgtype.Text, len(ps))
+	for i, p := range ps {
+		colMerchantID[i] = p.MerchantID
+		colCustomerID[i] = p.CustomerID
+		colShippedAt[i] = p.ShippedAt
+		colNotes[i] = p.Notes
+	}
+	args := make([]any, 0, 4*len(ps))
+	args = append(args, colMerchantID, colCustomerID, colShippedAt, colNotes)
+	rows, err := exec.Query(ctx, insertOrdersSQL, args...)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, scanOrder)
 }
 
 // UpdateOrder applies the non-zero fields of s to one row and
@@ -566,8 +586,8 @@ func UpdateOrders(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, s OrderS
 // the resulting row; pgb.ErrNotFound when DO NOTHING matched.
 func UpsertOrder(ctx context.Context, exec pgb.DBTX, id int64, p InsertOrderParams) (Order, error) {
 	rows, err := pgb.NewInsert("public.orders",
-		[]string{"id", "merchant_id", "customer_id", "status", "currency", "subtotal", "tax_total", "grand_total", "promo_codes", "placed_at", "shipped_at", "notes"},
-		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.MerchantID}, pgb.Lit{V: p.CustomerID}, pgb.Lit{V: p.Status, Cast: "order_status"}, pgb.Lit{V: p.Currency}, pgb.Lit{V: p.Subtotal}, pgb.Lit{V: p.TaxTotal}, pgb.Lit{V: p.GrandTotal}, pgb.Lit{V: p.PromoCodes, Cast: "text[]"}, pgb.Lit{V: p.PlacedAt}, pgb.Lit{V: p.ShippedAt}, pgb.Lit{V: p.Notes}},
+		[]string{"id", "merchant_id", "customer_id", "shipped_at", "notes"},
+		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.MerchantID}, pgb.Lit{V: p.CustomerID}, pgb.Lit{V: p.ShippedAt}, pgb.Lit{V: p.Notes}},
 	).OnConflict(pgb.OnConflict{
 		Target: []string{"id"},
 		Sets: []pgb.SetClause{

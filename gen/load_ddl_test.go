@@ -523,3 +523,43 @@ func TestStaticsHeuristicWarning(t *testing.T) {
 		t.Errorf("declared_pk must not warn; log = %q", log)
 	}
 }
+
+// TestEnrichPlainDefaults pins the CONSTR_DEFAULT extraction: a plain
+// DEFAULT clause marks the column HasDefault so insertableIdx can omit it
+// from INSERT lists (the server default then applies). bigserial columns
+// carry no DEFAULT constraint — isSerial already excludes them at emission.
+func TestEnrichPlainDefaults(t *testing.T) {
+	sch := ir.Schema{
+		DefaultSchema: "public",
+		Tables: []ir.Table{
+			{Schema: "public", Name: "defaults_t", Columns: []ir.Column{
+				{Name: "id", PGType: "int8", NotNull: true},
+				{Name: "email", PGType: "text", NotNull: true},
+				{Name: "name", PGType: "text", NotNull: true},
+				{Name: "balance", PGType: "numeric", NotNull: true},
+				{Name: "is_active", PGType: "bool", NotNull: true},
+				{Name: "bio", PGType: "text"},
+			}},
+		},
+	}
+	runEnrich(t, &sch, `CREATE TABLE defaults_t (
+  id         bigserial PRIMARY KEY,
+  email      text NOT NULL,
+  name       text NOT NULL DEFAULT 'unknown',
+  balance    numeric(12,2) NOT NULL DEFAULT 0,
+  is_active  boolean NOT NULL DEFAULT true,
+  bio        text
+);`)
+	u := tableByName(t, &sch, "public", "defaults_t")
+	for _, want := range []string{"name", "balance", "is_active"} {
+		c := findColumn(u, want)
+		if c == nil || !c.HasDefault {
+			t.Errorf("column %s: HasDefault = false, want true", want)
+		}
+	}
+	for _, notDefault := range []string{"id", "email", "bio"} {
+		if c := findColumn(u, notDefault); c != nil && c.HasDefault {
+			t.Errorf("column %s: HasDefault = true, want false", notDefault)
+		}
+	}
+}

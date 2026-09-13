@@ -49,12 +49,15 @@ rest are recorded here as the known-issues ledger, priority-ordered.
 4. **Column overrides match by name suffix only** — gen/maptype.go:
    `products.embedding` matches every table's `embedding`. Resolve overrides
    with full schema.table.column context.
-5. **Plain `DEFAULT` clauses are not extracted** — gen/load_ddl.go sets
-   HasDefault only for identity columns; inserts bind every settable column,
-   so a Go zero value reaches the server as an explicit NULL that overrides
-   the server default (23502 on NOT NULL defaults). Needs a semantic decision
-   (three-state params for defaulted columns vs omit from INSERT list) before
-   implementation — CONTRACTS.md-relevant.
+5. **Plain `DEFAULT` clauses are not extracted** — FIXED (2026-09-14
+   audit-cleanup shift): load_ddl.go now marks CONSTR_DEFAULT columns
+   HasDefault, activating the already-designed include_defaults gate in
+   insertableIdx (default: omitted from INSERT — the documented behavior;
+   `include_defaults: true` restores explicit binding). Tables whose every
+   column is server-defaulted get no insert statics at all. The fixture's
+   latent invalid `DEFAULT B'0'` (bit(8), SQLSTATE 22026) surfaced and was
+   corrected. CONTRACTS.md-relevant decision resolved in favor of the
+   documented design; no CONTRACT signature changed.
 6. **Hit struct hardcodes `Product` field** — FIXED (c1a5d78): the field is
    `Row` on every `Search<T>Hit`; docs and both DB-backed suites updated.
 

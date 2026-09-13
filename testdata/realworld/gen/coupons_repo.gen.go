@@ -164,9 +164,7 @@ type InsertCouponParams struct {
 	Code           string
 	PercentOff     pgtype.Numeric
 	MaxRedemptions pgtype.Int4
-	TimesRedeemed  int32
 	ExpiresAt      pgtype.Timestamptz
-	Active         bool
 }
 
 // scanCoupon scans one row positionally over every column in
@@ -218,8 +216,8 @@ func CountCoupons(ctx context.Context, exec pgb.DBTX, f CouponFilter) (int64, er
 // column, defaults included).
 func InsertCoupon(ctx context.Context, exec pgb.DBTX, p InsertCouponParams) (Coupon, error) {
 	rows, err := pgb.NewInsert("public.coupons",
-		[]string{"code", "percent_off", "max_redemptions", "times_redeemed", "expires_at", "active"},
-		[]pgb.Expr{pgb.Lit{V: p.Code}, pgb.Lit{V: p.PercentOff}, pgb.Lit{V: p.MaxRedemptions}, pgb.Lit{V: p.TimesRedeemed}, pgb.Lit{V: p.ExpiresAt}, pgb.Lit{V: p.Active}},
+		[]string{"code", "percent_off", "max_redemptions", "expires_at"},
+		[]pgb.Expr{pgb.Lit{V: p.Code}, pgb.Lit{V: p.PercentOff}, pgb.Lit{V: p.MaxRedemptions}, pgb.Lit{V: p.ExpiresAt}},
 	).Returning(pgb.Col{Table: "coupons", Name: "code"}, pgb.Col{Table: "coupons", Name: "percent_off"}, pgb.Col{Table: "coupons", Name: "max_redemptions"}, pgb.Col{Table: "coupons", Name: "times_redeemed"}, pgb.Col{Table: "coupons", Name: "expires_at"}, pgb.Col{Table: "coupons", Name: "active"}).Run(ctx, exec)
 	if err != nil {
 		return Coupon{}, err
@@ -234,7 +232,7 @@ func InsertCoupon(ctx context.Context, exec pgb.DBTX, p InsertCouponParams) (Cou
 	return us[0], nil
 }
 
-const insertCouponsSQL = "INSERT INTO public.coupons (code, percent_off, max_redemptions, times_redeemed, expires_at, active) SELECT * FROM unnest($1::text[], $2::numeric[], $3::int4[], $4::int4[], $5::timestamptz[], $6::bool[]) RETURNING code, percent_off, max_redemptions, times_redeemed, expires_at, active"
+const insertCouponsSQL = "INSERT INTO public.coupons (code, percent_off, max_redemptions, expires_at) SELECT * FROM unnest($1::text[], $2::numeric[], $3::int4[], $4::timestamptz[]) RETURNING code, percent_off, max_redemptions, times_redeemed, expires_at, active"
 
 // InsertCoupons inserts a whole batch in one round trip via
 // unnest and returns every inserted row.
@@ -245,19 +243,15 @@ func InsertCoupons(ctx context.Context, exec pgb.DBTX, ps []InsertCouponParams) 
 	colCode := make([]string, len(ps))
 	colPercentOff := make([]pgtype.Numeric, len(ps))
 	colMaxRedemptions := make([]pgtype.Int4, len(ps))
-	colTimesRedeemed := make([]int32, len(ps))
 	colExpiresAt := make([]pgtype.Timestamptz, len(ps))
-	colActive := make([]bool, len(ps))
 	for i, p := range ps {
 		colCode[i] = p.Code
 		colPercentOff[i] = p.PercentOff
 		colMaxRedemptions[i] = p.MaxRedemptions
-		colTimesRedeemed[i] = p.TimesRedeemed
 		colExpiresAt[i] = p.ExpiresAt
-		colActive[i] = p.Active
 	}
-	args := make([]any, 0, 6*len(ps))
-	args = append(args, colCode, colPercentOff, colMaxRedemptions, colTimesRedeemed, colExpiresAt, colActive)
+	args := make([]any, 0, 4*len(ps))
+	args = append(args, colCode, colPercentOff, colMaxRedemptions, colExpiresAt)
 	rows, err := exec.Query(ctx, insertCouponsSQL, args...)
 	if err != nil {
 		return nil, err
@@ -393,8 +387,8 @@ func UpdateCoupons(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, s Coupo
 // the resulting row; pgb.ErrNotFound when DO NOTHING matched.
 func UpsertCoupon(ctx context.Context, exec pgb.DBTX, code string, p InsertCouponParams) (Coupon, error) {
 	rows, err := pgb.NewInsert("public.coupons",
-		[]string{"code", "percent_off", "max_redemptions", "times_redeemed", "expires_at", "active"},
-		[]pgb.Expr{pgb.Lit{V: code}, pgb.Lit{V: p.PercentOff}, pgb.Lit{V: p.MaxRedemptions}, pgb.Lit{V: p.TimesRedeemed}, pgb.Lit{V: p.ExpiresAt}, pgb.Lit{V: p.Active}},
+		[]string{"code", "percent_off", "max_redemptions", "expires_at"},
+		[]pgb.Expr{pgb.Lit{V: code}, pgb.Lit{V: p.PercentOff}, pgb.Lit{V: p.MaxRedemptions}, pgb.Lit{V: p.ExpiresAt}},
 	).OnConflict(pgb.OnConflict{
 		Target: []string{"code"},
 		Sets: []pgb.SetClause{

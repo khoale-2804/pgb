@@ -78,7 +78,6 @@ type DocSet struct {
 // and serial columns are out, default-bearing columns join only with
 // the include_defaults option.
 type InsertDocParams struct {
-	ID    uuid.UUID
 	Title string
 	Body  string
 }
@@ -132,8 +131,8 @@ func CountDocs(ctx context.Context, exec pgb.DBTX, f DocFilter) (int64, error) {
 // column, defaults included).
 func InsertDoc(ctx context.Context, exec pgb.DBTX, p InsertDocParams) (Doc, error) {
 	rows, err := pgb.NewInsert("public.docs",
-		[]string{"id", "title", "body"},
-		[]pgb.Expr{pgb.Lit{V: p.ID}, pgb.Lit{V: p.Title}, pgb.Lit{V: p.Body}},
+		[]string{"title", "body"},
+		[]pgb.Expr{pgb.Lit{V: p.Title}, pgb.Lit{V: p.Body}},
 	).Returning(pgb.Col{Table: "docs", Name: "id"}, pgb.Col{Table: "docs", Name: "title"}, pgb.Col{Table: "docs", Name: "body"}).Run(ctx, exec)
 	if err != nil {
 		return Doc{}, err
@@ -148,7 +147,7 @@ func InsertDoc(ctx context.Context, exec pgb.DBTX, p InsertDocParams) (Doc, erro
 	return us[0], nil
 }
 
-const insertDocsSQL = "INSERT INTO public.docs (id, title, body) SELECT * FROM unnest($1::uuid[], $2::text[], $3::text[]) RETURNING id, title, body"
+const insertDocsSQL = "INSERT INTO public.docs (title, body) SELECT * FROM unnest($1::text[], $2::text[]) RETURNING id, title, body"
 
 // InsertDocs inserts a whole batch in one round trip via
 // unnest and returns every inserted row.
@@ -156,16 +155,14 @@ func InsertDocs(ctx context.Context, exec pgb.DBTX, ps []InsertDocParams) ([]Doc
 	if len(ps) == 0 {
 		return nil, nil
 	}
-	colID := make([]uuid.UUID, len(ps))
 	colTitle := make([]string, len(ps))
 	colBody := make([]string, len(ps))
 	for i, p := range ps {
-		colID[i] = p.ID
 		colTitle[i] = p.Title
 		colBody[i] = p.Body
 	}
-	args := make([]any, 0, 3*len(ps))
-	args = append(args, colID, colTitle, colBody)
+	args := make([]any, 0, 2*len(ps))
+	args = append(args, colTitle, colBody)
 	rows, err := exec.Query(ctx, insertDocsSQL, args...)
 	if err != nil {
 		return nil, err

@@ -232,17 +232,11 @@ type ProductSet struct {
 // and serial columns are out, default-bearing columns join only with
 // the include_defaults option.
 type InsertProductParams struct {
-	MerchantID  uuid.UUID
-	Sku         string
-	Title       string
-	Description string
-	Category    string
-	Price       pgtype.Numeric
-	InStock     bool
-	Attributes  []byte
-	Tags        []string
-	CreatedAt   pgtype.Timestamptz
-	UpdatedAt   pgtype.Timestamptz
+	MerchantID uuid.UUID
+	Sku        string
+	Title      string
+	Category   string
+	Price      pgtype.Numeric
 }
 
 // scanProduct scans one row positionally over every column in
@@ -294,8 +288,8 @@ func CountProducts(ctx context.Context, exec pgb.DBTX, f ProductFilter) (int64, 
 // column, defaults included).
 func InsertProduct(ctx context.Context, exec pgb.DBTX, p InsertProductParams) (Product, error) {
 	rows, err := pgb.NewInsert("public.products",
-		[]string{"merchant_id", "sku", "title", "description", "category", "price", "in_stock", "attributes", "tags", "created_at", "updated_at"},
-		[]pgb.Expr{pgb.Lit{V: p.MerchantID}, pgb.Lit{V: p.Sku}, pgb.Lit{V: p.Title}, pgb.Lit{V: p.Description}, pgb.Lit{V: p.Category}, pgb.Lit{V: p.Price}, pgb.Lit{V: p.InStock}, pgb.Lit{V: p.Attributes, Cast: "jsonb"}, pgb.Lit{V: p.Tags, Cast: "text[]"}, pgb.Lit{V: p.CreatedAt}, pgb.Lit{V: p.UpdatedAt}},
+		[]string{"merchant_id", "sku", "title", "category", "price"},
+		[]pgb.Expr{pgb.Lit{V: p.MerchantID}, pgb.Lit{V: p.Sku}, pgb.Lit{V: p.Title}, pgb.Lit{V: p.Category}, pgb.Lit{V: p.Price}},
 	).Returning(pgb.Col{Table: "products", Name: "id"}, pgb.Col{Table: "products", Name: "merchant_id"}, pgb.Col{Table: "products", Name: "sku"}, pgb.Col{Table: "products", Name: "title"}, pgb.Col{Table: "products", Name: "description"}, pgb.Col{Table: "products", Name: "category"}, pgb.Col{Table: "products", Name: "price"}, pgb.Col{Table: "products", Name: "in_stock"}, pgb.Col{Table: "products", Name: "attributes"}, pgb.Col{Table: "products", Name: "tags"}, pgb.Col{Table: "products", Name: "created_at"}, pgb.Col{Table: "products", Name: "updated_at"}).Run(ctx, exec)
 	if err != nil {
 		return Product{}, err
@@ -308,6 +302,35 @@ func InsertProduct(ctx context.Context, exec pgb.DBTX, p InsertProductParams) (P
 		return Product{}, pgb.ErrNotFound
 	}
 	return us[0], nil
+}
+
+const insertProductsSQL = "INSERT INTO public.products (merchant_id, sku, title, category, price) SELECT * FROM unnest($1::uuid[], $2::text[], $3::text[], $4::text[], $5::numeric[]) RETURNING id, merchant_id, sku, title, description, category, price, in_stock, attributes, tags, created_at, updated_at"
+
+// InsertProducts inserts a whole batch in one round trip via
+// unnest and returns every inserted row.
+func InsertProducts(ctx context.Context, exec pgb.DBTX, ps []InsertProductParams) ([]Product, error) {
+	if len(ps) == 0 {
+		return nil, nil
+	}
+	colMerchantID := make([]uuid.UUID, len(ps))
+	colSku := make([]string, len(ps))
+	colTitle := make([]string, len(ps))
+	colCategory := make([]string, len(ps))
+	colPrice := make([]pgtype.Numeric, len(ps))
+	for i, p := range ps {
+		colMerchantID[i] = p.MerchantID
+		colSku[i] = p.Sku
+		colTitle[i] = p.Title
+		colCategory[i] = p.Category
+		colPrice[i] = p.Price
+	}
+	args := make([]any, 0, 5*len(ps))
+	args = append(args, colMerchantID, colSku, colTitle, colCategory, colPrice)
+	rows, err := exec.Query(ctx, insertProductsSQL, args...)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, scanProduct)
 }
 
 // UpdateProduct applies the non-zero fields of s to one row and
@@ -534,8 +557,8 @@ func UpdateProducts(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, s Prod
 // the resulting row; pgb.ErrNotFound when DO NOTHING matched.
 func UpsertProduct(ctx context.Context, exec pgb.DBTX, id int64, p InsertProductParams) (Product, error) {
 	rows, err := pgb.NewInsert("public.products",
-		[]string{"id", "merchant_id", "sku", "title", "description", "category", "price", "in_stock", "attributes", "tags", "created_at", "updated_at"},
-		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.MerchantID}, pgb.Lit{V: p.Sku}, pgb.Lit{V: p.Title}, pgb.Lit{V: p.Description}, pgb.Lit{V: p.Category}, pgb.Lit{V: p.Price}, pgb.Lit{V: p.InStock}, pgb.Lit{V: p.Attributes, Cast: "jsonb"}, pgb.Lit{V: p.Tags, Cast: "text[]"}, pgb.Lit{V: p.CreatedAt}, pgb.Lit{V: p.UpdatedAt}},
+		[]string{"id", "merchant_id", "sku", "title", "category", "price"},
+		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.MerchantID}, pgb.Lit{V: p.Sku}, pgb.Lit{V: p.Title}, pgb.Lit{V: p.Category}, pgb.Lit{V: p.Price}},
 	).OnConflict(pgb.OnConflict{
 		Target: []string{"id"},
 		Sets: []pgb.SetClause{

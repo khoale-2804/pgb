@@ -135,7 +135,6 @@ type InsertAppAuditLogParams struct {
 	Entity   string
 	EntityID int64
 	Payload  []byte
-	At       pgtype.Timestamptz
 }
 
 // scanAppAuditLog scans one row positionally over every column in
@@ -187,8 +186,8 @@ func CountAppAuditLogs(ctx context.Context, exec pgb.DBTX, f AppAuditLogFilter) 
 // column, defaults included).
 func InsertAppAuditLog(ctx context.Context, exec pgb.DBTX, p InsertAppAuditLogParams) (AppAuditLog, error) {
 	rows, err := pgb.NewInsert("app.audit_log",
-		[]string{"entity", "entity_id", "payload", "at"},
-		[]pgb.Expr{pgb.Lit{V: p.Entity}, pgb.Lit{V: p.EntityID}, pgb.Lit{V: p.Payload, Cast: "jsonb"}, pgb.Lit{V: p.At}},
+		[]string{"entity", "entity_id", "payload"},
+		[]pgb.Expr{pgb.Lit{V: p.Entity}, pgb.Lit{V: p.EntityID}, pgb.Lit{V: p.Payload, Cast: "jsonb"}},
 	).Returning(pgb.Col{Table: "audit_log", Name: "id"}, pgb.Col{Table: "audit_log", Name: "entity"}, pgb.Col{Table: "audit_log", Name: "entity_id"}, pgb.Col{Table: "audit_log", Name: "payload"}, pgb.Col{Table: "audit_log", Name: "at"}).Run(ctx, exec)
 	if err != nil {
 		return AppAuditLog{}, err
@@ -315,8 +314,8 @@ func UpdateAppAuditLogs(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, s 
 // the resulting row; pgb.ErrNotFound when DO NOTHING matched.
 func UpsertAppAuditLog(ctx context.Context, exec pgb.DBTX, id int64, p InsertAppAuditLogParams) (AppAuditLog, error) {
 	rows, err := pgb.NewInsert("app.audit_log",
-		[]string{"id", "entity", "entity_id", "payload", "at"},
-		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.Entity}, pgb.Lit{V: p.EntityID}, pgb.Lit{V: p.Payload, Cast: "jsonb"}, pgb.Lit{V: p.At}},
+		[]string{"id", "entity", "entity_id", "payload"},
+		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.Entity}, pgb.Lit{V: p.EntityID}, pgb.Lit{V: p.Payload, Cast: "jsonb"}},
 	).OnConflict(pgb.OnConflict{
 		Target: []string{"id"},
 		Sets: []pgb.SetClause{

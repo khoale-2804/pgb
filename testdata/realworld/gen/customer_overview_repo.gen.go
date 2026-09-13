@@ -144,12 +144,6 @@ func customerOverviewsFilterWhere(f CustomerOverviewFilter) []pgb.Expr {
 	return w
 }
 
-// InsertCustomerOverviewParams carries the INSERT column values: generated
-// and serial columns are out, default-bearing columns join only with
-// the include_defaults option.
-type InsertCustomerOverviewParams struct {
-}
-
 // scanCustomerOverview scans one row positionally over every column in
 // catalog order — the single scan path for all generated reads.
 func scanCustomerOverview(row pgx.CollectableRow) (CustomerOverview, error) {

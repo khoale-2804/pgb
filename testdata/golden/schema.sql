@@ -72,7 +72,7 @@ CREATE TABLE users (
   lan           cidr,
   mac           macaddr,
   mac8          macaddr8,
-  bitfield      bit(8)      NOT NULL DEFAULT B'0',
+  bitfield      bit(8)      NOT NULL DEFAULT B'00000000',
   flags         varbit(16),
   tags          text[]      NOT NULL DEFAULT '{}',
   scores        int4[]      NOT NULL DEFAULT ARRAY[]::int4[],

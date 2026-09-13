@@ -97,12 +97,6 @@ func orderStatsFilterWhere(f OrderStatFilter) []pgb.Expr {
 	return w
 }
 
-// InsertOrderStatParams carries the INSERT column values: generated
-// and serial columns are out, default-bearing columns join only with
-// the include_defaults option.
-type InsertOrderStatParams struct {
-}
-
 // scanOrderStat scans one row positionally over every column in
 // catalog order — the single scan path for all generated reads.
 func scanOrderStat(row pgx.CollectableRow) (OrderStat, error) {

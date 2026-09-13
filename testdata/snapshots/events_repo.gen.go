@@ -131,10 +131,9 @@ type EventSet struct {
 // and serial columns are out, default-bearing columns join only with
 // the include_defaults option.
 type InsertEventParams struct {
-	UserID     int64
-	Kind       string
-	Payload    []byte
-	OccurredAt pgtype.Timestamptz
+	UserID  int64
+	Kind    string
+	Payload []byte
 }
 
 // scanEvent scans one row positionally over every column in
@@ -171,8 +170,8 @@ func CountEvents(ctx context.Context, exec pgb.DBTX, f EventFilter) (int64, erro
 // column, defaults included).
 func InsertEvent(ctx context.Context, exec pgb.DBTX, p InsertEventParams) (Event, error) {
 	rows, err := pgb.NewInsert("public.events",
-		[]string{"user_id", "kind", "payload", "occurred_at"},
-		[]pgb.Expr{pgb.Lit{V: p.UserID}, pgb.Lit{V: p.Kind}, pgb.Lit{V: p.Payload, Cast: "jsonb"}, pgb.Lit{V: p.OccurredAt}},
+		[]string{"user_id", "kind", "payload"},
+		[]pgb.Expr{pgb.Lit{V: p.UserID}, pgb.Lit{V: p.Kind}, pgb.Lit{V: p.Payload, Cast: "jsonb"}},
 	).Returning(pgb.Col{Table: "events", Name: "id"}, pgb.Col{Table: "events", Name: "user_id"}, pgb.Col{Table: "events", Name: "kind"}, pgb.Col{Table: "events", Name: "payload"}, pgb.Col{Table: "events", Name: "occurred_at"}).Run(ctx, exec)
 	if err != nil {
 		return Event{}, err

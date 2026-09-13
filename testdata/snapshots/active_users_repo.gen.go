@@ -107,12 +107,6 @@ func activeUsersFilterWhere(f ActiveUserFilter) []pgb.Expr {
 	return w
 }
 
-// InsertActiveUserParams carries the INSERT column values: generated
-// and serial columns are out, default-bearing columns join only with
-// the include_defaults option.
-type InsertActiveUserParams struct {
-}
-
 // scanActiveUser scans one row positionally over every column in
 // catalog order — the single scan path for all generated reads.
 func scanActiveUser(row pgx.CollectableRow) (ActiveUser, error) {

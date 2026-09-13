@@ -46,7 +46,7 @@ speculation. Ordered by severity.
   broken hardcoded SQL. Golden has the same shape (json_color), so this is
   systemic, not fixture-specific.
 
-### 3. Default-bearing columns ride in INSERT lists; explicit NULL overrides the default
+### 3. RESOLVED (2026-09-14): Default-bearing columns ride in INSERT lists; explicit NULL overrides the default
 - `gen/pass_statics.go:155` / `gen/load_ddl.go:376-380`: `HasDefault` is only
   set for IDENTITY columns. Plain `DEFAULT` clauses (`DEFAULT now()`,
   `DEFAULT gen_random_uuid()`, `DEFAULT 0`, `DEFAULT '{}'`) are ignored, so

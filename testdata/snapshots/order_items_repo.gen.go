@@ -174,7 +174,6 @@ type InsertOrderItemParams struct {
 	ProductID   int64
 	Quantity    int32
 	UnitPrice   pgtype.Numeric
-	GiftWrap    bool
 }
 
 // scanOrderItem scans one row positionally over every column in
@@ -211,8 +210,8 @@ func CountOrderItems(ctx context.Context, exec pgb.DBTX, f OrderItemFilter) (int
 // column, defaults included).
 func InsertOrderItem(ctx context.Context, exec pgb.DBTX, p InsertOrderItemParams) (OrderItem, error) {
 	rows, err := pgb.NewInsert("public.order_items",
-		[]string{"order_shop_id", "order_id", "product_id", "quantity", "unit_price", "gift_wrap"},
-		[]pgb.Expr{pgb.Lit{V: p.OrderShopID}, pgb.Lit{V: p.OrderID}, pgb.Lit{V: p.ProductID}, pgb.Lit{V: p.Quantity}, pgb.Lit{V: p.UnitPrice}, pgb.Lit{V: p.GiftWrap}},
+		[]string{"order_shop_id", "order_id", "product_id", "quantity", "unit_price"},
+		[]pgb.Expr{pgb.Lit{V: p.OrderShopID}, pgb.Lit{V: p.OrderID}, pgb.Lit{V: p.ProductID}, pgb.Lit{V: p.Quantity}, pgb.Lit{V: p.UnitPrice}},
 	).Returning(pgb.Col{Table: "order_items", Name: "order_shop_id"}, pgb.Col{Table: "order_items", Name: "order_id"}, pgb.Col{Table: "order_items", Name: "product_id"}, pgb.Col{Table: "order_items", Name: "quantity"}, pgb.Col{Table: "order_items", Name: "unit_price"}, pgb.Col{Table: "order_items", Name: "gift_wrap"}).Run(ctx, exec)
 	if err != nil {
 		return OrderItem{}, err
@@ -227,7 +226,7 @@ func InsertOrderItem(ctx context.Context, exec pgb.DBTX, p InsertOrderItemParams
 	return us[0], nil
 }
 
-const insertOrderItemsSQL = "INSERT INTO public.order_items (order_shop_id, order_id, product_id, quantity, unit_price, gift_wrap) SELECT * FROM unnest($1::int4[], $2::int8[], $3::int8[], $4::int4[], $5::numeric[], $6::bool[]) RETURNING order_shop_id, order_id, product_id, quantity, unit_price, gift_wrap"
+const insertOrderItemsSQL = "INSERT INTO public.order_items (order_shop_id, order_id, product_id, quantity, unit_price) SELECT * FROM unnest($1::int4[], $2::int8[], $3::int8[], $4::int4[], $5::numeric[]) RETURNING order_shop_id, order_id, product_id, quantity, unit_price, gift_wrap"
 
 // InsertOrderItems inserts a whole batch in one round trip via
 // unnest and returns every inserted row.
@@ -240,17 +239,15 @@ func InsertOrderItems(ctx context.Context, exec pgb.DBTX, ps []InsertOrderItemPa
 	colProductID := make([]int64, len(ps))
 	colQuantity := make([]int32, len(ps))
 	colUnitPrice := make([]pgtype.Numeric, len(ps))
-	colGiftWrap := make([]bool, len(ps))
 	for i, p := range ps {
 		colOrderShopID[i] = p.OrderShopID
 		colOrderID[i] = p.OrderID
 		colProductID[i] = p.ProductID
 		colQuantity[i] = p.Quantity
 		colUnitPrice[i] = p.UnitPrice
-		colGiftWrap[i] = p.GiftWrap
 	}
-	args := make([]any, 0, 6*len(ps))
-	args = append(args, colOrderShopID, colOrderID, colProductID, colQuantity, colUnitPrice, colGiftWrap)
+	args := make([]any, 0, 5*len(ps))
+	args = append(args, colOrderShopID, colOrderID, colProductID, colQuantity, colUnitPrice)
 	rows, err := exec.Query(ctx, insertOrderItemsSQL, args...)
 	if err != nil {
 		return nil, err

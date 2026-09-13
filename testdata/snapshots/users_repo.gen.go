@@ -644,28 +644,19 @@ type UserSet struct {
 type InsertUserParams struct {
 	Email                                                  string
 	Password                                               string
-	Name                                                   string
 	Bio                                                    pgtype.Text
 	Age                                                    pgtype.Int2
-	Balance                                                pgtype.Numeric
 	Rating                                                 pgtype.Float4
-	Score                                                  float64
-	IsActive                                               bool
-	CreatedAt                                              pgtype.Timestamptz
 	UpdatedAt                                              pgtype.Timestamptz
 	BirthDate                                              pgtype.Date
 	LastSeen                                               pgtype.Time
 	Avatar                                                 []byte
-	Metadata                                               []byte
 	Settings                                               map[string]any
 	Homepage                                               netip.Prefix
 	Lan                                                    netip.Prefix
 	Mac                                                    net.HardwareAddr
 	Mac8                                                   net.HardwareAddr
-	Bitfield                                               any
 	Flags                                                  any
-	Tags                                                   []string
-	Scores                                                 []int32
 	Grid                                                   []int32
 	Homesite                                               pgtype.Point
 	Seg                                                    pgtype.Lseg
@@ -680,12 +671,9 @@ type InsertUserParams struct {
 	LogLsn                                                 any
 	LastXid                                                pgtype.Uint64
 	SlotTid                                                pgtype.TID
-	Cash                                                   pgtype.Numeric
-	Status                                                 UserStatus
 	Addr                                                   any
 	EmailDomain                                            any
 	Positive                                               any
-	UUIDCol                                                uuid.UUID
 	LoginCi                                                string
 	CollateCol                                             pgtype.Text
 	DeletedAt                                              pgtype.Timestamptz
@@ -741,8 +729,8 @@ func CountUsers(ctx context.Context, exec pgb.DBTX, f UserFilter) (int64, error)
 // column, defaults included).
 func InsertUser(ctx context.Context, exec pgb.DBTX, p InsertUserParams) (User, error) {
 	rows, err := pgb.NewInsert("public.users",
-		[]string{"email", "password", "name", "bio", "age", "balance", "rating", "score", "is_active", "created_at", "updated_at", "birth_date", "last_seen", "avatar", "metadata", "settings", "homepage", "lan", "mac", "mac8", "bitfield", "flags", "tags", "scores", "grid", "homesite", "seg", "box_col", "path_col", "poly", "circle_col", "line_col", "tsv", "tsq", "xml_doc", "log_lsn", "last_xid", "slot_tid", "cash", "status", "addr", "email_domain", "positive", "uuid_col", "login_ci", "collate_col", "deleted_at", "very_long_column_identifier_exactly_sixty_three_characters_in_l"},
-		[]pgb.Expr{pgb.Lit{V: p.Email}, pgb.Lit{V: p.Password}, pgb.Lit{V: p.Name}, pgb.Lit{V: p.Bio}, pgb.Lit{V: p.Age}, pgb.Lit{V: p.Balance}, pgb.Lit{V: p.Rating}, pgb.Lit{V: p.Score}, pgb.Lit{V: p.IsActive}, pgb.Lit{V: p.CreatedAt}, pgb.Lit{V: p.UpdatedAt}, pgb.Lit{V: p.BirthDate}, pgb.Lit{V: p.LastSeen}, pgb.Lit{V: p.Avatar}, pgb.Lit{V: p.Metadata, Cast: "jsonb"}, pgb.Lit{V: p.Settings, Cast: "json"}, pgb.Lit{V: p.Homepage}, pgb.Lit{V: p.Lan}, pgb.Lit{V: p.Mac}, pgb.Lit{V: p.Mac8}, pgb.Lit{V: p.Bitfield}, pgb.Lit{V: p.Flags}, pgb.Lit{V: p.Tags, Cast: "text[]"}, pgb.Lit{V: p.Scores, Cast: "int4[]"}, pgb.Lit{V: p.Grid, Cast: "int4[]"}, pgb.Lit{V: p.Homesite}, pgb.Lit{V: p.Seg}, pgb.Lit{V: p.BoxCol}, pgb.Lit{V: p.PathCol}, pgb.Lit{V: p.Poly}, pgb.Lit{V: p.CircleCol}, pgb.Lit{V: p.LineCol}, pgb.Lit{V: p.Tsv}, pgb.Lit{V: p.Tsq}, pgb.Lit{V: p.XMLDoc}, pgb.Lit{V: p.LogLsn}, pgb.Lit{V: p.LastXid}, pgb.Lit{V: p.SlotTid}, pgb.Lit{V: p.Cash}, pgb.Lit{V: p.Status, Cast: "user_status"}, pgb.Lit{V: p.Addr}, pgb.Lit{V: p.EmailDomain}, pgb.Lit{V: p.Positive}, pgb.Lit{V: p.UUIDCol}, pgb.Lit{V: p.LoginCi}, pgb.Lit{V: p.CollateCol}, pgb.Lit{V: p.DeletedAt}, pgb.Lit{V: p.VeryLongColumnIdentifierExactlySixtyThreeCharactersInL}},
+		[]string{"email", "password", "bio", "age", "rating", "updated_at", "birth_date", "last_seen", "avatar", "settings", "homepage", "lan", "mac", "mac8", "flags", "grid", "homesite", "seg", "box_col", "path_col", "poly", "circle_col", "line_col", "tsv", "tsq", "xml_doc", "log_lsn", "last_xid", "slot_tid", "addr", "email_domain", "positive", "login_ci", "collate_col", "deleted_at", "very_long_column_identifier_exactly_sixty_three_characters_in_l"},
+		[]pgb.Expr{pgb.Lit{V: p.Email}, pgb.Lit{V: p.Password}, pgb.Lit{V: p.Bio}, pgb.Lit{V: p.Age}, pgb.Lit{V: p.Rating}, pgb.Lit{V: p.UpdatedAt}, pgb.Lit{V: p.BirthDate}, pgb.Lit{V: p.LastSeen}, pgb.Lit{V: p.Avatar}, pgb.Lit{V: p.Settings, Cast: "json"}, pgb.Lit{V: p.Homepage}, pgb.Lit{V: p.Lan}, pgb.Lit{V: p.Mac}, pgb.Lit{V: p.Mac8}, pgb.Lit{V: p.Flags}, pgb.Lit{V: p.Grid, Cast: "int4[]"}, pgb.Lit{V: p.Homesite}, pgb.Lit{V: p.Seg}, pgb.Lit{V: p.BoxCol}, pgb.Lit{V: p.PathCol}, pgb.Lit{V: p.Poly}, pgb.Lit{V: p.CircleCol}, pgb.Lit{V: p.LineCol}, pgb.Lit{V: p.Tsv}, pgb.Lit{V: p.Tsq}, pgb.Lit{V: p.XMLDoc}, pgb.Lit{V: p.LogLsn}, pgb.Lit{V: p.LastXid}, pgb.Lit{V: p.SlotTid}, pgb.Lit{V: p.Addr}, pgb.Lit{V: p.EmailDomain}, pgb.Lit{V: p.Positive}, pgb.Lit{V: p.LoginCi}, pgb.Lit{V: p.CollateCol}, pgb.Lit{V: p.DeletedAt}, pgb.Lit{V: p.VeryLongColumnIdentifierExactlySixtyThreeCharactersInL}},
 	).Returning(pgb.Col{Table: "users", Name: "id"}, pgb.Col{Table: "users", Name: "email"}, pgb.Col{Table: "users", Name: "password"}, pgb.Col{Table: "users", Name: "name"}, pgb.Col{Table: "users", Name: "bio"}, pgb.Col{Table: "users", Name: "age"}, pgb.Col{Table: "users", Name: "balance"}, pgb.Col{Table: "users", Name: "rating"}, pgb.Col{Table: "users", Name: "score"}, pgb.Col{Table: "users", Name: "is_active"}, pgb.Col{Table: "users", Name: "created_at"}, pgb.Col{Table: "users", Name: "updated_at"}, pgb.Col{Table: "users", Name: "birth_date"}, pgb.Col{Table: "users", Name: "last_seen"}, pgb.Col{Table: "users", Name: "avatar"}, pgb.Col{Table: "users", Name: "metadata"}, pgb.Col{Table: "users", Name: "settings"}, pgb.Col{Table: "users", Name: "homepage"}, pgb.Col{Table: "users", Name: "lan"}, pgb.Col{Table: "users", Name: "mac"}, pgb.Col{Table: "users", Name: "mac8"}, pgb.Col{Table: "users", Name: "bitfield"}, pgb.Col{Table: "users", Name: "flags"}, pgb.Col{Table: "users", Name: "tags"}, pgb.Col{Table: "users", Name: "scores"}, pgb.Col{Table: "users", Name: "grid"}, pgb.Col{Table: "users", Name: "homesite"}, pgb.Col{Table: "users", Name: "seg"}, pgb.Col{Table: "users", Name: "box_col"}, pgb.Col{Table: "users", Name: "path_col"}, pgb.Col{Table: "users", Name: "poly"}, pgb.Col{Table: "users", Name: "circle_col"}, pgb.Col{Table: "users", Name: "line_col"}, pgb.Col{Table: "users", Name: "tsv"}, pgb.Col{Table: "users", Name: "tsq"}, pgb.Col{Table: "users", Name: "xml_doc"}, pgb.Col{Table: "users", Name: "log_lsn"}, pgb.Col{Table: "users", Name: "last_xid"}, pgb.Col{Table: "users", Name: "slot_tid"}, pgb.Col{Table: "users", Name: "cash"}, pgb.Col{Table: "users", Name: "status"}, pgb.Col{Table: "users", Name: "addr"}, pgb.Col{Table: "users", Name: "email_domain"}, pgb.Col{Table: "users", Name: "positive"}, pgb.Col{Table: "users", Name: "uuid_col"}, pgb.Col{Table: "users", Name: "login_ci"}, pgb.Col{Table: "users", Name: "collate_col"}, pgb.Col{Table: "users", Name: "search_slug"}, pgb.Col{Table: "users", Name: "name_upper"}, pgb.Col{Table: "users", Name: "deleted_at"}, pgb.Col{Table: "users", Name: "very_long_column_identifier_exactly_sixty_three_characters_in_l"}).Run(ctx, exec)
 	if err != nil {
 		return User{}, err
@@ -1557,8 +1545,8 @@ func UpdateUsers(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, s UserSet
 // the resulting row; pgb.ErrNotFound when DO NOTHING matched.
 func UpsertUser(ctx context.Context, exec pgb.DBTX, id int64, p InsertUserParams) (User, error) {
 	rows, err := pgb.NewInsert("public.users",
-		[]string{"id", "email", "password", "name", "bio", "age", "balance", "rating", "score", "is_active", "created_at", "updated_at", "birth_date", "last_seen", "avatar", "metadata", "settings", "homepage", "lan", "mac", "mac8", "bitfield", "flags", "tags", "scores", "grid", "homesite", "seg", "box_col", "path_col", "poly", "circle_col", "line_col", "tsv", "tsq", "xml_doc", "log_lsn", "last_xid", "slot_tid", "cash", "status", "addr", "email_domain", "positive", "uuid_col", "login_ci", "collate_col", "deleted_at", "very_long_column_identifier_exactly_sixty_three_characters_in_l"},
-		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.Email}, pgb.Lit{V: p.Password}, pgb.Lit{V: p.Name}, pgb.Lit{V: p.Bio}, pgb.Lit{V: p.Age}, pgb.Lit{V: p.Balance}, pgb.Lit{V: p.Rating}, pgb.Lit{V: p.Score}, pgb.Lit{V: p.IsActive}, pgb.Lit{V: p.CreatedAt}, pgb.Lit{V: p.UpdatedAt}, pgb.Lit{V: p.BirthDate}, pgb.Lit{V: p.LastSeen}, pgb.Lit{V: p.Avatar}, pgb.Lit{V: p.Metadata, Cast: "jsonb"}, pgb.Lit{V: p.Settings, Cast: "json"}, pgb.Lit{V: p.Homepage}, pgb.Lit{V: p.Lan}, pgb.Lit{V: p.Mac}, pgb.Lit{V: p.Mac8}, pgb.Lit{V: p.Bitfield}, pgb.Lit{V: p.Flags}, pgb.Lit{V: p.Tags, Cast: "text[]"}, pgb.Lit{V: p.Scores, Cast: "int4[]"}, pgb.Lit{V: p.Grid, Cast: "int4[]"}, pgb.Lit{V: p.Homesite}, pgb.Lit{V: p.Seg}, pgb.Lit{V: p.BoxCol}, pgb.Lit{V: p.PathCol}, pgb.Lit{V: p.Poly}, pgb.Lit{V: p.CircleCol}, pgb.Lit{V: p.LineCol}, pgb.Lit{V: p.Tsv}, pgb.Lit{V: p.Tsq}, pgb.Lit{V: p.XMLDoc}, pgb.Lit{V: p.LogLsn}, pgb.Lit{V: p.LastXid}, pgb.Lit{V: p.SlotTid}, pgb.Lit{V: p.Cash}, pgb.Lit{V: p.Status, Cast: "user_status"}, pgb.Lit{V: p.Addr}, pgb.Lit{V: p.EmailDomain}, pgb.Lit{V: p.Positive}, pgb.Lit{V: p.UUIDCol}, pgb.Lit{V: p.LoginCi}, pgb.Lit{V: p.CollateCol}, pgb.Lit{V: p.DeletedAt}, pgb.Lit{V: p.VeryLongColumnIdentifierExactlySixtyThreeCharactersInL}},
+		[]string{"id", "email", "password", "bio", "age", "rating", "updated_at", "birth_date", "last_seen", "avatar", "settings", "homepage", "lan", "mac", "mac8", "flags", "grid", "homesite", "seg", "box_col", "path_col", "poly", "circle_col", "line_col", "tsv", "tsq", "xml_doc", "log_lsn", "last_xid", "slot_tid", "addr", "email_domain", "positive", "login_ci", "collate_col", "deleted_at", "very_long_column_identifier_exactly_sixty_three_characters_in_l"},
+		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.Email}, pgb.Lit{V: p.Password}, pgb.Lit{V: p.Bio}, pgb.Lit{V: p.Age}, pgb.Lit{V: p.Rating}, pgb.Lit{V: p.UpdatedAt}, pgb.Lit{V: p.BirthDate}, pgb.Lit{V: p.LastSeen}, pgb.Lit{V: p.Avatar}, pgb.Lit{V: p.Settings, Cast: "json"}, pgb.Lit{V: p.Homepage}, pgb.Lit{V: p.Lan}, pgb.Lit{V: p.Mac}, pgb.Lit{V: p.Mac8}, pgb.Lit{V: p.Flags}, pgb.Lit{V: p.Grid, Cast: "int4[]"}, pgb.Lit{V: p.Homesite}, pgb.Lit{V: p.Seg}, pgb.Lit{V: p.BoxCol}, pgb.Lit{V: p.PathCol}, pgb.Lit{V: p.Poly}, pgb.Lit{V: p.CircleCol}, pgb.Lit{V: p.LineCol}, pgb.Lit{V: p.Tsv}, pgb.Lit{V: p.Tsq}, pgb.Lit{V: p.XMLDoc}, pgb.Lit{V: p.LogLsn}, pgb.Lit{V: p.LastXid}, pgb.Lit{V: p.SlotTid}, pgb.Lit{V: p.Addr}, pgb.Lit{V: p.EmailDomain}, pgb.Lit{V: p.Positive}, pgb.Lit{V: p.LoginCi}, pgb.Lit{V: p.CollateCol}, pgb.Lit{V: p.DeletedAt}, pgb.Lit{V: p.VeryLongColumnIdentifierExactlySixtyThreeCharactersInL}},
 	).OnConflict(pgb.OnConflict{
 		Target: []string{"id"},
 		Sets: []pgb.SetClause{

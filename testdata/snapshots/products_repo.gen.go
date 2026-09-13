@@ -229,10 +229,7 @@ type InsertProductParams struct {
 	Category    string
 	Rating      pgtype.Numeric
 	Price       pgtype.Numeric
-	InStock     bool
-	Metadata    []byte
 	Embedding   pgvector.Vector
-	CreatedAt   pgtype.Timestamptz
 }
 
 // scanProduct scans one row positionally over every column in
@@ -284,8 +281,8 @@ func CountProducts(ctx context.Context, exec pgb.DBTX, f ProductFilter) (int64, 
 // column, defaults included).
 func InsertProduct(ctx context.Context, exec pgb.DBTX, p InsertProductParams) (Product, error) {
 	rows, err := pgb.NewInsert("public.products",
-		[]string{"sku", "title", "description", "category", "rating", "price", "in_stock", "metadata", "embedding", "created_at"},
-		[]pgb.Expr{pgb.Lit{V: p.Sku}, pgb.Lit{V: p.Title}, pgb.Lit{V: p.Description}, pgb.Lit{V: p.Category}, pgb.Lit{V: p.Rating}, pgb.Lit{V: p.Price}, pgb.Lit{V: p.InStock}, pgb.Lit{V: p.Metadata, Cast: "jsonb"}, pgb.Lit{V: p.Embedding}, pgb.Lit{V: p.CreatedAt}},
+		[]string{"sku", "title", "description", "category", "rating", "price", "embedding"},
+		[]pgb.Expr{pgb.Lit{V: p.Sku}, pgb.Lit{V: p.Title}, pgb.Lit{V: p.Description}, pgb.Lit{V: p.Category}, pgb.Lit{V: p.Rating}, pgb.Lit{V: p.Price}, pgb.Lit{V: p.Embedding}},
 	).Returning(pgb.Col{Table: "products", Name: "id"}, pgb.Col{Table: "products", Name: "sku"}, pgb.Col{Table: "products", Name: "title"}, pgb.Col{Table: "products", Name: "description"}, pgb.Col{Table: "products", Name: "category"}, pgb.Col{Table: "products", Name: "rating"}, pgb.Col{Table: "products", Name: "price"}, pgb.Col{Table: "products", Name: "in_stock"}, pgb.Col{Table: "products", Name: "metadata"}, pgb.Col{Table: "products", Name: "embedding"}, pgb.Col{Table: "products", Name: "created_at"}).Run(ctx, exec)
 	if err != nil {
 		return Product{}, err
@@ -298,6 +295,39 @@ func InsertProduct(ctx context.Context, exec pgb.DBTX, p InsertProductParams) (P
 		return Product{}, pgb.ErrNotFound
 	}
 	return us[0], nil
+}
+
+const insertProductsSQL = "INSERT INTO public.products (sku, title, description, category, rating, price, embedding) SELECT * FROM unnest($1::text[], $2::text[], $3::text[], $4::text[], $5::numeric[], $6::numeric[], $7::vector[]) RETURNING id, sku, title, description, category, rating, price, in_stock, metadata, embedding, created_at"
+
+// InsertProducts inserts a whole batch in one round trip via
+// unnest and returns every inserted row.
+func InsertProducts(ctx context.Context, exec pgb.DBTX, ps []InsertProductParams) ([]Product, error) {
+	if len(ps) == 0 {
+		return nil, nil
+	}
+	colSku := make([]string, len(ps))
+	colTitle := make([]string, len(ps))
+	colDescription := make([]string, len(ps))
+	colCategory := make([]string, len(ps))
+	colRating := make([]pgtype.Numeric, len(ps))
+	colPrice := make([]pgtype.Numeric, len(ps))
+	colEmbedding := make([]pgvector.Vector, len(ps))
+	for i, p := range ps {
+		colSku[i] = p.Sku
+		colTitle[i] = p.Title
+		colDescription[i] = p.Description
+		colCategory[i] = p.Category
+		colRating[i] = p.Rating
+		colPrice[i] = p.Price
+		colEmbedding[i] = p.Embedding
+	}
+	args := make([]any, 0, 7*len(ps))
+	args = append(args, colSku, colTitle, colDescription, colCategory, colRating, colPrice, colEmbedding)
+	rows, err := exec.Query(ctx, insertProductsSQL, args...)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, scanProduct)
 }
 
 // UpdateProduct applies the non-zero fields of s to one row and
@@ -508,8 +538,8 @@ func UpdateProducts(ctx context.Context, exec pgb.DBTX, where []pgb.Expr, s Prod
 // the resulting row; pgb.ErrNotFound when DO NOTHING matched.
 func UpsertProduct(ctx context.Context, exec pgb.DBTX, id int64, p InsertProductParams) (Product, error) {
 	rows, err := pgb.NewInsert("public.products",
-		[]string{"id", "sku", "title", "description", "category", "rating", "price", "in_stock", "metadata", "embedding", "created_at"},
-		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.Sku}, pgb.Lit{V: p.Title}, pgb.Lit{V: p.Description}, pgb.Lit{V: p.Category}, pgb.Lit{V: p.Rating}, pgb.Lit{V: p.Price}, pgb.Lit{V: p.InStock}, pgb.Lit{V: p.Metadata, Cast: "jsonb"}, pgb.Lit{V: p.Embedding}, pgb.Lit{V: p.CreatedAt}},
+		[]string{"id", "sku", "title", "description", "category", "rating", "price", "embedding"},
+		[]pgb.Expr{pgb.Lit{V: id}, pgb.Lit{V: p.Sku}, pgb.Lit{V: p.Title}, pgb.Lit{V: p.Description}, pgb.Lit{V: p.Category}, pgb.Lit{V: p.Rating}, pgb.Lit{V: p.Price}, pgb.Lit{V: p.Embedding}},
 	).OnConflict(pgb.OnConflict{
 		Target: []string{"id"},
 		Sets: []pgb.SetClause{

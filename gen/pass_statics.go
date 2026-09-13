@@ -355,25 +355,30 @@ func staticsFile(sch ir.Schema, t ir.Table, opts Options, dir DirectiveSet) ([]b
 		field string
 	}
 	var params []paramCol
-	b.WriteString("// Insert" + singular + "Params carries the INSERT column values: generated\n")
-	b.WriteString("// and serial columns are out, default-bearing columns join only with\n// the include_defaults option.\n")
-	b.WriteString("type Insert" + singular + "Params struct {\n")
-	seenP := map[string]int{}
-	uniqP := func(base string) string {
-		n := base
-		if k := seenP[strings.ToLower(base)]; k > 0 {
-			n = base + strconv.Itoa(k+1)
+	// No insertable columns (every column is generated, serial, or
+	// server-defaulted): no params struct and no insert statics — there is
+	// nothing to bind (e.g. the fixture's all-defaults inventory table).
+	if writable && len(insIdx) > 0 {
+		b.WriteString("// Insert" + singular + "Params carries the INSERT column values: generated\n")
+		b.WriteString("// and serial columns are out, default-bearing columns join only with\n// the include_defaults option.\n")
+		b.WriteString("type Insert" + singular + "Params struct {\n")
+		seenP := map[string]int{}
+		uniqP := func(base string) string {
+			n := base
+			if k := seenP[strings.ToLower(base)]; k > 0 {
+				n = base + strconv.Itoa(k+1)
+			}
+			seenP[strings.ToLower(base)]++
+			return n
 		}
-		seenP[strings.ToLower(base)]++
-		return n
+		for _, i := range insIdx {
+			typ, _ := resolveColType(t, t.Columns[i], opts, dir)
+			f := uniqP(names[i])
+			b.WriteString("\t" + f + " " + typ + "\n")
+			params = append(params, paramCol{idx: i, field: f})
+		}
+		b.WriteString("}\n\n")
 	}
-	for _, i := range insIdx {
-		typ, _ := resolveColType(t, t.Columns[i], opts, dir)
-		f := uniqP(names[i])
-		b.WriteString("\t" + f + " " + typ + "\n")
-		params = append(params, paramCol{idx: i, field: f})
-	}
-	b.WriteString("}\n\n")
 
 	// ---- positional scan func ----
 	b.WriteString("// scan" + singular + " scans one row positionally over every column in\n// catalog order — the single scan path for all generated reads.\n")
@@ -423,9 +428,11 @@ func staticsFile(sch ir.Schema, t ir.Table, opts Options, dir DirectiveSet) ([]b
 
 	if writable {
 		// ---- InsertUser ----
-		b.WriteString("// Insert" + singular + " inserts one row and returns it (RETURNING every\n// column, defaults included).\n")
-		b.WriteString("func Insert" + singular + "(ctx context.Context, exec pgb.DBTX, p Insert" + singular + "Params) (" + model + ", error) {\n")
+		// Skipped entirely when no columns are bindable: an INSERT with an
+		// empty column list has no params shape (all-defaults tables).
 		if len(params) > 0 {
+			b.WriteString("// Insert" + singular + " inserts one row and returns it (RETURNING every\n// column, defaults included).\n")
+			b.WriteString("func Insert" + singular + "(ctx context.Context, exec pgb.DBTX, p Insert" + singular + "Params) (" + model + ", error) {\n")
 			cols := make([]string, len(params))
 			vals := make([]string, len(params))
 			for k, pc := range params {
@@ -434,11 +441,9 @@ func staticsFile(sch ir.Schema, t ir.Table, opts Options, dir DirectiveSet) ([]b
 			}
 			fmt.Fprintf(&b, "\trows, err := pgb.NewInsert(%s,\n\t\t[]string{%s},\n\t\t[]pgb.Expr{%s},\n\t).Returning(%s).Run(ctx, exec)\n",
 				strconv.Quote(qname), strings.Join(cols, ", "), strings.Join(vals, ", "), retArgs)
-		} else {
-			fmt.Fprintf(&b, "\trows, err := pgb.NewInsert(%s).Returning(%s).Run(ctx, exec)\n", strconv.Quote(qname), retArgs)
+			b.WriteString("\tif err != nil {\n\t\treturn " + model + "{}, err\n\t}\n")
+			collect()
 		}
-		b.WriteString("\tif err != nil {\n\t\treturn " + model + "{}, err\n\t}\n")
-		collect()
 
 		// ---- InsertUsers (unnest batch) ----
 		// pgx has no codec for []any or []Enum arrays, so the batch form is

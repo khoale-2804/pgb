@@ -34,6 +34,19 @@ PK/generated-column data) → M1 (golden snapshot tests + docs sync) → polish.
 - Known proto limits (documented): catalog proto has NO PK/unique/view-flag/
   generated-col data → v0.1 slice uses id-column heuristic for upsert/keyset
   and cannot exclude generated columns from INSERT — M3a fixes exactly this.
+- M3c (2026-09-14): gen/pass_search.go — pass D emits <table>_search.gen.go
+  (search predicate methods on the indexed pass-B col types, JSON-path
+  wrappers via core.Raw, table Score(), Search<Table> + Scan<Table> +
+  hit/opts types), wired into gen.Generate after pass C. Fixture fix:
+  skippable_partner no longer pgb:skip (identity-BY-DEFAULT coverage;
+  COVERAGE row 3 notes it).
+- M1 (2026-09-14): golden snapshots — gen/golden_test.go replays the real
+  sqlc request (testdata/golden/plugin_request.pb, the raw GenerateRequest
+  proto captured from the plugin's stdin) through gen.Generate and
+  byte-compares against testdata/snapshots/ (44 files; -update rewrites,
+  stale snapshots pruned). go-cmp added. Backlog 3+4 done; docs sync (item 5)
+  remains. NOTE: gofmt -l flags pre-existing ir/ir.go alignment (out of
+  bounds for gen builders).
 
 ## BACKLOG (priority order; stop and commit+push at each green boundary)
 

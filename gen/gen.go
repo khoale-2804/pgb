@@ -12,19 +12,19 @@ import (
 // options JSON) -> Build (catalog -> IR + directives) -> Enrich (oliphant
 // re-parse of the schema files: search indexes, COMMENT ON directives,
 // generated columns, PK/unique keys, view flags) -> drop pgb:skip tables ->
-// PassModels -> PassBuilders -> PassStatics -> sorted response.
+// PassModels -> PassBuilders -> PassStatics -> PassSearch -> sorted response.
 //
 // Emitted files, deterministic names:
 //
-//	models.gen.go        pass A (models + enums)
-//	<table>.gen.go       pass B (table descriptors + column builders)
-//	<table>_repo.gen.go  pass C (filter/set/params types + statics)
+//	models.gen.go          pass A (models + enums)
+//	<table>.gen.go         pass B (table descriptors + column builders)
+//	<table>_repo.gen.go    pass C (filter/set/params types + statics)
+//	<table>_search.gen.go  pass D (pg_search predicates, Score, Search<Table>)
 //
 // Pass A query wrappers (queries.gen.go) are NOT implemented in this slice —
-// no such file is emitted. pg_search codegen is M1/M3: Enrich populates
-// ir.Table.Search, but no pass consumes it yet, so no search file is ever
-// emitted. Every pass returns gofmt'd contents; the file list is sorted by
-// name so the response is byte-deterministic for the same catalog + options.
+// no such file is emitted. Every pass returns gofmt'd contents; the file list
+// is sorted by name so the response is byte-deterministic for the same
+// catalog + options.
 func Generate(ctx context.Context, req *plugin.GenerateRequest) (*plugin.GenerateResponse, error) {
 	opts := ParseOptions(req)
 
@@ -72,6 +72,12 @@ func Generate(ctx context.Context, req *plugin.GenerateRequest) (*plugin.Generat
 		return nil, err
 	}
 	files = append(files, statics...)
+
+	search, err := PassSearch(sch, opts, dir)
+	if err != nil {
+		return nil, err
+	}
+	files = append(files, search...)
 
 	sort.Slice(files, func(i, j int) bool { return files[i].Name < files[j].Name })
 

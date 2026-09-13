@@ -141,9 +141,21 @@ func TestSQLCPluginIntegration(t *testing.T) {
 		t.Errorf("queries.gen.go emitted — pass A wrappers are not in this slice")
 	}
 	for _, n := range names {
-		if strings.HasPrefix(n, "pgb_ignored") || strings.HasPrefix(n, "skippable_partner") {
+		if strings.HasPrefix(n, "pgb_ignored") {
 			t.Errorf("pgb:skip table leaked into output: %s", n)
 		}
+	}
+	// skippable_partner is NOT skipped (it covers identity BY DEFAULT —
+	// COVERAGE row 3): it must generate model/builder/statics files.
+	skippable := false
+	for _, n := range names {
+		if strings.HasPrefix(n, "skippable_partner") {
+			skippable = true
+			break
+		}
+	}
+	if !skippable {
+		t.Errorf("skippable_partner (identity BY DEFAULT, not skipped) generated no files; got %v", names)
 	}
 
 	// 5. The emitted package must compile. It imports pgtype, uuid (uuid

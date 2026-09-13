@@ -9,7 +9,7 @@ to the pass that owns it ([pipeline](/internals/codegen-pipeline)).
 |---|---|---|---|---|
 | 1 | serial / bigserial PK | `users.id`, everywhere | scan + Insert omits column + Get param | A/C |
 | 2 | identity ALWAYS (`orders.id`) | §D | INSERT column-list omission | A/C |
-| 3 | identity BY DEFAULT (`inventory.item_id`, `skippable_partner.id`) | §J, §L | same, `IncludeDefaults` opt-in | C |
+| 3 | identity BY DEFAULT (`inventory.item_id`, `skippable_partner.id`) | §J, §L | same, `IncludeDefaults` opt-in. 2026-09-13: `skippable_partner` lost its stray `pgb:skip` comment and now generates (model + builder + statics); `pgb_ignored` is the only skip case | C |
 | 4 | standalone sequence default (`tickets.number`) | §J | default-omission + filter presence | A/C |
 | 5 | all numeric families (int2..int8, numeric(p,s), float4/8, money) | §B, §C, §D | typed predicates `Gt/Lt/Between`, scans, Set[T] | A/B/C |
 | 6 | text family incl. citext + COLLATE | `users.email`, `users.login_ci`, `users.collate_col` | `Eq/Like/ILike`, scans | A/B |

@@ -174,7 +174,7 @@ type SearchDocsOpts struct {
 // and the snippet fragment (populated only when SearchDocsOpts.SnippetCol
 // selected one, NULL/zero otherwise).
 type DocHit struct {
-	Product Doc
+	Row     Doc
 	Score   float64
 	Snippet pgtype.Text
 }
@@ -189,7 +189,7 @@ func ScanDocs(row pgx.CollectableRow) (DocHit, error) {
 	if err := row.Scan(&p.ID, &p.Title, &p.Body, &h.Score); err != nil {
 		return DocHit{}, err
 	}
-	h.Product = p
+	h.Row = p
 	return h, nil
 }
 
@@ -225,7 +225,7 @@ func SearchDocs(ctx context.Context, exec pgb.DBTX, q string, o SearchDocsOpts) 
 		if err := row.Scan(&p.ID, &p.Title, &p.Body, &h.Score, &h.Snippet); err != nil {
 			return DocHit{}, err
 		}
-		h.Product = p
+		h.Row = p
 		return h, nil
 	})
 }

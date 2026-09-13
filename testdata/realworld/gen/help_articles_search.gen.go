@@ -174,7 +174,7 @@ type SearchHelpArticlesOpts struct {
 // and the snippet fragment (populated only when SearchHelpArticlesOpts.SnippetCol
 // selected one, NULL/zero otherwise).
 type HelpArticleHit struct {
-	Product HelpArticle
+	Row     HelpArticle
 	Score   float64
 	Snippet pgtype.Text
 }
@@ -189,7 +189,7 @@ func ScanHelpArticles(row pgx.CollectableRow) (HelpArticleHit, error) {
 	if err := row.Scan(&p.ID, &p.Slug, &p.Title, &p.Body, &p.Tags, &p.Published, &p.UpdatedAt, &h.Score); err != nil {
 		return HelpArticleHit{}, err
 	}
-	h.Product = p
+	h.Row = p
 	return h, nil
 }
 
@@ -225,7 +225,7 @@ func SearchHelpArticles(ctx context.Context, exec pgb.DBTX, q string, o SearchHe
 		if err := row.Scan(&p.ID, &p.Slug, &p.Title, &p.Body, &p.Tags, &p.Published, &p.UpdatedAt, &h.Score, &h.Snippet); err != nil {
 			return HelpArticleHit{}, err
 		}
-		h.Product = p
+		h.Row = p
 		return h, nil
 	})
 }

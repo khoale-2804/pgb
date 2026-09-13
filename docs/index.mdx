@@ -73,7 +73,7 @@ func main() {
         Snippet: "description",
     })
     for _, h := range hits {
-        log.Printf("%.2f  %s  %s", h.Score, h.Product.Title, h.Snippet["description"])
+        log.Printf("%.2f  %s  %s", h.Score, h.Row.Title, h.Snippet["description"])
     }
 }
 ```

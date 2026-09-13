@@ -428,8 +428,8 @@ func TestSearch(t *testing.T) {
 		}
 	}
 	// the running-shoes product must outrank the hat for this query
-	if hits[0].Product.Sku != "shoe-1" {
-		t.Fatalf("expected shoe-1 first, got %+v", hits[0].Product)
+	if hits[0].Row.Sku != "shoe-1" {
+		t.Fatalf("expected shoe-1 first, got %+v", hits[0].Row)
 	}
 	if !hits[0].Snippet.Valid || hits[0].Snippet.String == "" {
 		t.Fatalf("expected a snippet, got %+v", hits[0].Snippet)

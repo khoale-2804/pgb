@@ -251,7 +251,7 @@ func main() {
 	}
 	for _, h := range hits {
 		fmt.Printf("%.2f  %-12s %s\n",
-			h.Score, h.Product.Title, h.Snippet["description"])
+			h.Score, h.Row.Title, h.Snippet["description"])
 	}
 
 	// 5. UpdateUser — three-state sets:

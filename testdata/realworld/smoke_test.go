@@ -329,9 +329,9 @@ func TestBM25SearchStatics(t *testing.T) {
 	skus := map[string]bool{}
 	for _, h := range hits {
 		if h.Score <= 0 {
-			t.Fatalf("expected positive BM25 score, got %v for %+v", h.Score, h.Product)
+			t.Fatalf("expected positive BM25 score, got %v for %+v", h.Score, h.Row)
 		}
-		skus[h.Product.Sku] = true
+		skus[h.Row.Sku] = true
 	}
 	if !skus[grinder.Sku] || !skus[book.Sku] {
 		t.Fatalf("BM25 'coffee' should match grinder and book, got %v", skus)
@@ -356,7 +356,7 @@ func TestBM25SearchStatics(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SearchHelpArticles: %v", err)
 	}
-	if len(ah) != 1 || ah[0].Product.Slug != "refunds" {
+	if len(ah) != 1 || ah[0].Row.Slug != "refunds" {
 		t.Fatalf("edge_ngram 'refu' should match the refunds article, got %+v", ah)
 	}
 

@@ -256,7 +256,7 @@ type SearchProductsOpts struct {
 // and the snippet fragment (populated only when SearchProductsOpts.SnippetCol
 // selected one, NULL/zero otherwise).
 type ProductHit struct {
-	Product Product
+	Row     Product
 	Score   float64
 	Snippet pgtype.Text
 }
@@ -271,7 +271,7 @@ func ScanProducts(row pgx.CollectableRow) (ProductHit, error) {
 	if err := row.Scan(&p.ID, &p.MerchantID, &p.Sku, &p.Title, &p.Description, &p.Category, &p.Price, &p.InStock, &p.Attributes, &p.Tags, &p.CreatedAt, &p.UpdatedAt, &h.Score); err != nil {
 		return ProductHit{}, err
 	}
-	h.Product = p
+	h.Row = p
 	return h, nil
 }
 
@@ -307,7 +307,7 @@ func SearchProducts(ctx context.Context, exec pgb.DBTX, q string, o SearchProduc
 		if err := row.Scan(&p.ID, &p.MerchantID, &p.Sku, &p.Title, &p.Description, &p.Category, &p.Price, &p.InStock, &p.Attributes, &p.Tags, &p.CreatedAt, &p.UpdatedAt, &h.Score, &h.Snippet); err != nil {
 			return ProductHit{}, err
 		}
-		h.Product = p
+		h.Row = p
 		return h, nil
 	})
 }

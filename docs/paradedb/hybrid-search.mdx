@@ -76,8 +76,8 @@ if err != nil {
     return err
 }
 for _, h := range hits {
-    // h.Score is the fused RRF score; h.Product is the full row
-    fmt.Printf("%.4f  %s\n", h.Score, h.Product.Title)
+    // h.Score is the fused RRF score; h.Row is the full row
+    fmt.Printf("%.4f  %s\n", h.Score, h.Row.Title)
 }
 ```
 

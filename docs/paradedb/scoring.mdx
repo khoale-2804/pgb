@@ -42,7 +42,7 @@ if err != nil {
 }
 for _, h := range hits {
 	fmt.Printf("%.3f  %s  %s\n",
-		h.Score, h.Product.Title, h.Snippet["description"])
+		h.Score, h.Row.Title, h.Snippet["description"])
 }
 ```
 
@@ -66,7 +66,7 @@ Snippet and highlight options that are developer constants (the tags) are emitte
 
 ```go
 type ProductHit struct {
-	Product db.Product
+	Row    db.Product
 	Score   float64
 	Snippet map[string]string // one entry per snippet'd column —
 	// "description" here

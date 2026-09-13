@@ -255,7 +255,7 @@ func emitSearchStatic(b *strings.Builder, t ir.Table, tableVar, model, tableType
 	fmt.Fprintf(b, "type Search%sOpts struct {\n\tLimit      int\n\tSnippetCol string\n}\n\n", tableVar)
 
 	fmt.Fprintf(b, "// %sHit is one Search%s result row: the full model, the BM25 score,\n// and the snippet fragment (populated only when Search%sOpts.SnippetCol\n// selected one, NULL/zero otherwise).\n", model, tableVar, tableVar)
-	fmt.Fprintf(b, "type %sHit struct {\n\tProduct %s\n\tScore   float64\n\tSnippet pgtype.Text\n}\n\n", model, model)
+	fmt.Fprintf(b, "type %sHit struct {\n\tRow %s\n\tScore   float64\n\tSnippet pgtype.Text\n}\n\n", model, model)
 
 	fmt.Fprintf(b, "// Scan%s scans one Search%s row positionally: every %s column\n// in catalog order, then the score. Rows requested with a snippet\n// projection carry one extra trailing column — Search%s scans those\n// rows itself.\n", tableVar, tableVar, t.Name, tableVar)
 	fmt.Fprintf(b, "func Scan%s(row pgx.CollectableRow) (%sHit, error) {\n\tvar h %sHit\n\tvar p %s\n", tableVar, model, model, model)
@@ -264,7 +264,7 @@ func emitSearchStatic(b *strings.Builder, t ir.Table, tableVar, model, tableType
 		dests = append(dests, "&p."+n)
 	}
 	dests = append(dests, "&h.Score")
-	fmt.Fprintf(b, "\tif err := row.Scan(%s); err != nil {\n\t\treturn %sHit{}, err\n\t}\n\th.Product = p\n\treturn h, nil\n}\n\n", strings.Join(dests, ", "), model)
+	fmt.Fprintf(b, "\tif err := row.Scan(%s); err != nil {\n\t\treturn %sHit{}, err\n\t}\n\th.Row = p\n\treturn h, nil\n}\n\n", strings.Join(dests, ", "), model)
 
 	fmt.Fprintf(b, "// Search%s runs the generic document query against the index key\n// field: WHERE %s @@@ pdb.parse($1) — pdb.parse carries ParadeDB's full\n// query-string syntax — selecting every column plus pdb.score(%s),\n// optionally one pdb.snippet fragment, ordered pdb.score(%s) DESC,\n// %s ASC and LIMIT-bounded.\n", tableVar, keyField, keyField, keyField, keyField)
 	fmt.Fprintf(b, "func Search%s(ctx context.Context, exec pgb.DBTX, q string, o Search%sOpts) ([]%sHit, error) {\n", tableVar, tableVar, model)
@@ -293,5 +293,5 @@ func emitSearchStatic(b *strings.Builder, t ir.Table, tableVar, model, tableType
 	}
 	snipDests = append(snipDests, "&h.Score", "&h.Snippet")
 	fmt.Fprintf(b, "\t\tif err := row.Scan(%s); err != nil {\n\t\t\treturn %sHit{}, err\n\t\t}\n", strings.Join(snipDests, ", "), model)
-	b.WriteString("\t\th.Product = p\n\t\treturn h, nil\n\t})\n}\n")
+	b.WriteString("\t\th.Row = p\n\t\treturn h, nil\n\t})\n}\n")
 }

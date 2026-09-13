@@ -515,7 +515,7 @@ Every function: explicit column lists, bound args, `pgb.ErrNotFound` sentinel wr
 ## 12. Testing & CI matrix
 
 1. **Emitter unit tests** — table-driven: tree → SQL + args, byte-exact, covering every operator incl. §8.2.
-2. **Golden generated-code tests** — `testdata/schema.sql` → snapshots; `-update` regenerates; diffs are reviewable in PRs.
+2. **Golden generated-code tests** — canonical fixture `testdata/golden/` (`schema.sql` + `queries.sql` + `sqlc.yaml` + `COVERAGE.md` 56-row feature matrix; every type family, constraint, index shape, directive, identifier edge, both pg_search shapes, negative suite in `testdata/negative/`) → snapshots; `-update` regenerates; diffs are reviewable in PRs. The fixture doubles as a parse/analyze acceptance test for sqlc@main — first run surfaced: bare index-cast rejection (parenthesized), pgvector-go hyphen override gotcha (structured form), `any` leaks for tsvector/xml/pg_lsn (standalone-catalog rationale).
 3. **Round-trip property test** — the emitter's SQL is fed back through oliphant and must re-parse to the same statement shape. We ship with the parser in-process; this catches malformed emission generically.
 4. **Integration (docker compose)** — every generated function executed against a real server:
    - `paradedb/paradedb:0.25.9+` on **PG18** — full matrix incl. search/hybrid.

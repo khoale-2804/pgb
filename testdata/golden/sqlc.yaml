@@ -1,0 +1,24 @@
+version: '2'
+sql:
+  - engine: postgresql
+    schema: schema.sql
+    queries: queries.sql
+    gen:
+      go:
+        out: gen
+        package: golden
+        sql_package: pgx/v5
+        emit_json_tags: true
+        overrides:
+          - db_type: vector
+            go_type:
+              import: github.com/pgvector/pgvector-go
+              package: pgvector
+              type: Vector
+# NOTE: the string form `go_type: github.com/pgvector/pgvector-go.Vector`
+# generates the INVALID type `pgvector-go.Vector` (hyphen in the derived
+# package name) — always use the structured form for hyphenated module paths.
+# The pgb plugin replaces this gen:go block in the real golden run:
+#   codegen: [{ out: db, plugin: pgb, options: { package: db, ... } }]
+# Stock gen:go is used here so `sqlc generate` doubles as a parse/analyze
+# acceptance test for the fixture itself (M0 fork-parity baseline).

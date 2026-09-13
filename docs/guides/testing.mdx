@@ -12,7 +12,7 @@ Table-driven: expression tree in, SQL + args out, byte-exact. Coverage includes 
 
 ## 2. Golden generated-code tests
 
-A canonical `testdata/schema.sql` (including `USING paradedb` DDL, enums, domains, generated columns) is run through the full pipeline; output is snapshotted.
+A canonical fixture lives in `testdata/golden/`: **`schema.sql`** (every type family, defaults, identity variants, generated columns, ranges/multiranges, enums/domains/composites, composite keys, FK actions, temporal `EXCLUDE`, partitions, multi-schema, views/matviews, keyword/case/unicode identifiers, `pgb:` directives, both `USING paradedb` shapes), **`queries.sql`** (every sqlc annotation incl. `:batchexec`/`:copyfrom`, joins, aggregates, windows, CTEs, a pg_search query with the `::float8` cast, a pgvector neighbor query), **`sqlc.yaml`** (pgx/v5, vector override in structured form), and **`COVERAGE.md`** — a 56-row matrix mapping each fixture feature to the generated artifact and pass that proves it. The fixture doubles as a parse/analyze acceptance test: `sqlc generate` (sqlc@main, pgx/v5) must succeed on it, and its first run surfaced three real findings (bare index-cast rejection, the hyphenated-pgvector override gotcha, `any` leaks for tsvector/xml/pg_lsn).
 
 ```go
 // golden_test.go — harness shape;
@@ -22,19 +22,19 @@ var update = flag.Bool("update", false,
 
 func TestGolden(t *testing.T) {
 	got, err := generateAll(t,
-		"testdata/schema.sql", "testdata/queries.sql")
+		"testdata/golden/schema.sql", "testdata/golden/queries.sql")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if *update {
-		if err := writeGolden(t, "testdata/golden", got); err != nil {
+		if err := writeGolden(t, "testdata/snapshots", got); err != nil {
 			t.Fatal(err)
 		}
 		return
 	}
 
-	want, err := readGolden(t, "testdata/golden")
+	want, err := readGolden(t, "testdata/snapshots")
 	if err != nil {
 		t.Fatal(err)
 	}

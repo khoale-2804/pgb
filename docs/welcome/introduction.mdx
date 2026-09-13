@@ -1,0 +1,56 @@
+---
+title: "Introduction"
+description: "What pgb is, the mental model, who it's for — and how these docs are organized."
+icon: "book-open"
+---
+
+**pgb** is a compiler for your data layer. You feed it a PostgreSQL schema; it
+emits a typed Go package — models, one query builder per table, static query
+functions, and a ParadeDB pg_search layer — so the repetitive SQL in your
+application is generated instead of hand-written, while every statement still
+comes out as plain, reviewable SQL.
+
+The mental model in one line: **schema is the source, SQL is the output, Go is
+the interface.** Nothing happens at runtime that you couldn't read in the
+generated files first — there is no reflection, no engine process, and every
+value travels as a bound parameter.
+
+## What it generates
+
+Four layers, per schema:
+
+1. **Models** — typed structs for every table, view, and enum, with positional
+   pgx scans.
+2. **Query builders** — one descriptor per table with typed predicates
+   (`Eq`, `Gt`, `In`, `Like`, …) that compose into statements.
+3. **Static functions** — the CRUD and search layer:
+   `Get / List / Count / Insert / InsertBatch / Update / Upsert / Delete`,
+   plus `Search` and `HybridSearch` for indexed tables.
+4. **Query wrappers** — typed Go functions for the queries you still write
+   by hand in `.sql` files.
+
+## Is pgb for you?
+
+- **Yes**, if you use (or are open to) [sqlc](https://sqlc.dev), want dynamic
+  filters and ParadeDB full-text search without raw-string SQL, and prefer
+  generated code you can read and diff.
+- **No**, if you want a runtime ORM with lazy loading and an identity map —
+  pgb deliberately has neither. See [Risks & FAQ](/guides/risks-faq).
+
+## How these docs are organized
+
+The docs follow the same progression a new user needs:
+
+| layer | where | start here when |
+|---|---|---|
+| **Welcome** | this page, [Editions](/editions/overview) | deciding whether and how to use pgb |
+| **Getting started** | [Installation](/welcome/installation), [Quickstart](/welcome/quickstart) | going from zero to generated code |
+| **Core concepts** | [Architecture](/architecture/overview), [SchemaIR](/architecture/schema-ir) | you want the mental model under the output |
+| **Generated code** | [builders](/generated-code/builders), [statics](/generated-code/statics), [pagination](/generated-code/pagination), [errors](/docs/errors) | you're calling or reviewing generated code |
+| **ParadeDB** | the [pg_search section](/paradedb/overview) | you're building search, scoring, or hybrid queries |
+| **Reference** | [configuration](/reference/config), [type mapping](/reference/type-mapping), [core API](/reference/core-api), [support matrix](/reference/support-matrix) | you need an exact option, type, or version |
+| **Explanation** | [Risks & FAQ](/guides/risks-faq), [roadmap](/roadmap) | you're evaluating trade-offs and direction |
+
+Start with [Editions](/editions/overview) to pick your frontend — the
+[sqlc plugin](/editions/plugin) or the [standalone toolkit](/editions/orm) —
+then follow [Getting started](/welcome/installation).

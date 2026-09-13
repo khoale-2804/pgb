@@ -24,16 +24,16 @@
         "icon": "book-open",
         "groups": [
           {
-            "group": "Editions",
-            "pages": ["editions/overview", "editions/plugin", "editions/orm"]
+            "group": "Welcome",
+            "pages": ["welcome/introduction", "editions/overview"]
           },
           {
             "group": "Getting started",
-            "pages": ["welcome/quickstart"]
+            "pages": ["welcome/installation", "welcome/quickstart"]
           },
           {
             "group": "Core concepts",
-            "pages": ["architecture/overview", "architecture/schema-ir", "docs/performance"]
+            "pages": ["architecture/overview", "architecture/schema-ir"]
           },
           {
             "group": "Generated code",
@@ -43,6 +43,16 @@
               "generated-code/statics",
               "generated-code/pagination",
               "docs/errors"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "docs/performance",
+              "guides/handwritten-queries",
+              "guides/migrations",
+              "guides/testing",
+              "guides/recipes"
             ]
           },
           {
@@ -95,13 +105,8 @@
             "pages": ["internals/emitter", "internals/codegen-pipeline"]
           },
           {
-            "group": "Guides",
-            "pages": [
-              "guides/handwritten-queries",
-              "guides/testing",
-              "guides/migrations",
-              "guides/recipes"
-            ]
+            "group": "Editions reference",
+            "pages": ["editions/plugin", "editions/orm"]
           },
           {
             "group": "Project",

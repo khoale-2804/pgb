@@ -66,21 +66,31 @@ rest are recorded here as the known-issues ledger, priority-ordered.
 7. Cross-schema Go-name collisions possible (schema `app` + table `users` vs
    default-schema `app_users`) — no dedupe pass (pass_models.go,
    pass_builders.go).
-8. `series` pluralizes to `Seriess` (exception map defeats the
-   identity-plural guard in goTableNames).
+8. `series` pluralizes to `Seriess` — INTENTIONAL, not a defect: the
+   identity-plural guard exists so the row struct (Series) and the table
+   descriptor never share one Go identifier; the descriptor takes the
+   suffixed name. Documented here rather than "fixed".
 9. Repo files import every column's type even when unused in that file
    (no_filter + pgb:type combos can produce "imported and not used" in
-   rare combinations).
+   rare combinations). — FIXED (089afb3): assembleGoFile drops imports
+   whose qualifier never appears in the emitted body; the core import is
+   exempt.
 10. Malformed `pgb:*` COMMENT tokens are dropped silently; malformed plugin
-    options JSON reverts to defaults silently — surface warnings.
+    options JSON reverts to defaults silently — surface warnings. — FIXED
+    (4d63b32): both now warn on stderr naming the object/blob.
 11. `joinPath` doesn't escape `'` in JSON keys → invalid path SQL for keys
-    containing quotes (gen/load_ddl.go).
-12. `SearchIndex.Options` written, never read (dead data) — sort keys before
-    any future emission.
-13. `ListOpt` has no ORDER BY hook — keyset pagination on unordered results
-    is unsound on live data (documented risk; docs/guides).
+    containing quotes (gen/load_ddl.go). — FIXED (089afb3): quotes doubled;
+    unit-pinned.
+12. `SearchIndex.Options` written, never read (dead data) — FIXED (4d63b32):
+    field removed; non-key_field WITH options intentionally dropped with a
+    comment explaining why.
+13. `ListOpt` has no ORDER BY hook — FIXED (6f7b676): `ListOpt.Order`
+    appends pgb.Asc/Desc terms via Select.OrderBy before LIMIT/OFFSET;
+    statics docs example updated (it had also drifted to a non-existent
+    pgb.Limit() helper API).
 14. Nullable-array elements (`text[]` with NULL elements) scan into `[]string`
-    → pgx error; matches stock sqlc behavior, worth a docs note.
+    → pgx error; matches stock sqlc behavior — DOCUMENTED (6f7b676) in
+    docs/reference/type-mapping.mdx.
 15. Hot-path `fmt.Sprintf` per param in emitter (core/emit.go, core/expr.go)
     — strconv appends would do; codegen-time only, cosmetic.
 

@@ -130,6 +130,29 @@ there) — `export PATH=$PATH:$HOME/go/bin`.
 - Full gate green: build/vet/test/validate/validate-plugin; emitted
   package compiles.
 
+## ALREADY-DONE (2026-09-14 ledger-cleanup shift)
+
+- AUDIT P1 #5 CLOSED (c458ad4): plain DEFAULT clauses extracted
+  (CONSTR_DEFAULT → HasDefault), activating the already-designed
+  include_defaults gate — defaulted columns omitted from INSERT lists
+  (the DOCUMENTED behavior; docs already described it, implementation
+  lagged). All-defaults tables (fixture `inventory`) emit no insert
+  statics/params struct — the empty-INSERT shape was invalid Go. Fixture
+  fix (noted in COVERAGE.md): users.bitfield DEFAULT B'0' was invalid for
+  bit(8) (22026) — latent bug the new defaults execution exposed; now
+  B'00000000'. Products became batchable again (jsonb dropped from its
+  insertable set) — TestProductBatchAndCount restored, vector[] unnest
+  proven with pgx. Realworld smoke updated to the leaner INSERT shapes
+  (defaults seeded via the three-state update paths where content matters).
+- AUDIT P2 sweep: #9 unused-import drop in assembleGoFile + #11 joinPath
+  quote escaping (089afb3); #10 pgb:* / malformed-options warnings +
+  #12 dead SearchIndex.Options removed (4d63b32); #13 ListOpt.Order hook +
+  #14 nullable-array docs note + drifted statics example fixed (6f7b676).
+  #8 (Seriess) reclassified as intentional collision-avoidance. Remaining
+  open: AUDIT #7 (cross-schema name collisions) + #15 (cosmetic).
+- Full gate green after every milestone (build/vet/gofmt/unit/validate/
+  validate-plugin/integration 9/9/realworld smoke 4/4/edge build).
+
 ## ALREADY-DONE (2026-09-14 audit-cleanup shift)
 
 - AUDIT.md P1 sweep: 5 of 6 fixed, each committed green separately —

@@ -1,0 +1,58 @@
+---
+title: "sqlc plugin edition"
+description: "pgb as a sqlc process plugin — the v0.1 edition for SQL-first teams who already live in sqlc."
+icon: "plug"
+---
+
+The plugin edition is pgb's v0.1 shape: a [sqlc](https://sqlc.dev) process plugin that adds pgb's generated layers on top of the sqlc workflow you already run. Your `schema.sql` stays the source of truth, sqlc keeps doing parse/analysis/vet for handwritten queries, and `sqlc generate` now also emits the [generated `db` package](/generated-code/builders).
+
+## The flow
+
+```
+schema.sql + queries.sql
+        │
+        ▼  sqlc (parse + analyze: catalog, resolved queries)
+GenerateRequest (protobuf, stdin)
+        │
+        ▼  sqlc-gen-pgb
+        ├── builds SchemaIR: catalog proto + oliphant re-parse
+        │   (USING paradedb DDL, generated cols, COMMENT ON)
+        ├── pass A: models + handwritten-query wrappers
+        ├── pass B: descriptors + builders
+        └── pass C: static functions + search layer
+        │
+        ▼  GenerateResponse (files)
+db/  — one package, one type map
+```
+
+## What you get
+
+- Everything in the [Generated code](/generated-code/builders) section: typed descriptors, predicates (including the full [pg_search vocabulary](/paradedb/predicates)), [static functions](/generated-code/statics), [keyset pagination](/generated-code/pagination).
+- Typed wrappers for your handwritten `.sql` queries — sqlc's analyzer resolves them, pgb renders them.
+- `sqlc vet` and the whole sqlc config surface keep working.
+- ParadeDB coverage per the [ParadeDB section](/paradedb/overview), driven by `USING paradedb` DDL that sqlc drops but pgb re-parses.
+
+## Install
+
+```bash
+go install github.com/your-org/pgb/cmd/sqlc-gen-pgb@latest
+```
+
+then the [quickstart yaml](/welcome/quickstart). Process plugins run as executables; a WASM build for sqlc's plugin registry is planned so installation is one config line with a pinned sha256.
+
+## What this edition cannot do (and why)
+
+The plugin protocol hands pgb a resolved **catalog** and finished **query** objects — no SQL AST. Consequences, and the mitigation for each:
+
+| limit | mitigation |
+|---|---|
+| `CREATE INDEX` / `COMMENT ON` / generated-column kinds dropped by sqlc | pgb re-parses schema files itself with oliphant ([DDL extraction](/architecture/schema-ir)) |
+| `pdb.*` functions untyped by sqlc's analyzer (v1.31.1 fails; main degrades to `any`) | cast in SQL (`pdb.score(id)::float8`) or [database-backed analysis](/guides/handwritten-queries); generated code is unaffected — it emits SQL at runtime |
+| no AST → no arbitrary-query analysis of pgb's own | not needed: generated code is self-describing; the emitter is the source of truth |
+| release cadence coupled to sqlc | [support matrix](/reference/support-matrix) pins known-good versions; standalone edition removes the coupling entirely |
+
+## Who should pick it
+
+- Teams already on sqlc who want dynamic filters, search, and CRUD generation **without** changing their workflow.
+- Projects that want typed data access but keep handwritten SQL as a first-class citizen (`.sql` files reviewed like code).
+- Anyone evaluating pgb: it is the cheapest path to a working vertical slice, and the generated output is byte-identical to what the [standalone edition](/editions/orm) produces — migrating between editions is a config change, not a rewrite.

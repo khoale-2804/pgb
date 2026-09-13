@@ -19,6 +19,10 @@
         "icon": "book-open",
         "groups": [
           {
+            "group": "Editions",
+            "pages": ["editions/overview", "editions/plugin", "editions/orm"]
+          },
+          {
             "group": "Getting started",
             "pages": ["welcome/quickstart"]
           },

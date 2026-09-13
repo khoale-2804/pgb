@@ -1,0 +1,88 @@
+---
+title: "Standalone ORM edition"
+description: "pgb as a Go module: own parser and analyzer, the complete Postgres 15–19 type matrix, planner-aware emission, migrations and a relation layer."
+icon: "cube"
+---
+
+The standalone edition is pgb as a **plain Go package + CLI**, distributed through the Go module proxy — no sqlc in the loop. It owns the whole pipeline: schema parsing (oliphant, the pure-Go libpg_query-18 binding), its own catalog model, codegen, and the runtime your app imports.
+
+```bash
+# runtime (imported by generated code) + CLI
+go get github.com/your-org/pgb/core@latest
+go install github.com/your-org/pgb/cmd/pgb@latest
+pgb gen --schema schema.sql   # same output as the plugin edition
+```
+
+<Note>
+Shipping target: v0.2. v0.1 is the [sqlc plugin edition](/editions/plugin); the standalone edition is the same compiler with its own frontend, and golden tests prove the output is byte-identical. This page documents the edition's committed design.
+</Note>
+
+## Own parser, own catalog — no `any` leakage
+
+The plugin edition inherits sqlc's analyzer, which fails or degrades on extension functions. The standalone edition models the catalog itself, so **extension and modern types resolve natively**:
+
+- `pdb.*` functions and the `@@@` operator family typed against the pg_search catalog (no casts, no `any`).
+- pgvector, pg_trgm, pgcrypto, ltree — a curated extension registry, version-gated.
+- Full DDL fidelity: generated columns (stored/virtual), temporal constraints, partitioning, indexes — parsed, not dropped.
+
+## The type matrix (PG 15–19)
+
+Every built-in type maps to a Go type with generated, positional pgx scan + encode code — no reflection. Version deltas are explicit:
+
+| family | types | Go (default) | since |
+|---|---|---|---|
+| integers | int2 int4 int8 smallserial…bigserial | int16 / int32 / int64 | all |
+| unsigned/oid | oid xid xid8 pg_lsn | uint32 / uint64 | xid8: 14 |
+| float | float4 float8 | float32 / float64 | all |
+| exact | numeric | pgtype.Numeric (override: json.Number/string) | all |
+| money | money | string (pgx) — override `int64` cents recommended | all |
+| text | text varchar bpchar name citext | string | citext: ext |
+| bytes | bytea | []byte | all |
+| bool | boolean | bool | all |
+| date/time | date time timetz timestamp timestamptz interval | pgtype.Date / Time / Timetz / Timestamptz / Interval | all |
+| json | json jsonb | []byte (override: struct/map) | all |
+| uuid | uuid | uuid.UUID | all |
+| network | inet cidr macaddr macaddr8 | pgtype.* | macaddr8: 12 |
+| bit | bit varbit | pgtype.Bits | all |
+| ranges | int4/8range numrange ts/tstz/daterange | pgtype.Range[T] | all |
+| **multirange** | int4/8multirange nummultirange ts/tstz/datemultirange | pgtype.Multirange[T] | **14** |
+| text search | tsvector tsquery | pgtype.* | all |
+| xml | xml | string | all |
+| geometric | point line lseg box path polygon circle | pgtype.* / overrides | all |
+| **PG18+** | uuidv7 defaults, virtual generated cols | emitted DDL-aware | **18** |
+| extensions | vector (pgvector), ltree, hstore, citext | override / registry | per ext |
+
+Arrays exist for every base type (`[]T`, multidim flattened with explicit dims), composites become generated structs, domains unwrap to their base with the constraint documented in the IR. PG19 gains land behind the [version gate](/postgres/version-gates) at GA.
+
+## Planner-aware emission
+
+The emitter doesn't just produce valid SQL — it produces SQL shaped for Postgres's planner, and the generated code is shaped for pgx's plan cache:
+
+- **Sargable by construction.** Predicates emit bare indexed columns (`created_at >= $1`), never functions-over-columns. No `(@x IS NULL OR col = @x)` anti-patterns — the [builder](/generated-code/builders) composes structurally.
+- **Plan-cache friendly.** Every statement for a given call site has a constant node shape; parameters carry explicit casts (`$1::timestamptz`) so generic plans specialize cleanly. pgx runs with statement caching (`QueryExecModeCacheStatement`) — generated code is stable enough that cached plans stay valid across calls.
+- **Pushdown-shaped search SQL.** pg_search output follows the documented pushdown rules: operator present, `ORDER BY pdb.score(id) DESC, id LIMIT n` for Top-K, indexed tiebreaks, fast fields for filtered/sorted columns ([architecture](/paradedb/architecture), [performance](/paradedb/performance)).
+- **Batching over loops.** Where a slice is passed, generated code uses `unnest` batch statements or `pgx.Batch` pipelining — never N round trips.
+- **Partition-aware.** Partition key columns are flagged in the IR; generated filters on them are marked in the docs of the model so reviewers see when a query can't prune partitions.
+
+## Compile-time optimization
+
+Codegen replaces runtime work:
+
+- Explicit positional scans (no reflection, no `rows.Columns()`), zero-alloc in the hot path where types allow.
+- Statement text is precomputed at generate time and embedded — runtime cost is parameter binding + execution.
+- The [emitter](/internals/emitter) is deterministic; golden tests pin every statement, so a planner-relevant SQL change is a reviewable diff.
+- `pgb vet --explain` (planned, v0.3): runs generated statements against a dev database in CI and asserts the expected plan shape (Index Scan, SegmentedTopKExec) — catching missing indexes before merge.
+
+## What the edition adds over the plugin
+
+| capability | plugin | standalone |
+|---|---|---|
+| models, builders, statics, pagination | ✅ | ✅ (byte-identical) |
+| handwritten-query wrappers | via sqlc analysis | `Raw()`; own analyzer planned |
+| full type matrix incl. extensions | via sqlc + overrides | native catalog model |
+| [migrations](/guides/migrations) → declarative `pgb migrate` | bring your own | built-in (P2) |
+| relation layer / Include | — | built-in (P3) |
+| schema DSL (`pgb.schema`) | — | built-in (P1) |
+| sqlc vet / .sql workflow | ✅ | n/a |
+
+Choose it when you want pgb as the data layer itself; choose the [plugin edition](/editions/plugin) when sqlc remains your workflow's center. Both import the same runtime and produce the same code — [switching is a config change](/editions/overview).

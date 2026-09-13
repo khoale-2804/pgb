@@ -609,6 +609,18 @@ Concise engineering version of `docs/reference/support-matrix.mdx` (the user-fac
 
 ---
 
+## 18. Editions strategy (2026-09-13, user question: "ontop of sqlc or full blown standalone?")
+
+Decision: **standalone core, sqlc as one frontend.** One Go module (`github.com/your-org/pgb`), one semver, two editions sharing everything below the frontend boundary. User-facing docs: `docs/editions/{overview,plugin,orm}.mdx` (Editions group, first in the Docs tab).
+
+- **Shared core:** SchemaIR → codegen passes A/B/C → runtime core (`core/`: expression tree, emitter, scan, DBTX) + the type system. Golden tests require BYTE-IDENTICAL generated output from both frontends on the same schema — drift is a CI failure, not a hope.
+- **Edition A — sqlc plugin (v0.1, current design):** `cmd/sqlc-gen-pgb` shim + `sqlcfront` (GenerateRequest proto → IR). Remains the distribution channel to the sqlc community and the cheapest vertical slice; couples to sqlc's release cadence and analyzer gaps (no AST, index DDL dropped → oliphant re-parse, `pdb.*` untyped).
+- **Edition B — standalone ORM (v0.2+):** `cmd/pgb` CLI + library (`go get` the module, `go install` the CLI). Own frontend: oliphant parse → own catalog model (extension registry: pg_search `pdb.*`, pgvector, ltree… full PG15–19 type matrix incl. multiranges, geometric, xid8, PG18 uuidv7/virtual-generated awareness) → the same passes. Enables the whole 2.0 roadmap: DSL (P1), declarative migrations with own catalog diffing (P2), relation/Include layer (P3).
+- **Planner-aware emission commitments (edition B, and core where applicable):** sargable-by-construction predicates; constant statement shapes so pgx statement/plan caching stays valid; explicit param casts (`$1::timestamptz`); pushdown-shaped pg_search SQL (Top-K, fast fields, indexed tiebreaks); unnest/pgx.Batch batching instead of loops; `pgb vet --explain` plan assertions in CI (v0.3, planned).
+- **Why not "on top of sqlc" for the ORM:** the plugin protocol is a lossy ceiling (no AST, DDL dropped, cadence outside our control) and the ORM's "every type of every version" promise requires owning the catalog model. The plugin edition already re-parses schema files with oliphant — standalone promotes that side-pass to the main entrance. Honest cost: an own catalog model is the expensive part; scope it to what codegen consumes (not arbitrary-query analysis — that stays sqlc's job in edition A; `Raw()` covers it in edition B until the P3+ analyzer lands).
+
+---
+
 ## Changelog
 
 - 2026-09-13 (b): generated output consolidated into ONE package db (dbgen + models_package retired); executor param renamed exec; docs IA reorganized (Postgres tab folded into Reference).

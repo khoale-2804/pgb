@@ -148,7 +148,14 @@ RETURNING id, email, name, bio, metadata, tags,
 users, err := db.ListUsers(ctx, pool, db.UserFilter{
 	EmailLike:    pgb.Opt("%@corp.io"),
 	CreatedAfter: pgb.Opt(since),
-}, pgb.Limit(20), pgb.Offset(40))
+}, pgb.ListOpt{
+	Limit:  20,
+	Offset: 40,
+	// Order is optional but recommended: keyset pagination and LIMIT-less
+	// listings are only deterministic with an explicit, ideally unique
+	// ordering. Use pgb.Asc / pgb.Desc over typed columns.
+	Order: []pgb.Order{pgb.Asc(db.Users.CreatedAt().Col)},
+})
 if err != nil {
 	return err
 }
@@ -158,6 +165,7 @@ if err != nil {
 SELECT id, email, name, bio, metadata, tags, created_at, last_login_at
 FROM public.users
 WHERE email LIKE $1 AND created_at > $2
+ORDER BY users.created_at ASC, users.id DESC
 LIMIT $3 OFFSET $4
 ```
 

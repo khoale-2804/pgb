@@ -615,3 +615,19 @@ func TestWithTx(t *testing.T) {
 		}
 	})
 }
+
+// TestApplyListOrder pins the ListOpt.Order hook: explicit ordering terms
+// land before LIMIT/OFFSET so unordered lists (and keyset pagination) get a
+// deterministic row order.
+func TestApplyListOrder(t *testing.T) {
+	s := NewSelect("public.users", Col{Table: "users", Name: "id"}).
+		ApplyList(ListOpt{
+			Order: []Order{Asc(Col{Table: "users", Name: "created_at"}), Desc(Col{Table: "users", Name: "id"})},
+			Limit: 10,
+		})
+	sql, _ := s.SQL()
+	want := "SELECT users.id FROM public.users ORDER BY users.created_at ASC, users.id DESC LIMIT $1"
+	if sql != want {
+		t.Fatalf("SQL = %s", sql)
+	}
+}

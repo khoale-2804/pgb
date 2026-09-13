@@ -36,6 +36,8 @@ The canonical table. One map serves models, filter fields, function params, and 
 
 Arrays map to `[]T` of the element type (`text[]` → `[]string`).
 
+Note that `[]T` cannot represent NULL elements: a `text[]` column containing a NULL element scans into `[]string` with a pgx error on that row. This matches stock sqlc-gen-go behavior — keep element columns NOT NULL or read them as `any` via an override.
+
 ## Nullability modes
 
 | mode | nullable column representation |

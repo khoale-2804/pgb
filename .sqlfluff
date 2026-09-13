@@ -1,0 +1,25 @@
+[sqlfluff]
+dialect = postgres
+templater = raw
+# LT01/LT02 excluded: the fixture uses hand-aligned column tables (one space
+# runs aligning types/comments) — proper column alignment is `pgb fmt`'s job
+# (AST-based, v0.2). LT12 = file-final-newline, AM07 = statement terminator,
+# ST06 = FROM table ordering, RF04 = flags quoted keyword identifiers (K section
+# needs them), CV11 = NULL-safe comparison flags on CHECK constraints.
+exclude_rules = LT01, LT02, LT12, AM07, ST06, RF04, CV11
+max_line_length = 100
+
+[sqlfluff:rules:capitalisation.keywords]
+capitalisation_policy = upper
+
+[sqlfluff:rules:capitalisation.types]
+capitalisation_policy = upper
+
+[sqlfluff:rules:references.special_chars]
+allow_space_in_identifier = True
+
+[sqlfluff:layout:type:comma]
+line_position = trailing
+
+[sqlfluff:layout:type:binary_operator]
+line_position = leading

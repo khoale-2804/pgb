@@ -545,7 +545,10 @@ pgb/
   internal/golden/         # golden files + runner
   example/                 # demo schema (incl. USING paradedb DDL) + docker-compose + e2e
   docs/                    # Mintlify site (3 tabs: Docs / ParadeDB / Reference; 35 pages incl. errors, performance, migrations, recipes, internals)
-  Makefile                 # sqlc@main install, generate, test, compose-up
+  Makefile                 # fmt-schema / fmt-docs / check-docs / validate targets
+  tools/fmt-docs.py        # docs fenced-code formatter (gofmt, JSON, --check)
+  .sqlfluff                # schema SQL formatter config (postgres dialect;
+                           #   pgb fmt replaces in v0.2 — AST-based)
 ```
 
 ## 14. Milestones
@@ -626,3 +629,4 @@ Decision: **standalone core, sqlc as one frontend.** One Go module (`github.com/
 
 - 2026-09-13 (b): generated output consolidated into ONE package db (dbgen + models_package retired); executor param renamed exec; docs IA reorganized (Postgres tab folded into Reference).
 - 2026-09-13 (c): docs IA consolidated to 3 tabs (Generated code folded into Docs, Resources into Reference); 7 new pages (errors, performance, migrations, recipes, internals/emitter, internals/codegen-pipeline, paradedb/performance).
+- 2026-09-13 (d): formatters — docs code formatter (tools/fmt-docs.py, gofmt+JSON, --check); schema SQL formatter (sqlfluff interim, .sqlfluff config, Makefile targets; pgb fmt AST-based v0.2); fixture already sqlfluff-formatted and sqlc-parse-verified post-format.

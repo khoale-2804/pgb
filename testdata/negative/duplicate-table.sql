@@ -3,10 +3,10 @@
 -- (sqlc's analyzer also rejects this — the error must come from pgb's IR
 -- loader with the same clarity when running standalone).
 CREATE TABLE dup (
-  id bigserial PRIMARY KEY
+    id bigserial PRIMARY KEY
 );
 
 CREATE TABLE dup (
-  id bigserial PRIMARY KEY,
-  extra text
+    id bigserial PRIMARY KEY,
+    extra text
 );

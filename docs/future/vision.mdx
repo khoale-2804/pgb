@@ -65,6 +65,7 @@ Design points:
 
 - **ParadeDB annotations are first-class** — `@search(...)` fields become the `USING paradedb` index columns, `@@paradedb(keyField:)` sets the key field, JSON paths and aliases are declared where you read them. No other ORM schema language can express a search index; that stays pgb's wedge. Attributes are **plugin-owned**: they are claimed by the official `pgb-paradedb` extension via the [plugin system](/future/plugins), and an unknown attribute errors naming the plugin that would claim it.
 - Every construct has an exact SQL DDL projection — the DSL is **lossless against Postgres 18/19 features** (generated columns, temporal constraints, ranges), not a lossy abstraction.
+- **A formatter ships with the parser** (`pgb fmt`): canonical indentation, keyword casing, attribute ordering — and because it works on the parsed AST, it formats extension attributes (the `@search(...)` lines) that generic SQL formatters cannot parse. For plain SQL schemas, the interim formatter is sqlfluff (see `.sqlfluff`), which safely skips unparsable pg_search sections; `pgb fmt` removes that gap.
 - Base types mirror the [type-mapping table](/reference/type-mapping); `@pg(type:)` overrides map to Go.
 - **Output shape unchanged**: the DSL compiles to the same SchemaIR and emits into the same single `db` package (`package: db`) — one type map end to end, whether the source was SQL or DSL.
 - The SQL-first path stays untouched: `schema.sql` + sqlc continues to work. Both doors produce the same SchemaIR.

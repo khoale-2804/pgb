@@ -303,7 +303,9 @@ func exprJSONPath(n *ast.Node) (col, path string, ok bool) {
 
 // joinPath appends one 'field' segment to a json path.
 func joinPath(p, field string) string {
-	return p + "->'" + field + "'"
+	// JSON keys may contain single quotes; double them so the path fragment
+	// stays a valid quoted string in the re-emitted predicate SQL.
+	return p + "->'" + strings.ReplaceAll(field, "'", "''") + "'"
 }
 
 // typmodParts splits a pdb.* type name into its base tokenizer (the last

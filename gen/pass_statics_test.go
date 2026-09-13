@@ -397,3 +397,30 @@ func TestPassesSkipTablesAndSchemas(t *testing.T) {
 		}
 	}
 }
+
+// TestAssembleGoFileDropsUnusedImports pins the unused-import filter: a
+// column whose type import no emitted code references (no_filter + pgb:type
+// combos) must not produce an "imported and not used" file.
+func TestAssembleGoFileDropsUnusedImports(t *testing.T) {
+	opts := Options{Package: "db", Core: "github.com/khoale-2804/pgb/core"}
+	body := "var _ = pgb.Expr(nil)\n"
+
+	out, err := assembleGoFile(opts, []string{
+		opts.Core,
+		"github.com/google/uuid",         // qualifier absent from body -> dropped
+		"github.com/jackc/pgx/v5/pgtype", // qualifier present -> kept
+	}, body+"var _ = pgtype.Text{}\n")
+	if err != nil {
+		t.Fatalf("assembleGoFile: %v", err)
+	}
+	src := string(out)
+	if strings.Contains(src, `"github.com/google/uuid"`) {
+		t.Errorf("unused uuid import kept:\n%s", src)
+	}
+	if !strings.Contains(src, `"github.com/jackc/pgx/v5/pgtype"`) {
+		t.Errorf("used pgtype import dropped:\n%s", src)
+	}
+	if !strings.Contains(src, `pgb "github.com/khoale-2804/pgb/core"`) {
+		t.Errorf("core import must always be kept:\n%s", src)
+	}
+}

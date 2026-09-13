@@ -563,3 +563,18 @@ func TestEnrichPlainDefaults(t *testing.T) {
 		}
 	}
 }
+
+// TestJoinPathEscapesQuotes pins the JSON-path fragment escaping: keys
+// containing single quotes must double them to stay valid in re-emitted
+// predicate SQL.
+func TestJoinPathEscapesQuotes(t *testing.T) {
+	if got := joinPath("metadata", "color"); got != "metadata->'color'" {
+		t.Errorf("plain key: got %q", got)
+	}
+	if got := joinPath("metadata", "o'clock"); got != "metadata->'o''clock'" {
+		t.Errorf("quoted key: got %q", got)
+	}
+	if got := joinPath("metadata->'a'", "b'c"); got != "metadata->'a'->'b''c'" {
+		t.Errorf("chained quoted key: got %q", got)
+	}
+}

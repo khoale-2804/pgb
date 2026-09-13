@@ -62,6 +62,19 @@ func assembleGoFile(opts Options, imports []string, body string) ([]byte, error)
 	}
 	sort.Strings(paths)
 
+	// Drop imports whose qualifier never appears in the body: a column whose
+	// type is suppressed by directives (no_filter, defaults omitted, pgb:type
+	// overrides on skipped surfaces) must not leave an "imported and not
+	// used" file behind. The core import is exempt — emitted files always
+	// reference pgb.
+	kept := paths[:0]
+	for _, p := range paths {
+		if p == opts.Core || strings.Contains(body, importQualifier(p)+".") {
+			kept = append(kept, p)
+		}
+	}
+	paths = kept
+
 	var out strings.Builder
 	out.WriteString(genHeader(opts))
 	out.WriteString("\npackage " + opts.Package + "\n")

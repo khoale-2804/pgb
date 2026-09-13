@@ -171,7 +171,7 @@ func InsertCategory(ctx context.Context, exec pgb.DBTX, p InsertCategoryParams) 
 	return us[0], nil
 }
 
-const insertCategoriesSQL = "INSERT INTO public.categories (name, parent_id) SELECT * FROM unnest($1::text[], $2::int8[]) RETURNING id, name, parent_id"
+const insertCategoriesSQL = "INSERT INTO public.categories (\"name\", parent_id) SELECT * FROM unnest($1::text[], $2::int8[]) RETURNING id, \"name\", parent_id"
 
 // InsertCategories inserts a whole batch in one round trip via
 // unnest and returns every inserted row.

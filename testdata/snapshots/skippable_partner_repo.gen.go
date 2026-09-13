@@ -144,7 +144,7 @@ func InsertSkippablePartner(ctx context.Context, exec pgb.DBTX, p InsertSkippabl
 	return us[0], nil
 }
 
-const insertSkippablePartnersSQL = "INSERT INTO public.skippable_partner (label) SELECT * FROM unnest($1::text[]) RETURNING id, label"
+const insertSkippablePartnersSQL = "INSERT INTO public.skippable_partner (\"label\") SELECT * FROM unnest($1::text[]) RETURNING id, \"label\""
 
 // InsertSkippablePartners inserts a whole batch in one round trip via
 // unnest and returns every inserted row.

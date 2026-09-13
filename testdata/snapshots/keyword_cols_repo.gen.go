@@ -297,7 +297,7 @@ func InsertKeywordCol(ctx context.Context, exec pgb.DBTX, p InsertKeywordColPara
 	return us[0], nil
 }
 
-const insertKeywordColsSQL = "INSERT INTO public.keyword_cols (\"type\", \"range\", \"select\", \"class\", interface, \"map\", func, return, chan) SELECT * FROM unnest($1::text[], $2::int4[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[], $8::text[], $9::text[]) RETURNING id, \"type\", \"range\", \"select\", \"class\", interface, \"map\", func, return, chan"
+const insertKeywordColsSQL = "INSERT INTO public.keyword_cols (\"type\", \"range\", \"select\", \"class\", interface, map, func, \"return\", chan) SELECT * FROM unnest($1::text[], $2::int4[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[], $8::text[], $9::text[]) RETURNING id, \"type\", \"range\", \"select\", \"class\", interface, map, func, \"return\", chan"
 
 // InsertKeywordCols inserts a whole batch in one round trip via
 // unnest and returns every inserted row.

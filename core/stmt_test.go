@@ -226,7 +226,7 @@ func TestSelectSQL(t *testing.T) {
 						Raw{SQL: "id IN (?, ?)", Args: []any{7, 9}},
 					)
 			},
-			wantSQL:  "SELECT id FROM t WHERE name = $1 AND id IN ($2, $3)",
+			wantSQL:  `SELECT id FROM t WHERE "name" = $1 AND id IN ($2, $3)`,
 			wantArgs: []any{"x", 7, 9},
 		},
 		{
@@ -238,7 +238,7 @@ func TestSelectSQL(t *testing.T) {
 						eqCol("name", "x"),
 					)
 			},
-			wantSQL:  "SELECT id FROM t WHERE id IN ($1, $2) AND name = $3",
+			wantSQL:  `SELECT id FROM t WHERE id IN ($1, $2) AND "name" = $3`,
 			wantArgs: []any{7, 9, "x"},
 		},
 		{
@@ -313,7 +313,7 @@ func TestInsertSQL(t *testing.T) {
 					[]Expr{Lit{V: "ada@corp.io"}, Lit{V: "Ada Lovelace"}},
 				).Returning(col("id"), col("created_at"))
 			},
-			wantSQL:  "INSERT INTO public.users (email, name) VALUES ($1, $2) RETURNING id, created_at",
+			wantSQL:  `INSERT INTO public.users (email, "name") VALUES ($1, $2) RETURNING id, created_at`,
 			wantArgs: []any{"ada@corp.io", "Ada Lovelace"},
 		},
 		{
@@ -351,9 +351,9 @@ func TestInsertSQL(t *testing.T) {
 					Where: Bin{Op: "IS DISTINCT FROM", L: Col{Table: "users", Name: "name"}, R: Raw{SQL: "EXCLUDED.name"}},
 				}).Returning(col("id"))
 			},
-			wantSQL: "INSERT INTO public.users (email, name) VALUES ($1, $2) " +
-				"ON CONFLICT (email) DO UPDATE SET name = $3, bio = NULL " +
-				"WHERE users.name IS DISTINCT FROM EXCLUDED.name RETURNING id",
+			wantSQL: `INSERT INTO public.users (email, "name") VALUES ($1, $2) ` +
+				`ON CONFLICT (email) DO UPDATE SET "name" = $3, bio = NULL ` +
+				`WHERE users."name" IS DISTINCT FROM EXCLUDED.name RETURNING id`,
 			wantArgs: []any{"ada@corp.io", "Ada King", "Ada King"},
 		},
 	}
@@ -410,7 +410,7 @@ func TestUpdateSQL(t *testing.T) {
 					Where(Bin{Op: "@>", L: col("tags"), R: Lit{V: []string{"staff"}}}).
 					Returning(col("id"), col("email"))
 			},
-			wantSQL:  "UPDATE public.users SET bio = $1, name = NULL WHERE tags @> $2 RETURNING id, email",
+			wantSQL:  `UPDATE public.users SET bio = $1, "name" = NULL WHERE tags @> $2 RETURNING id, email`,
 			wantArgs: []any{"Principal engineer", []string{"staff"}},
 		},
 		{

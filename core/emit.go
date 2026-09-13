@@ -72,14 +72,11 @@ func needsQuote(s string) bool {
 			return true
 		}
 	}
-	// leading digit handled above; reserved words are quoted defensively
-	switch strings.ToUpper(s) {
-	case "SELECT", "FROM", "WHERE", "ORDER", "GROUP", "LIMIT", "OFFSET",
-		"INSERT", "UPDATE", "DELETE", "TABLE", "INDEX", "TYPE", "USER",
-		"END", "VALUES", "RETURNING", "CONFLICT", "RANGE", "CLASS", "MAP":
-		return true
-	}
-	return false
+	// leading digit and non-snake shapes handled above; keywords are quoted
+	// defensively (see keywords.go — full pg_get_keywords list, not just the
+	// reserved class, since unreserved collisions still break in some
+	// positions, e.g. a column named "default" in a column list).
+	return pgKeywords[s]
 }
 
 // Emit renders an expression tree to SQL + bound args. Deterministic: the

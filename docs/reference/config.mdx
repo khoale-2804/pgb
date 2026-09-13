@@ -30,7 +30,7 @@ sql:
           package: db
           # import path of the handwritten runtime core — pgb.DBTX,
           # pgb.Set, core.Expr, the emitter. Required.
-          core: github.com/your-org/pgb/core
+          core: github.com/khoale-2804/pgb/core
           # SQL emitter dialect gate: "18" (default) or "19" (beta
           # gate — non-search emission only until ParadeDB ships
           # PG19 binaries)
@@ -85,7 +85,7 @@ sql:
       - out: db
         plugin: pgb
         options:
-          core: github.com/your-org/pgb/core
+          core: github.com/khoale-2804/pgb/core
 plugins:
   - name: pgb
     process: { cmd: sqlc-gen-pgb }
@@ -98,7 +98,7 @@ Grow it only when a default stops fitting: switch `target` when you adopt PG19, 
 | key | type | default | common values | meaning |
 |---|---|---|---|---|
 | `package` | string | `db` | `db` (near-universal), `sqlc` (drop-in migration from sqlc-gen-go) | Name of the ONE generated package. Models, handwritten-query wrappers, descriptors + builders, and static functions are all emitted into it — one type map, end to end |
-| `core` | string | — | `github.com/your-org/pgb/core`; a fork path pinned with a Go `replace` | Import path of the handwritten runtime core (`pgb.DBTX`, `pgb.Set`, `core.Expr`, the emitter). Generated files import it; required, no default |
+| `core` | string | — | `github.com/khoale-2804/pgb/core`; a fork path pinned with a Go `replace` | Import path of the handwritten runtime core (`pgb.DBTX`, `pgb.Set`, `core.Expr`, the emitter). Generated files import it; required, no default |
 | `target` | `"18"` \| `"19"` | `"18"` | `"18"` (ParadeDB binaries exist — the safe default), `"19"` (beta gate, non-search emission only) | SQL emitter dialect gate — errors on unsupported feature combos (e.g. search emission with `target: "19"` until ParadeDB ships PG19 binaries); warns when the target major is within ~6 months of EOL — see [version gates](/postgres/version-gates) and the [support matrix](/reference/support-matrix) |
 | `nullability` | `pgtype` \| `pointers` | `pgtype` | `pgtype` (pgx-native, `.Valid` checks), `pointers` (`*string` / `*time.Time`, nil checks) | Representation of nullable columns — see [type mapping](/reference/type-mapping) |
 | `paradedb.version` | string | `"0.26"` | `"0.26"` (recommended — tracks 0.26-rc on a 0.25.9+ floor), `"0.25"` (legacy, warns) | Gate for the pg_search emitter; validated against known pg_search releases — unsupported combos error, legacy values warn — see the [support matrix](/reference/support-matrix) |

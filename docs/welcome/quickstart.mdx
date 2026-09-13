@@ -21,7 +21,7 @@ On v1.31.1 your schema still parses fine (the PG17-era grammar handles all pgb-r
 ## 2. Build the plugin binary
 
 ```bash
-git clone https://github.com/your-org/pgb && cd pgb
+git clone https://github.com/khoale-2804/pgb && cd pgb
 go build -o /usr/local/bin/sqlc-gen-pgb ./gen
 ```
 
@@ -81,7 +81,7 @@ sql:
         plugin: pgb
         options:
           package: db           # the ONE generated package name
-          core: github.com/your-org/pgb/core
+          core: github.com/khoale-2804/pgb/core
           target: "18"          # or "19": SQL emitter dialect gate
           paradedb:
             version: "0.26"     # pg_search gate: 0.25.9+ floor
@@ -152,7 +152,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	pgb "github.com/your-org/pgb/core"
+	pgb "github.com/khoale-2804/pgb/core"
 	"github.com/your-org/shop/db"
 )
 

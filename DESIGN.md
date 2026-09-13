@@ -144,7 +144,7 @@ sql:
         plugin: pgb
         options:
           package: db
-          core: github.com/you/pgb/core
+          core: github.com/khoale-2804/pgb/core
           target: "18"            # emitter dialect gate: "18" | "19"
           paradedb:
             version: "0.26"
@@ -574,7 +574,7 @@ pgb/
 1. `pgb` as the working name?
 2. Nullability default: `pgtype.Xxx` (sqlc-familiar) vs `nullability: pointers`?
 3. Pilot schema: nyuka (has full-text-ish needs?) or a fresh demo schema first?
-4. Publish as OSS eventually, or private tool? (affects naming/repo layout only)
+4. ~~Publish as OSS eventually, or private tool?~~ RESOLVED 09-13: public + MIT (repo: github.com/khoale-2804/pgb).
 
 ---
 
@@ -615,7 +615,7 @@ Concise engineering version of `docs/reference/support-matrix.mdx` (the user-fac
 
 ## 18. Editions strategy (2026-09-13, user question: "ontop of sqlc or full blown standalone?")
 
-Decision: **standalone core, sqlc as one frontend.** One Go module (`github.com/your-org/pgb`), one semver, two editions sharing everything below the frontend boundary. User-facing docs: `docs/editions/{overview,plugin,orm}.mdx` (Editions group, first in the Docs tab).
+Decision: **standalone core, sqlc as one frontend.** One Go module (`github.com/khoale-2804/pgb`), one semver, two editions sharing everything below the frontend boundary. User-facing docs: `docs/editions/{overview,plugin,orm}.mdx` (Editions group, first in the Docs tab).
 
 - **Shared core:** SchemaIR → codegen passes A/B/C → runtime core (`core/`: expression tree, emitter, scan, DBTX) + the type system. Golden tests require BYTE-IDENTICAL generated output from both frontends on the same schema — drift is a CI failure, not a hope.
 - **Edition A — sqlc plugin (v0.1, current design):** `cmd/sqlc-gen-pgb` shim + `sqlcfront` (GenerateRequest proto → IR). Remains the distribution channel to the sqlc community and the cheapest vertical slice; couples to sqlc's release cadence and analyzer gaps (no AST, index DDL dropped → oliphant re-parse, `pdb.*` untyped).

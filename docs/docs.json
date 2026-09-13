@@ -113,12 +113,12 @@
   "navbar": {
     "primary": {
       "type": "github",
-      "href": "https://github.com/your-org/pgb"
+      "href": "https://github.com/khoale-2804/pgb"
     }
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/your-org/pgb"
+      "github": "https://github.com/khoale-2804/pgb"
     }
   },
   "seo": {

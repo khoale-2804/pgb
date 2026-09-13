@@ -114,6 +114,8 @@ func enrichStmt(sch *ir.Schema, dir *DirectiveSet, n *ast.Node) {
 		enrichComment(sch, dir, inner.CommentStmt)
 	case *ast.Node_CreateStmt:
 		enrichCreate(sch, inner.CreateStmt)
+	case *ast.Node_AlterTableStmt:
+		enrichAlterTable(sch, inner.AlterTableStmt)
 	case *ast.Node_ViewStmt:
 		enrichView(sch, inner.ViewStmt)
 	case *ast.Node_CreateTableAsStmt:
@@ -387,6 +389,30 @@ func enrichCreate(sch *ir.Schema, st *ast.CreateStmt) {
 	}
 	for _, cn := range st.GetConstraints() {
 		applyConstraint(t, cn.GetConstraint(), "")
+	}
+}
+
+// enrichAlterTable extracts key constraints added via
+// ALTER TABLE ... ADD CONSTRAINT ... PRIMARY KEY|UNIQUE — previously these
+// were silently dropped (sqlc's catalog proto does not carry them either),
+// which made the statics fall back to the id-column heuristic for tables
+// whose real key is declared by ALTER.
+func enrichAlterTable(sch *ir.Schema, st *ast.AlterTableStmt) {
+	if st.GetRelation() == nil {
+		return
+	}
+	t := findTable(sch, st.GetRelation().GetSchemaname(), st.GetRelation().GetRelname())
+	if t == nil {
+		return
+	}
+	for _, cmd := range st.GetCmds() {
+		atc := cmd.GetAlterTableCmd()
+		if atc == nil || atc.GetDef() == nil {
+			continue
+		}
+		if con := atc.GetDef().GetConstraint(); con != nil {
+			applyConstraint(t, con, "")
+		}
 	}
 }
 

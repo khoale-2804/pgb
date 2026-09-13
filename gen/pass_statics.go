@@ -203,6 +203,15 @@ func staticsFile(sch ir.Schema, t ir.Table, opts Options, dir DirectiveSet) ([]b
 	pkName := ""
 	if pk := heuristicPK(t); pk != nil {
 		pkName = pk[0]
+		if len(t.PrimaryKey) == 0 && len(t.Uniques) == 0 {
+			// The key came from the id-column heuristic, not the DDL: warn
+			// instead of silently keying Get/Update/Upsert/Delete on a
+			// column that may not be unique (wrong-row reads, ON CONFLICT
+			// 42P10). With no DDL match at all the heuristic is also the
+			// only signal we have — this fires per table, once.
+			warnf("table %s: no primary key or unique constraint found in the parsed DDL — "+
+				"key-based statics fall back to the heuristic column %q; verify it is unique", qname, pkName)
+		}
 	}
 	// The single-row statics take the key value as a named parameter — the
 	// column's own name ("id" for the common case), keyword-sanitized.

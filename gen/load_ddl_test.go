@@ -441,3 +441,85 @@ CREATE VIEW active_users AS SELECT id FROM users;
 		t.Error("Enrich is not deterministic across runs")
 	}
 }
+
+func TestEnrichAlterTableKeys(t *testing.T) {
+	t.Run("alter add constraint primary key", func(t *testing.T) {
+		sch := ddlSchema()
+		runEnrich(t, &sch, `
+CREATE TABLE orders (id bigint, shop_id integer NOT NULL, sku text NOT NULL);
+ALTER TABLE orders ADD CONSTRAINT orders_pkey PRIMARY KEY (shop_id, id);`)
+		o := tableByName(t, &sch, "public", "orders")
+		if !reflect.DeepEqual(o.PrimaryKey, []string{"shop_id", "id"}) {
+			t.Errorf("PrimaryKey = %v, want [shop_id id]", o.PrimaryKey)
+		}
+	})
+	t.Run("alter add constraint unique", func(t *testing.T) {
+		sch := ddlSchema()
+		runEnrich(t, &sch, `
+CREATE TABLE docs (id uuid, title text NOT NULL);
+ALTER TABLE docs ADD CONSTRAINT docs_title_key UNIQUE (title);`)
+		d := tableByName(t, &sch, "public", "docs")
+		if !reflect.DeepEqual(d.Uniques, [][]string{{"title"}}) {
+			t.Errorf("Uniques = %v, want [[title]]", d.Uniques)
+		}
+	})
+	t.Run("inline pk wins over later alter pk", func(t *testing.T) {
+		sch := ddlSchema()
+		runEnrich(t, &sch, `
+CREATE TABLE users (id bigserial PRIMARY KEY, email text);
+ALTER TABLE users ADD CONSTRAINT users_email_pkey PRIMARY KEY (email);`)
+		u := tableByName(t, &sch, "public", "users")
+		if !reflect.DeepEqual(u.PrimaryKey, []string{"id"}) {
+			t.Errorf("PrimaryKey = %v, want [id] (first wins)", u.PrimaryKey)
+		}
+	})
+	t.Run("alter on unknown table is ignored", func(t *testing.T) {
+		sch := ddlSchema()
+		runEnrich(t, &sch, `ALTER TABLE absent_table ADD CONSTRAINT x PRIMARY KEY (id);`)
+		if got := len(sch.Tables); got != len(ddlSchema().Tables) {
+			t.Errorf("table count changed: %d", got)
+		}
+	})
+}
+
+// TestStaticsHeuristicWarning pins the stderr warning that fires when a
+// table's key-based statics are keyed on the id-column heuristic instead of
+// a DDL-declared primary key or unique constraint.
+func TestStaticsHeuristicWarning(t *testing.T) {
+	sch := ir.Schema{
+		DefaultSchema: "public",
+		Tables: []ir.Table{
+			{
+				Schema: "public",
+				Name:   "heuristic_only",
+				Columns: []ir.Column{
+					{Name: "id", PGType: "int8", NotNull: true},
+					{Name: "email", PGType: "text", NotNull: true},
+				},
+			},
+			{
+				Schema:     "public",
+				Name:       "declared_pk",
+				PrimaryKey: []string{"id"},
+				Columns: []ir.Column{
+					{Name: "id", PGType: "int8", NotNull: true},
+					{Name: "email", PGType: "text", NotNull: true},
+				},
+			},
+		},
+	}
+	log := captureStderr(t, func() {
+		if _, err := PassStatics(sch, Options{}, DirectiveSet{
+			Tables: map[string]Directives{}, Columns: map[string]Directives{},
+		}); err != nil {
+			t.Errorf("PassStatics: %v", err)
+		}
+	})
+	if !bytes.Contains([]byte(log), []byte("heuristic_only")) ||
+		!bytes.Contains([]byte(log), []byte("heuristic column")) {
+		t.Errorf("heuristic warning for heuristic_only missing; log = %q", log)
+	}
+	if bytes.Contains([]byte(log), []byte("declared_pk")) {
+		t.Errorf("declared_pk must not warn; log = %q", log)
+	}
+}

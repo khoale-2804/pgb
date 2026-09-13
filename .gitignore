@@ -3,7 +3,7 @@ node_modules/
 .mintlify/
 dist/
 .DS_Store
-gen/
+testdata/golden/gen/
 
 # pgb plugin build + integration test artifacts
 bin/

@@ -34,7 +34,7 @@ func (c CacheBlobKeyCol) Ne(v string) pgb.Expr {
 }
 
 func (c CacheBlobKeyCol) In(vs ...string) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c CacheBlobKeyCol) IsNull() pgb.Expr {
@@ -78,7 +78,7 @@ func (c CacheBlobValueCol) Ne(v []byte) pgb.Expr {
 }
 
 func (c CacheBlobValueCol) In(vs ...[]byte) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "bytea[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "bytea[]" + ")", Args: []any{vs}}
 }
 
 func (c CacheBlobValueCol) IsNull() pgb.Expr {
@@ -106,7 +106,7 @@ func (c CacheBlobExpiresAtCol) Ne(v pgtype.Timestamptz) pgb.Expr {
 }
 
 func (c CacheBlobExpiresAtCol) In(vs ...pgtype.Timestamptz) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "timestamptz[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "timestamptz[]" + ")", Args: []any{vs}}
 }
 
 func (c CacheBlobExpiresAtCol) IsNull() pgb.Expr {

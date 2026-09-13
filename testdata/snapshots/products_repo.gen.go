@@ -300,45 +300,6 @@ func InsertProduct(ctx context.Context, exec pgb.DBTX, p InsertProductParams) (P
 	return us[0], nil
 }
 
-const insertProductsSQL = "INSERT INTO public.products (sku, title, description, category, rating, price, in_stock, metadata, embedding, created_at) SELECT * FROM unnest($1::text[], $2::text[], $3::text[], $4::text[], $5::numeric[], $6::numeric[], $7::bool[], $8::jsonb[], $9::vector[], $10::timestamptz[]) RETURNING id, sku, title, description, category, rating, price, in_stock, metadata, embedding, created_at"
-
-// InsertProducts inserts a whole batch in one round trip via
-// unnest and returns every inserted row.
-func InsertProducts(ctx context.Context, exec pgb.DBTX, ps []InsertProductParams) ([]Product, error) {
-	if len(ps) == 0 {
-		return nil, nil
-	}
-	colSku := make([]string, len(ps))
-	colTitle := make([]string, len(ps))
-	colDescription := make([]string, len(ps))
-	colCategory := make([]string, len(ps))
-	colRating := make([]pgtype.Numeric, len(ps))
-	colPrice := make([]pgtype.Numeric, len(ps))
-	colInStock := make([]bool, len(ps))
-	colMetadata := make([][]byte, len(ps))
-	colEmbedding := make([]pgvector.Vector, len(ps))
-	colCreatedAt := make([]pgtype.Timestamptz, len(ps))
-	for i, p := range ps {
-		colSku[i] = p.Sku
-		colTitle[i] = p.Title
-		colDescription[i] = p.Description
-		colCategory[i] = p.Category
-		colRating[i] = p.Rating
-		colPrice[i] = p.Price
-		colInStock[i] = p.InStock
-		colMetadata[i] = p.Metadata
-		colEmbedding[i] = p.Embedding
-		colCreatedAt[i] = p.CreatedAt
-	}
-	args := make([]any, 0, 10*len(ps))
-	args = append(args, colSku, colTitle, colDescription, colCategory, colRating, colPrice, colInStock, colMetadata, colEmbedding, colCreatedAt)
-	rows, err := exec.Query(ctx, insertProductsSQL, args...)
-	if err != nil {
-		return nil, err
-	}
-	return pgx.CollectRows(rows, scanProduct)
-}
-
 // UpdateProduct applies the non-zero fields of s to one row and
 // returns the updated row; pgb.ErrNotFound when absent.
 func UpdateProduct(ctx context.Context, exec pgb.DBTX, id int64, s ProductSet) (Product, error) {

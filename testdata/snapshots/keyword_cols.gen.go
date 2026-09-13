@@ -34,7 +34,7 @@ func (c KeywordColIDCol) Ne(v int64) pgb.Expr {
 }
 
 func (c KeywordColIDCol) In(vs ...int64) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "bigserial[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "int8[]" + ")", Args: []any{vs}}
 }
 
 func (c KeywordColIDCol) IsNull() pgb.Expr {
@@ -85,7 +85,7 @@ func (c KeywordColTypeCol) Ne(v pgtype.Text) pgb.Expr {
 }
 
 func (c KeywordColTypeCol) In(vs ...pgtype.Text) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c KeywordColTypeCol) IsNull() pgb.Expr {
@@ -129,7 +129,7 @@ func (c KeywordColRangeCol) Ne(v pgtype.Int4) pgb.Expr {
 }
 
 func (c KeywordColRangeCol) In(vs ...pgtype.Int4) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int4[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "int4[]" + ")", Args: []any{vs}}
 }
 
 func (c KeywordColRangeCol) IsNull() pgb.Expr {
@@ -180,7 +180,7 @@ func (c KeywordColSelectCol) Ne(v pgtype.Text) pgb.Expr {
 }
 
 func (c KeywordColSelectCol) In(vs ...pgtype.Text) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c KeywordColSelectCol) IsNull() pgb.Expr {
@@ -224,7 +224,7 @@ func (c KeywordColClassCol) Ne(v pgtype.Text) pgb.Expr {
 }
 
 func (c KeywordColClassCol) In(vs ...pgtype.Text) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c KeywordColClassCol) IsNull() pgb.Expr {
@@ -268,7 +268,7 @@ func (c KeywordColInterfaceCol) Ne(v pgtype.Text) pgb.Expr {
 }
 
 func (c KeywordColInterfaceCol) In(vs ...pgtype.Text) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c KeywordColInterfaceCol) IsNull() pgb.Expr {
@@ -312,7 +312,7 @@ func (c KeywordColMapCol) Ne(v pgtype.Text) pgb.Expr {
 }
 
 func (c KeywordColMapCol) In(vs ...pgtype.Text) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c KeywordColMapCol) IsNull() pgb.Expr {
@@ -356,7 +356,7 @@ func (c KeywordColFuncCol) Ne(v pgtype.Text) pgb.Expr {
 }
 
 func (c KeywordColFuncCol) In(vs ...pgtype.Text) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c KeywordColFuncCol) IsNull() pgb.Expr {
@@ -400,7 +400,7 @@ func (c KeywordColReturnCol) Ne(v pgtype.Text) pgb.Expr {
 }
 
 func (c KeywordColReturnCol) In(vs ...pgtype.Text) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c KeywordColReturnCol) IsNull() pgb.Expr {
@@ -444,7 +444,7 @@ func (c KeywordColChanCol) Ne(v pgtype.Text) pgb.Expr {
 }
 
 func (c KeywordColChanCol) In(vs ...pgtype.Text) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c KeywordColChanCol) IsNull() pgb.Expr {

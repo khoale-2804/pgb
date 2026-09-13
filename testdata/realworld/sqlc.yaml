@@ -1,0 +1,23 @@
+version: '2'
+sql:
+  - engine: postgresql
+    schema: schema.sql
+    queries: query.sql
+    codegen:
+      - out: gen
+        plugin: pgb
+        options:
+          package: db
+          core: github.com/khoale-2804/pgb/core
+          target: "18"
+plugins:
+  - name: pgb
+    process:
+      cmd: "./pgb-plugin"
+# pgb generates CRUD + paradedb search statics from the schema alone; the
+# named queries in query.sql are the parse/analyze acceptance set (no
+# gen:go block — the pgb plugin replaces stock sqlc-gen-go output).
+# sqlc LookPaths the plugin cmd as one string (no `go run <pkg>` allowed)
+# and strips the child environment, so the cmd is the ./pgb-plugin wrapper,
+# which delegates to `go run` via the pgb module. Run sqlc from this
+# directory: `cd testdata/realworld && sqlc generate`.

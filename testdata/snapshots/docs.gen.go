@@ -34,7 +34,7 @@ func (c DocIDCol) Ne(v uuid.UUID) pgb.Expr {
 }
 
 func (c DocIDCol) In(vs ...uuid.UUID) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "uuid[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "uuid[]" + ")", Args: []any{vs}}
 }
 
 func (c DocIDCol) IsNull() pgb.Expr {
@@ -62,7 +62,7 @@ func (c DocTitleCol) Ne(v string) pgb.Expr {
 }
 
 func (c DocTitleCol) In(vs ...string) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c DocTitleCol) IsNull() pgb.Expr {
@@ -106,7 +106,7 @@ func (c DocBodyCol) Ne(v string) pgb.Expr {
 }
 
 func (c DocBodyCol) In(vs ...string) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c DocBodyCol) IsNull() pgb.Expr {

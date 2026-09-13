@@ -35,7 +35,7 @@ func (c ProductIDCol) Ne(v int64) pgb.Expr {
 }
 
 func (c ProductIDCol) In(vs ...int64) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "bigserial[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "int8[]" + ")", Args: []any{vs}}
 }
 
 func (c ProductIDCol) IsNull() pgb.Expr {
@@ -86,7 +86,7 @@ func (c ProductSkuCol) Ne(v string) pgb.Expr {
 }
 
 func (c ProductSkuCol) In(vs ...string) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c ProductSkuCol) IsNull() pgb.Expr {
@@ -130,7 +130,7 @@ func (c ProductTitleCol) Ne(v string) pgb.Expr {
 }
 
 func (c ProductTitleCol) In(vs ...string) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c ProductTitleCol) IsNull() pgb.Expr {
@@ -174,7 +174,7 @@ func (c ProductDescriptionCol) Ne(v string) pgb.Expr {
 }
 
 func (c ProductDescriptionCol) In(vs ...string) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c ProductDescriptionCol) IsNull() pgb.Expr {
@@ -218,7 +218,7 @@ func (c ProductCategoryCol) Ne(v string) pgb.Expr {
 }
 
 func (c ProductCategoryCol) In(vs ...string) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c ProductCategoryCol) IsNull() pgb.Expr {
@@ -262,7 +262,7 @@ func (c ProductRatingCol) Ne(v pgtype.Numeric) pgb.Expr {
 }
 
 func (c ProductRatingCol) In(vs ...pgtype.Numeric) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "numeric[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "numeric[]" + ")", Args: []any{vs}}
 }
 
 func (c ProductRatingCol) IsNull() pgb.Expr {
@@ -313,7 +313,7 @@ func (c ProductPriceCol) Ne(v pgtype.Numeric) pgb.Expr {
 }
 
 func (c ProductPriceCol) In(vs ...pgtype.Numeric) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "numeric[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "numeric[]" + ")", Args: []any{vs}}
 }
 
 func (c ProductPriceCol) IsNull() pgb.Expr {
@@ -364,7 +364,7 @@ func (c ProductInStockCol) Ne(v bool) pgb.Expr {
 }
 
 func (c ProductInStockCol) In(vs ...bool) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "bool[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "bool[]" + ")", Args: []any{vs}}
 }
 
 func (c ProductInStockCol) IsNull() pgb.Expr {
@@ -400,7 +400,7 @@ func (c ProductMetadataCol) NotNull() pgb.Expr {
 }
 
 func (c ProductMetadataCol) KeyEq(path string, v any) pgb.Expr {
-	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " ->> ?", Args: []any{path, v}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " ->> ? = ?", Args: []any{path, v}}
 }
 
 // Embedding returns the typed accessor for column embedding.
@@ -444,7 +444,7 @@ func (c ProductCreatedAtCol) Ne(v pgtype.Timestamptz) pgb.Expr {
 }
 
 func (c ProductCreatedAtCol) In(vs ...pgtype.Timestamptz) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "timestamptz[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "timestamptz[]" + ")", Args: []any{vs}}
 }
 
 func (c ProductCreatedAtCol) IsNull() pgb.Expr {

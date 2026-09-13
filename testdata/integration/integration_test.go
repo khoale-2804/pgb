@@ -307,27 +307,67 @@ func TestUserCRUD(t *testing.T) {
 	}
 }
 
-func TestProductBatchAndCount(t *testing.T) {
+// TestOrderItemsBatchAndCount exercises the unnest batch lane on order_items,
+// the fixture's only all-scalar insertable table: products (jsonb/vector) and
+// users (text[]/enum) correctly get no batch static — array-of-array columns
+// have no pgx codec (42804).
+func TestOrderItemsBatchAndCount(t *testing.T) {
 	pool := setup(t)
-	truncate(t, pool, "products")
+	truncate(t, pool, "users", "products", "orders", "order_items")
 
-	var params []db.InsertProductParams
-	for i := 0; i < 25; i++ {
-		params = append(params, newProductParams(t,
-			fmt.Sprintf("batch-%d", i),
-			fmt.Sprintf("Batch product %d", i),
-			"batch test product", "batch"))
+	u, err := db.InsertUser(context.Background(), pool, newUserParams(t, "buyer@example.com"))
+	if err != nil {
+		t.Fatalf("seed user: %v", err)
 	}
-	inserted, err := db.InsertProducts(context.Background(), pool, params)
+	// the composite PK (order_shop_id, order_id, product_id) forces distinct
+	// combos: 5 orders x 5 products = 25 batch rows
+	var products []db.Product
+	for i := 0; i < 5; i++ {
+		p, err := db.InsertProduct(context.Background(), pool, newProductParams(t,
+			fmt.Sprintf("batch-%d", i), fmt.Sprintf("Batch product %d", i), "batch test product", "batch"))
+		if err != nil {
+			t.Fatalf("seed product %d: %v", i, err)
+		}
+		products = append(products, p)
+	}
+	var orders []db.Order
+	for i := 0; i < 5; i++ {
+		o, err := db.InsertOrder(context.Background(), pool, db.InsertOrderParams{
+			ShopID:   1,
+			UserID:   u.ID,
+			Channel:  db.OrderChannelWeb,
+			Total:    num(t, "29.97"),
+			PlacedAt: tsnow(),
+		})
+		if err != nil {
+			t.Fatalf("seed order %d: %v", i, err)
+		}
+		orders = append(orders, o)
+	}
+
+	var params []db.InsertOrderItemParams
+	for _, o := range orders {
+		for _, p := range products {
+			params = append(params, db.InsertOrderItemParams{
+				OrderShopID: 1,
+				OrderID:     o.ID,
+				ProductID:   p.ID,
+				Quantity:    1,
+				UnitPrice:   num(t, "9.99"),
+				GiftWrap:    false,
+			})
+		}
+	}
+	inserted, err := db.InsertOrderItems(context.Background(), pool, params)
 	if err != nil || len(inserted) != 25 {
-		t.Fatalf("InsertProducts: %v (%d rows)", err, len(inserted))
+		t.Fatalf("InsertOrderItems: %v (%d rows)", err, len(inserted))
 	}
 
-	n, err := db.CountProducts(context.Background(), pool, db.ProductFilter{
-		Category: db.Opt("batch"),
+	n, err := db.CountOrderItems(context.Background(), pool, db.OrderItemFilter{
+		ProductID: db.Opt(products[0].ID),
 	})
-	if err != nil || n != 25 {
-		t.Fatalf("CountProducts: %v (%d)", err, n)
+	if err != nil || n != 5 {
+		t.Fatalf("CountOrderItems: %v (%d)", err, n)
 	}
 }
 
@@ -366,8 +406,11 @@ func TestSearch(t *testing.T) {
 	hat := newProductParams(t, "hat-1", "Sun Hat", "wide brim summer hat", "hats")
 	hat.Price = num(t, "19.00")
 	hat.InStock = false
-	if _, err := db.InsertProducts(context.Background(), pool, []db.InsertProductParams{shoe, hat}); err != nil {
-		t.Fatalf("InsertProducts: %v", err)
+	if _, err := db.InsertProduct(context.Background(), pool, shoe); err != nil {
+		t.Fatalf("InsertProduct shoe: %v", err)
+	}
+	if _, err := db.InsertProduct(context.Background(), pool, hat); err != nil {
+		t.Fatalf("InsertProduct hat: %v", err)
 	}
 
 	// BM25 search via the generated static: parse + score + snippet
@@ -453,5 +496,66 @@ func TestOrdersAndCompositeKeys(t *testing.T) {
 	})
 	if err != nil || n != 1 {
 		t.Fatalf("DeleteOrders: %v (%d)", err, n)
+	}
+}
+
+// countWhere wraps a builder Select carrying the given predicates in a
+// COUNT(*) subquery — every emitted predicate shape gets executed by the
+// real server, so broken SQL (not just broken Go) fails the suite.
+func countWhere(t *testing.T, pool *pgxpool.Pool, preds ...pgb.Expr) int64 {
+	t.Helper()
+	sql, args := db.Users.Select().Where(preds...).SQL()
+	var n int64
+	if err := pool.QueryRow(context.Background(),
+		"SELECT count(*) FROM ("+sql+") AS p", args...).Scan(&n); err != nil {
+		t.Fatalf("predicate query: %v\nSQL: %s", err, sql)
+	}
+	return n
+}
+
+// TestEmittedPredicateShapes executes the generated predicate methods against
+// pg_search 0.25.9: the Go-level snapshot tests pin Go shapes, only this test
+// pins that the SHAPES ARE VALID SQL.
+func TestEmittedPredicateShapes(t *testing.T) {
+	pool := setup(t)
+	truncate(t, pool, "users")
+
+	a := newUserParams(t, "a@example.com")
+	a.Metadata = []byte(`{"color":"red"}`)
+	a.Tags = []string{"vip", "beta"}
+	b := newUserParams(t, "b@example.com")
+	ua, err := db.InsertUser(context.Background(), pool, a)
+	if err != nil {
+		t.Fatalf("seed a: %v", err)
+	}
+	if _, err := db.InsertUser(context.Background(), pool, b); err != nil {
+		t.Fatalf("seed b: %v", err)
+	}
+
+	cases := []struct {
+		name string
+		pred pgb.Expr
+		want int64
+	}{
+		{"In text", db.Users.Email().In("a@example.com", "b@example.com", "c@example.com"), 2},
+		{"In int", db.Users.ID().In(ua.ID, 999999), 1},
+		{"Ne", db.Users.Email().Ne("a@example.com"), 1},
+		{"ILike", db.Users.Email().ILike("%@EXAMPLE.COM"), 2},
+		{"Like", db.Users.Email().Like("a@%"), 1},
+		{"Gt/Lte pair", db.Users.ID().Gt(0), 2},
+		{"IsNull", db.Users.Bio().IsNull(), 2},
+		{"NotNull", db.Users.Bio().NotNull(), 0},
+		{"KeyEq jsonb path", db.Users.Metadata().KeyEq("color", "red"), 1},
+		{"Contains array", db.Users.Tags().Contains([]string{"vip"}), 1},
+		{"Between", db.Users.CreatedAt().Between(
+			pgtype.Timestamptz{Time: time.Now().Add(-time.Hour), Valid: true},
+			pgtype.Timestamptz{Time: time.Now().Add(time.Hour), Valid: true}), 2},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := countWhere(t, pool, tc.pred); got != tc.want {
+				t.Fatalf("got %d rows, want %d", got, tc.want)
+			}
+		})
 	}
 }

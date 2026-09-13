@@ -34,7 +34,7 @@ func (c ShiftIDCol) Ne(v int64) pgb.Expr {
 }
 
 func (c ShiftIDCol) In(vs ...int64) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "bigserial[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "int8[]" + ")", Args: []any{vs}}
 }
 
 func (c ShiftIDCol) IsNull() pgb.Expr {
@@ -85,7 +85,7 @@ func (c ShiftEmployeeIDCol) Ne(v int32) pgb.Expr {
 }
 
 func (c ShiftEmployeeIDCol) In(vs ...int32) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int4[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "int4[]" + ")", Args: []any{vs}}
 }
 
 func (c ShiftEmployeeIDCol) IsNull() pgb.Expr {

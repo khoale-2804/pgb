@@ -166,33 +166,33 @@ func (c ProductDescriptionCol) Highlight() pgb.Expr {
 }
 
 // ProductMetadataColorCol carries the pg_search surface for the indexed JSON path
-// products.metadata->'color' (index alias json_color): the path is re-emitted exactly as indexed,
+// (products.metadata->'color')::pdb.literal('alias=json_color') (index alias json_color): the path is re-emitted exactly as indexed,
 // through pgb.Raw. No Boost composition (MatchB) or snippets on path
 // fields.
 type ProductMetadataColorCol struct{ pgb.Col }
 
 func (c ProductMetadataColorCol) Match(q string) pgb.Expr {
-	return pgb.Raw{SQL: "products.metadata->'color' ||| ?", Args: []any{q}}
+	return pgb.Raw{SQL: "(products.metadata->'color')::pdb.literal('alias=json_color') ||| ?", Args: []any{q}}
 }
 
 func (c ProductMetadataColorCol) MatchAll(q string) pgb.Expr {
-	return pgb.Raw{SQL: "products.metadata->'color' &&& ?", Args: []any{q}}
+	return pgb.Raw{SQL: "(products.metadata->'color')::pdb.literal('alias=json_color') &&& ?", Args: []any{q}}
 }
 
 func (c ProductMetadataColorCol) Exact(v any) pgb.Expr {
-	return pgb.Raw{SQL: "products.metadata->'color' === ?", Args: []any{v}}
+	return pgb.Raw{SQL: "(products.metadata->'color')::pdb.literal('alias=json_color') === ?", Args: []any{v}}
 }
 
 func (c ProductMetadataColorCol) ExactAny(vs []string) pgb.Expr {
-	return pgb.Raw{SQL: "products.metadata->'color' === ?::text[]", Args: []any{vs}}
+	return pgb.Raw{SQL: "(products.metadata->'color')::pdb.literal('alias=json_color') === ?::text[]", Args: []any{vs}}
 }
 
 func (c ProductMetadataColorCol) Regex(pattern string) pgb.Expr {
-	return pgb.Raw{SQL: "products.metadata->'color' @@@ pdb.regex(?)", Args: []any{pattern}}
+	return pgb.Raw{SQL: "(products.metadata->'color')::pdb.literal('alias=json_color') @@@ pdb.regex(?)", Args: []any{pattern}}
 }
 
 func (c ProductMetadataColorCol) Parse(q string) pgb.Expr {
-	return pgb.Raw{SQL: "products.metadata->'color' @@@ pdb.parse(?)", Args: []any{q}}
+	return pgb.Raw{SQL: "(products.metadata->'color')::pdb.literal('alias=json_color') @@@ pdb.parse(?)", Args: []any{q}}
 }
 
 func (c ProductRatingCol) Match(q string) pgb.Expr {
@@ -262,7 +262,7 @@ type ProductHit struct {
 }
 
 // ScanProducts scans one SearchProducts row positionally: every products column
-// in catalog order, then the spgb. Rows requested with a snippet
+// in catalog order, then the score. Rows requested with a snippet
 // projection carry one extra trailing column — SearchProducts scans those
 // rows itself.
 func ScanProducts(row pgx.CollectableRow) (ProductHit, error) {

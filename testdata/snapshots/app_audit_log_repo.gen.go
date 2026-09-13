@@ -203,33 +203,6 @@ func InsertAppAuditLog(ctx context.Context, exec pgb.DBTX, p InsertAppAuditLogPa
 	return us[0], nil
 }
 
-const insertAppAuditLogsSQL = "INSERT INTO app.audit_log (entity, entity_id, payload, at) SELECT * FROM unnest($1::text[], $2::int8[], $3::jsonb[], $4::timestamptz[]) RETURNING id, entity, entity_id, payload, at"
-
-// InsertAppAuditLogs inserts a whole batch in one round trip via
-// unnest and returns every inserted row.
-func InsertAppAuditLogs(ctx context.Context, exec pgb.DBTX, ps []InsertAppAuditLogParams) ([]AppAuditLog, error) {
-	if len(ps) == 0 {
-		return nil, nil
-	}
-	colEntity := make([]string, len(ps))
-	colEntityID := make([]int64, len(ps))
-	colPayload := make([][]byte, len(ps))
-	colAt := make([]pgtype.Timestamptz, len(ps))
-	for i, p := range ps {
-		colEntity[i] = p.Entity
-		colEntityID[i] = p.EntityID
-		colPayload[i] = p.Payload
-		colAt[i] = p.At
-	}
-	args := make([]any, 0, 4*len(ps))
-	args = append(args, colEntity, colEntityID, colPayload, colAt)
-	rows, err := exec.Query(ctx, insertAppAuditLogsSQL, args...)
-	if err != nil {
-		return nil, err
-	}
-	return pgx.CollectRows(rows, scanAppAuditLog)
-}
-
 // UpdateAppAuditLog applies the non-zero fields of s to one row and
 // returns the updated row; pgb.ErrNotFound when absent.
 func UpdateAppAuditLog(ctx context.Context, exec pgb.DBTX, id int64, s AppAuditLogSet) (AppAuditLog, error) {

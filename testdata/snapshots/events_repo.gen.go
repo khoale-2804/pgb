@@ -187,33 +187,6 @@ func InsertEvent(ctx context.Context, exec pgb.DBTX, p InsertEventParams) (Event
 	return us[0], nil
 }
 
-const insertEventsSQL = "INSERT INTO public.events (user_id, kind, payload, occurred_at) SELECT * FROM unnest($1::int8[], $2::text[], $3::jsonb[], $4::timestamptz[]) RETURNING id, user_id, kind, payload, occurred_at"
-
-// InsertEvents inserts a whole batch in one round trip via
-// unnest and returns every inserted row.
-func InsertEvents(ctx context.Context, exec pgb.DBTX, ps []InsertEventParams) ([]Event, error) {
-	if len(ps) == 0 {
-		return nil, nil
-	}
-	colUserID := make([]int64, len(ps))
-	colKind := make([]string, len(ps))
-	colPayload := make([][]byte, len(ps))
-	colOccurredAt := make([]pgtype.Timestamptz, len(ps))
-	for i, p := range ps {
-		colUserID[i] = p.UserID
-		colKind[i] = p.Kind
-		colPayload[i] = p.Payload
-		colOccurredAt[i] = p.OccurredAt
-	}
-	args := make([]any, 0, 4*len(ps))
-	args = append(args, colUserID, colKind, colPayload, colOccurredAt)
-	rows, err := exec.Query(ctx, insertEventsSQL, args...)
-	if err != nil {
-		return nil, err
-	}
-	return pgx.CollectRows(rows, scanEvent)
-}
-
 // UpdateEvents applies s to every row matching where and
 // returns the affected count; an empty where is refused with
 // pgb.ErrNoWhere before any SQL is sent.

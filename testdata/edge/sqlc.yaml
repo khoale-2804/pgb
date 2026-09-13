@@ -1,0 +1,21 @@
+version: '2'
+sql:
+  - engine: postgresql
+    schema: schema.sql
+    queries: queries.sql
+    codegen:
+      - out: gen
+        plugin: pgb
+        options:
+          package: edge
+          core: github.com/khoale-2804/pgb/core
+          target: "18"
+plugins:
+  - name: pgb
+    process:
+      cmd: "sqlc-gen-pgb"
+# sqlc resolves the plugin cmd as a single executable via PATH (no shell, no
+# `go run`), so first: make install-plugin (or make plugin + make
+# validate-plugin, which rewrites the cmd to the absolute bin/ path).
+# The golden fixture documents the same recipe in its Makefile
+# validate-plugin target and gen/integration_test.go.

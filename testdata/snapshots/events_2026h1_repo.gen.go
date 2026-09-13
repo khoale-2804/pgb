@@ -203,33 +203,6 @@ func InsertEventsV2026H1(ctx context.Context, exec pgb.DBTX, p InsertEventsV2026
 	return us[0], nil
 }
 
-const insertEventsV2026H1sSQL = "INSERT INTO public.events_2026h1 (user_id, kind, payload, occurred_at) SELECT * FROM unnest($1::int8[], $2::text[], $3::jsonb[], $4::timestamptz[]) RETURNING id, user_id, kind, payload, occurred_at"
-
-// InsertEventsV2026H1s inserts a whole batch in one round trip via
-// unnest and returns every inserted row.
-func InsertEventsV2026H1s(ctx context.Context, exec pgb.DBTX, ps []InsertEventsV2026H1Params) ([]EventsV2026H1, error) {
-	if len(ps) == 0 {
-		return nil, nil
-	}
-	colUserID := make([]int64, len(ps))
-	colKind := make([]string, len(ps))
-	colPayload := make([][]byte, len(ps))
-	colOccurredAt := make([]pgtype.Timestamptz, len(ps))
-	for i, p := range ps {
-		colUserID[i] = p.UserID
-		colKind[i] = p.Kind
-		colPayload[i] = p.Payload
-		colOccurredAt[i] = p.OccurredAt
-	}
-	args := make([]any, 0, 4*len(ps))
-	args = append(args, colUserID, colKind, colPayload, colOccurredAt)
-	rows, err := exec.Query(ctx, insertEventsV2026H1sSQL, args...)
-	if err != nil {
-		return nil, err
-	}
-	return pgx.CollectRows(rows, scanEventsV2026H1)
-}
-
 // UpdateEventsV2026H1 applies the non-zero fields of s to one row and
 // returns the updated row; pgb.ErrNotFound when absent.
 func UpdateEventsV2026H1(ctx context.Context, exec pgb.DBTX, id int64, s EventsV2026H1Set) (EventsV2026H1, error) {

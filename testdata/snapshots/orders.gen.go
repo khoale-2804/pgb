@@ -34,7 +34,7 @@ func (c OrderIDCol) Ne(v int64) pgb.Expr {
 }
 
 func (c OrderIDCol) In(vs ...int64) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int8[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "int8[]" + ")", Args: []any{vs}}
 }
 
 func (c OrderIDCol) IsNull() pgb.Expr {
@@ -85,7 +85,7 @@ func (c OrderShopIDCol) Ne(v int32) pgb.Expr {
 }
 
 func (c OrderShopIDCol) In(vs ...int32) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int4[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "int4[]" + ")", Args: []any{vs}}
 }
 
 func (c OrderShopIDCol) IsNull() pgb.Expr {
@@ -136,7 +136,7 @@ func (c OrderUserIDCol) Ne(v int64) pgb.Expr {
 }
 
 func (c OrderUserIDCol) In(vs ...int64) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int8[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "int8[]" + ")", Args: []any{vs}}
 }
 
 func (c OrderUserIDCol) IsNull() pgb.Expr {
@@ -211,7 +211,7 @@ func (c OrderTotalCol) Ne(v pgtype.Numeric) pgb.Expr {
 }
 
 func (c OrderTotalCol) In(vs ...pgtype.Numeric) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "numeric[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "numeric[]" + ")", Args: []any{vs}}
 }
 
 func (c OrderTotalCol) IsNull() pgb.Expr {
@@ -262,7 +262,7 @@ func (c OrderPlacedAtCol) Ne(v pgtype.Timestamptz) pgb.Expr {
 }
 
 func (c OrderPlacedAtCol) In(vs ...pgtype.Timestamptz) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "timestamptz[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "timestamptz[]" + ")", Args: []any{vs}}
 }
 
 func (c OrderPlacedAtCol) IsNull() pgb.Expr {
@@ -361,7 +361,7 @@ func (c OrderNotesCol) Ne(v pgtype.Text) pgb.Expr {
 }
 
 func (c OrderNotesCol) In(vs ...pgtype.Text) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c OrderNotesCol) IsNull() pgb.Expr {

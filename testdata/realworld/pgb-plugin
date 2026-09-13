@@ -1,0 +1,28 @@
+#!/bin/sh
+# sqlc process-plugin wrapper for the pgb code generator.
+#
+# sqlc 1.31 resolves the plugin `cmd` with exec.LookPath on the whole string
+# (no shell word splitting) and executes the child with a stripped
+# environment (only SQLC_VERSION). A bare `go run <pkg>` therefore cannot be
+# the cmd: it is not an executable, and the stripped env hides `go`, HOME,
+# and the module cache. This wrapper restores the minimum the go toolchain
+# needs and delegates via `go run`, so no prebuilt plugin binary is required.
+#
+# sqlc resolves `./pgb-plugin` relative to its own working directory — run
+# sqlc from this directory:
+#
+#     cd testdata/realworld && sqlc generate
+
+# PATH is unset in the sqlc child; sh falls back to /bin:/usr/bin, which
+# carries id/getent but not necessarily the go toolchain.
+PATH="${PATH:+$PATH:}/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin"
+export PATH
+
+# HOME is also stripped; recover it from the passwd database so GOCACHE and
+# GOMODCACHE land in their usual per-user locations.
+if [ -z "${HOME:-}" ]; then
+  HOME="$(getent passwd "$(id -u)" | cut -d: -f6)"
+  export HOME
+fi
+
+exec go run github.com/khoale-2804/pgb/cmd/sqlc-gen-pgb "$@"

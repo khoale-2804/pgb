@@ -218,7 +218,14 @@ func pathWrapperName(base string, f ir.SearchField, taken map[string]bool) strin
 // available on path fields.
 func emitPathSearch(b *strings.Builder, t ir.Table, f ir.SearchField, base string, taken map[string]bool) {
 	colType := pathWrapperName(base, f, taken)
-	qualified := core.QuoteIdent(t.Name) + "." + f.Path
+	qualified := core.QuoteIdent(t.Name) + "." + core.QuoteIdent(f.Column) + strings.TrimPrefix(f.Path, f.Column)
+	// Aliased index fields resolve ONLY through their literal cast — a bare
+	// path errors "field ... is not part of the pg_search index" (verified
+	// on pg_search 0.25.9), so the predicate re-emits the cast too.
+	if f.Alias != "" {
+		qualified = "(" + qualified + ")::pdb.literal('alias=" +
+			strings.ReplaceAll(f.Alias, "'", "''") + "')"
+	}
 	if f.Alias != "" {
 		fmt.Fprintf(b, "// %s carries the pg_search surface for the indexed JSON path\n// %s (index alias %s): the path is re-emitted exactly as indexed,\n// through pgb.Raw. No Boost composition (MatchB) or snippets on path\n// fields.\n", colType, qualified, f.Alias)
 	} else {
@@ -250,7 +257,7 @@ func emitSearchStatic(b *strings.Builder, t ir.Table, tableVar, model, tableType
 	fmt.Fprintf(b, "// %sHit is one Search%s result row: the full model, the BM25 score,\n// and the snippet fragment (populated only when Search%sOpts.SnippetCol\n// selected one, NULL/zero otherwise).\n", model, tableVar, tableVar)
 	fmt.Fprintf(b, "type %sHit struct {\n\tProduct %s\n\tScore   float64\n\tSnippet pgtype.Text\n}\n\n", model, model)
 
-	fmt.Fprintf(b, "// Scan%s scans one Search%s row positionally: every %s column\n// in catalog order, then the spgb. Rows requested with a snippet\n// projection carry one extra trailing column — Search%s scans those\n// rows itself.\n", tableVar, tableVar, t.Name, tableVar)
+	fmt.Fprintf(b, "// Scan%s scans one Search%s row positionally: every %s column\n// in catalog order, then the score. Rows requested with a snippet\n// projection carry one extra trailing column — Search%s scans those\n// rows itself.\n", tableVar, tableVar, t.Name, tableVar)
 	fmt.Fprintf(b, "func Scan%s(row pgx.CollectableRow) (%sHit, error) {\n\tvar h %sHit\n\tvar p %s\n", tableVar, model, model, model)
 	dests := make([]string, 0, len(t.Columns)+1)
 	for _, n := range names {

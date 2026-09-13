@@ -34,7 +34,7 @@ func (c AppUserIDCol) Ne(v int64) pgb.Expr {
 }
 
 func (c AppUserIDCol) In(vs ...int64) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "bigserial[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "int8[]" + ")", Args: []any{vs}}
 }
 
 func (c AppUserIDCol) IsNull() pgb.Expr {
@@ -85,7 +85,7 @@ func (c AppUserLoginCol) Ne(v string) pgb.Expr {
 }
 
 func (c AppUserLoginCol) In(vs ...string) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c AppUserLoginCol) IsNull() pgb.Expr {
@@ -129,7 +129,7 @@ func (c AppUserPersonIDCol) Ne(v pgtype.Int8) pgb.Expr {
 }
 
 func (c AppUserPersonIDCol) In(vs ...pgtype.Int8) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int8[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "int8[]" + ")", Args: []any{vs}}
 }
 
 func (c AppUserPersonIDCol) IsNull() pgb.Expr {
@@ -180,7 +180,7 @@ func (c AppUserDisplayCol) Ne(v pgtype.Text) pgb.Expr {
 }
 
 func (c AppUserDisplayCol) In(vs ...pgtype.Text) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c AppUserDisplayCol) IsNull() pgb.Expr {

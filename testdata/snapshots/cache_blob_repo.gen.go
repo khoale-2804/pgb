@@ -156,31 +156,6 @@ func InsertCacheBlob(ctx context.Context, exec pgb.DBTX, p InsertCacheBlobParams
 	return us[0], nil
 }
 
-const insertCacheBlobsSQL = "INSERT INTO public.cache_blob (key, value, expires_at) SELECT * FROM unnest($1::text[], $2::bytea[], $3::timestamptz[]) RETURNING key, value, expires_at"
-
-// InsertCacheBlobs inserts a whole batch in one round trip via
-// unnest and returns every inserted row.
-func InsertCacheBlobs(ctx context.Context, exec pgb.DBTX, ps []InsertCacheBlobParams) ([]CacheBlob, error) {
-	if len(ps) == 0 {
-		return nil, nil
-	}
-	colKey := make([]string, len(ps))
-	colValue := make([][]byte, len(ps))
-	colExpiresAt := make([]pgtype.Timestamptz, len(ps))
-	for i, p := range ps {
-		colKey[i] = p.Key
-		colValue[i] = p.Value
-		colExpiresAt[i] = p.ExpiresAt
-	}
-	args := make([]any, 0, 3*len(ps))
-	args = append(args, colKey, colValue, colExpiresAt)
-	rows, err := exec.Query(ctx, insertCacheBlobsSQL, args...)
-	if err != nil {
-		return nil, err
-	}
-	return pgx.CollectRows(rows, scanCacheBlob)
-}
-
 // UpdateCacheBlob applies the non-zero fields of s to one row and
 // returns the updated row; pgb.ErrNotFound when absent.
 func UpdateCacheBlob(ctx context.Context, exec pgb.DBTX, key string, s CacheBlobSet) (CacheBlob, error) {

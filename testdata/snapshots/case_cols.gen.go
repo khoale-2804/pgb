@@ -34,7 +34,7 @@ func (c CaseColIDCol) Ne(v int64) pgb.Expr {
 }
 
 func (c CaseColIDCol) In(vs ...int64) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "bigserial[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "int8[]" + ")", Args: []any{vs}}
 }
 
 func (c CaseColIDCol) IsNull() pgb.Expr {
@@ -85,7 +85,7 @@ func (c CaseColEmailCol) Ne(v pgtype.Text) pgb.Expr {
 }
 
 func (c CaseColEmailCol) In(vs ...pgtype.Text) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c CaseColEmailCol) IsNull() pgb.Expr {
@@ -129,7 +129,7 @@ func (c CaseColMixedcaseCol) Ne(v pgtype.Int4) pgb.Expr {
 }
 
 func (c CaseColMixedcaseCol) In(vs ...pgtype.Int4) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int4[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "int4[]" + ")", Args: []any{vs}}
 }
 
 func (c CaseColMixedcaseCol) IsNull() pgb.Expr {
@@ -180,7 +180,7 @@ func (c CaseColCafCol) Ne(v pgtype.Text) pgb.Expr {
 }
 
 func (c CaseColCafCol) In(vs ...pgtype.Text) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c CaseColCafCol) IsNull() pgb.Expr {
@@ -224,7 +224,7 @@ func (c CaseColPlainColCol) Ne(v pgtype.Text) pgb.Expr {
 }
 
 func (c CaseColPlainColCol) In(vs ...pgtype.Text) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c CaseColPlainColCol) IsNull() pgb.Expr {

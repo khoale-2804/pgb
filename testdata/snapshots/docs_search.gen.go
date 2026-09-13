@@ -180,7 +180,7 @@ type DocHit struct {
 }
 
 // ScanDocs scans one SearchDocs row positionally: every docs column
-// in catalog order, then the spgb. Rows requested with a snippet
+// in catalog order, then the score. Rows requested with a snippet
 // projection carry one extra trailing column — SearchDocs scans those
 // rows itself.
 func ScanDocs(row pgx.CollectableRow) (DocHit, error) {

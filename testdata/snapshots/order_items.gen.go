@@ -34,7 +34,7 @@ func (c OrderItemOrderShopIDCol) Ne(v int32) pgb.Expr {
 }
 
 func (c OrderItemOrderShopIDCol) In(vs ...int32) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int4[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "int4[]" + ")", Args: []any{vs}}
 }
 
 func (c OrderItemOrderShopIDCol) IsNull() pgb.Expr {
@@ -85,7 +85,7 @@ func (c OrderItemOrderIDCol) Ne(v int64) pgb.Expr {
 }
 
 func (c OrderItemOrderIDCol) In(vs ...int64) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int8[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "int8[]" + ")", Args: []any{vs}}
 }
 
 func (c OrderItemOrderIDCol) IsNull() pgb.Expr {
@@ -136,7 +136,7 @@ func (c OrderItemProductIDCol) Ne(v int64) pgb.Expr {
 }
 
 func (c OrderItemProductIDCol) In(vs ...int64) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int8[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "int8[]" + ")", Args: []any{vs}}
 }
 
 func (c OrderItemProductIDCol) IsNull() pgb.Expr {
@@ -187,7 +187,7 @@ func (c OrderItemQuantityCol) Ne(v int32) pgb.Expr {
 }
 
 func (c OrderItemQuantityCol) In(vs ...int32) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int4[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "int4[]" + ")", Args: []any{vs}}
 }
 
 func (c OrderItemQuantityCol) IsNull() pgb.Expr {
@@ -238,7 +238,7 @@ func (c OrderItemUnitPriceCol) Ne(v pgtype.Numeric) pgb.Expr {
 }
 
 func (c OrderItemUnitPriceCol) In(vs ...pgtype.Numeric) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "numeric[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "numeric[]" + ")", Args: []any{vs}}
 }
 
 func (c OrderItemUnitPriceCol) IsNull() pgb.Expr {
@@ -289,7 +289,7 @@ func (c OrderItemGiftWrapCol) Ne(v bool) pgb.Expr {
 }
 
 func (c OrderItemGiftWrapCol) In(vs ...bool) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "bool[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "bool[]" + ")", Args: []any{vs}}
 }
 
 func (c OrderItemGiftWrapCol) IsNull() pgb.Expr {

@@ -437,7 +437,11 @@ func staticsFile(sch ir.Schema, t ir.Table, opts Options, dir DirectiveSet) ([]b
 		batchable := true
 		for _, pc := range params {
 			typ, _ := resolveColType(t, t.Columns[pc.idx], opts, dir)
-			if typ == "any" || opts.Enums[strings.ToLower(t.Columns[pc.idx].PGType)] != "" {
+			// Slice Go types are array-bearing columns (text[], jsonb,
+			// bytea -> []byte): the unnest lane would need an array of
+			// arrays, which pgx cannot encode (42804).
+			if typ == "any" || strings.HasPrefix(typ, "[]") ||
+				opts.Enums[strings.ToLower(t.Columns[pc.idx].PGType)] != "" {
 				batchable = false
 				break
 			}

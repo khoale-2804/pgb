@@ -57,8 +57,8 @@ func (c Call) emit(e *emitter) {
 		}
 		a.emit(e)
 	}
-	for _, n := range c.Named {
-		if len(c.Args) > 0 || len(c.Named) > 0 {
+	for i, n := range c.Named {
+		if len(c.Args) > 0 || i > 0 {
 			e.str(", ")
 		}
 		e.str(n.Name + " => ")

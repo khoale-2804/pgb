@@ -34,7 +34,7 @@ func (c ActiveUserIDCol) Ne(v int64) pgb.Expr {
 }
 
 func (c ActiveUserIDCol) In(vs ...int64) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "bigserial[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "int8[]" + ")", Args: []any{vs}}
 }
 
 func (c ActiveUserIDCol) IsNull() pgb.Expr {
@@ -85,7 +85,7 @@ func (c ActiveUserEmailCol) Ne(v string) pgb.Expr {
 }
 
 func (c ActiveUserEmailCol) In(vs ...string) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c ActiveUserEmailCol) IsNull() pgb.Expr {
@@ -129,7 +129,7 @@ func (c ActiveUserNameCol) Ne(v string) pgb.Expr {
 }
 
 func (c ActiveUserNameCol) In(vs ...string) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c ActiveUserNameCol) IsNull() pgb.Expr {
@@ -173,7 +173,7 @@ func (c ActiveUserCreatedAtCol) Ne(v pgtype.Timestamptz) pgb.Expr {
 }
 
 func (c ActiveUserCreatedAtCol) In(vs ...pgtype.Timestamptz) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "timestamptz[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "timestamptz[]" + ")", Args: []any{vs}}
 }
 
 func (c ActiveUserCreatedAtCol) IsNull() pgb.Expr {

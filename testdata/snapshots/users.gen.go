@@ -37,7 +37,7 @@ func (c UserIDCol) Ne(v int64) pgb.Expr {
 }
 
 func (c UserIDCol) In(vs ...int64) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "bigserial[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "int8[]" + ")", Args: []any{vs}}
 }
 
 func (c UserIDCol) IsNull() pgb.Expr {
@@ -88,7 +88,7 @@ func (c UserEmailCol) Ne(v string) pgb.Expr {
 }
 
 func (c UserEmailCol) In(vs ...string) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c UserEmailCol) IsNull() pgb.Expr {
@@ -140,7 +140,7 @@ func (c UserNameCol) Ne(v string) pgb.Expr {
 }
 
 func (c UserNameCol) In(vs ...string) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c UserNameCol) IsNull() pgb.Expr {
@@ -184,7 +184,7 @@ func (c UserBioCol) Ne(v pgtype.Text) pgb.Expr {
 }
 
 func (c UserBioCol) In(vs ...pgtype.Text) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c UserBioCol) IsNull() pgb.Expr {
@@ -228,7 +228,7 @@ func (c UserAgeCol) Ne(v pgtype.Int2) pgb.Expr {
 }
 
 func (c UserAgeCol) In(vs ...pgtype.Int2) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int2[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "int2[]" + ")", Args: []any{vs}}
 }
 
 func (c UserAgeCol) IsNull() pgb.Expr {
@@ -279,7 +279,7 @@ func (c UserBalanceCol) Ne(v pgtype.Numeric) pgb.Expr {
 }
 
 func (c UserBalanceCol) In(vs ...pgtype.Numeric) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "numeric[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "numeric[]" + ")", Args: []any{vs}}
 }
 
 func (c UserBalanceCol) IsNull() pgb.Expr {
@@ -330,7 +330,7 @@ func (c UserRatingCol) Ne(v pgtype.Float4) pgb.Expr {
 }
 
 func (c UserRatingCol) In(vs ...pgtype.Float4) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "float4[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "float4[]" + ")", Args: []any{vs}}
 }
 
 func (c UserRatingCol) IsNull() pgb.Expr {
@@ -381,7 +381,7 @@ func (c UserScoreCol) Ne(v float64) pgb.Expr {
 }
 
 func (c UserScoreCol) In(vs ...float64) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "float8[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "float8[]" + ")", Args: []any{vs}}
 }
 
 func (c UserScoreCol) IsNull() pgb.Expr {
@@ -432,7 +432,7 @@ func (c UserIsActiveCol) Ne(v bool) pgb.Expr {
 }
 
 func (c UserIsActiveCol) In(vs ...bool) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "bool[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "bool[]" + ")", Args: []any{vs}}
 }
 
 func (c UserIsActiveCol) IsNull() pgb.Expr {
@@ -460,7 +460,7 @@ func (c UserCreatedAtCol) Ne(v pgtype.Timestamptz) pgb.Expr {
 }
 
 func (c UserCreatedAtCol) In(vs ...pgtype.Timestamptz) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "timestamptz[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "timestamptz[]" + ")", Args: []any{vs}}
 }
 
 func (c UserCreatedAtCol) IsNull() pgb.Expr {
@@ -511,7 +511,7 @@ func (c UserUpdatedAtCol) Ne(v pgtype.Timestamptz) pgb.Expr {
 }
 
 func (c UserUpdatedAtCol) In(vs ...pgtype.Timestamptz) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "timestamptz[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "timestamptz[]" + ")", Args: []any{vs}}
 }
 
 func (c UserUpdatedAtCol) IsNull() pgb.Expr {
@@ -562,7 +562,7 @@ func (c UserBirthDateCol) Ne(v pgtype.Date) pgb.Expr {
 }
 
 func (c UserBirthDateCol) In(vs ...pgtype.Date) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "date[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "date[]" + ")", Args: []any{vs}}
 }
 
 func (c UserBirthDateCol) IsNull() pgb.Expr {
@@ -613,7 +613,7 @@ func (c UserLastSeenCol) Ne(v pgtype.Time) pgb.Expr {
 }
 
 func (c UserLastSeenCol) In(vs ...pgtype.Time) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "timetz[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "timetz[]" + ")", Args: []any{vs}}
 }
 
 func (c UserLastSeenCol) IsNull() pgb.Expr {
@@ -664,7 +664,7 @@ func (c UserAvatarCol) Ne(v []byte) pgb.Expr {
 }
 
 func (c UserAvatarCol) In(vs ...[]byte) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "bytea[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "bytea[]" + ")", Args: []any{vs}}
 }
 
 func (c UserAvatarCol) IsNull() pgb.Expr {
@@ -700,7 +700,7 @@ func (c UserMetadataCol) NotNull() pgb.Expr {
 }
 
 func (c UserMetadataCol) KeyEq(path string, v any) pgb.Expr {
-	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " ->> ?", Args: []any{path, v}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " ->> ? = ?", Args: []any{path, v}}
 }
 
 // Settings returns the typed accessor for column settings.
@@ -728,7 +728,7 @@ func (c UserSettingsCol) NotNull() pgb.Expr {
 }
 
 func (c UserSettingsCol) KeyEq(path string, v any) pgb.Expr {
-	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " ->> ?", Args: []any{path, v}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " ->> ? = ?", Args: []any{path, v}}
 }
 
 // Homepage returns the typed accessor for column homepage.
@@ -748,7 +748,7 @@ func (c UserHomepageCol) Ne(v netip.Prefix) pgb.Expr {
 }
 
 func (c UserHomepageCol) In(vs ...netip.Prefix) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "inet[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "inet[]" + ")", Args: []any{vs}}
 }
 
 func (c UserHomepageCol) IsNull() pgb.Expr {
@@ -776,7 +776,7 @@ func (c UserLanCol) Ne(v netip.Prefix) pgb.Expr {
 }
 
 func (c UserLanCol) In(vs ...netip.Prefix) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "cidr[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "cidr[]" + ")", Args: []any{vs}}
 }
 
 func (c UserLanCol) IsNull() pgb.Expr {
@@ -804,7 +804,7 @@ func (c UserMacCol) Ne(v net.HardwareAddr) pgb.Expr {
 }
 
 func (c UserMacCol) In(vs ...net.HardwareAddr) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "macaddr[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "macaddr[]" + ")", Args: []any{vs}}
 }
 
 func (c UserMacCol) IsNull() pgb.Expr {
@@ -832,7 +832,7 @@ func (c UserMac8Col) Ne(v net.HardwareAddr) pgb.Expr {
 }
 
 func (c UserMac8Col) In(vs ...net.HardwareAddr) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "macaddr8[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "macaddr8[]" + ")", Args: []any{vs}}
 }
 
 func (c UserMac8Col) IsNull() pgb.Expr {
@@ -1208,7 +1208,7 @@ func (c UserXMLDocCol) Ne(v pgtype.Text) pgb.Expr {
 }
 
 func (c UserXMLDocCol) In(vs ...pgtype.Text) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c UserXMLDocCol) IsNull() pgb.Expr {
@@ -1324,7 +1324,7 @@ func (c UserCashCol) Ne(v pgtype.Numeric) pgb.Expr {
 }
 
 func (c UserCashCol) In(vs ...pgtype.Numeric) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "money[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "money[]" + ")", Args: []any{vs}}
 }
 
 func (c UserCashCol) IsNull() pgb.Expr {
@@ -1471,7 +1471,7 @@ func (c UserUUIDColCol) Ne(v uuid.UUID) pgb.Expr {
 }
 
 func (c UserUUIDColCol) In(vs ...uuid.UUID) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "uuid[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "uuid[]" + ")", Args: []any{vs}}
 }
 
 func (c UserUUIDColCol) IsNull() pgb.Expr {
@@ -1499,7 +1499,7 @@ func (c UserLoginCiCol) Ne(v string) pgb.Expr {
 }
 
 func (c UserLoginCiCol) In(vs ...string) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c UserLoginCiCol) IsNull() pgb.Expr {
@@ -1543,7 +1543,7 @@ func (c UserCollateColCol) Ne(v pgtype.Text) pgb.Expr {
 }
 
 func (c UserCollateColCol) In(vs ...pgtype.Text) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c UserCollateColCol) IsNull() pgb.Expr {
@@ -1587,7 +1587,7 @@ func (c UserSearchSlugCol) Ne(v pgtype.Text) pgb.Expr {
 }
 
 func (c UserSearchSlugCol) In(vs ...pgtype.Text) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c UserSearchSlugCol) IsNull() pgb.Expr {
@@ -1631,7 +1631,7 @@ func (c UserNameUpperCol) Ne(v pgtype.Text) pgb.Expr {
 }
 
 func (c UserNameUpperCol) In(vs ...pgtype.Text) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c UserNameUpperCol) IsNull() pgb.Expr {
@@ -1675,7 +1675,7 @@ func (c UserDeletedAtCol) Ne(v pgtype.Timestamptz) pgb.Expr {
 }
 
 func (c UserDeletedAtCol) In(vs ...pgtype.Timestamptz) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "timestamptz[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "timestamptz[]" + ")", Args: []any{vs}}
 }
 
 func (c UserDeletedAtCol) IsNull() pgb.Expr {
@@ -1726,7 +1726,7 @@ func (c UserVeryLongColumnIdentifierExactlySixtyThreeCharactersInLCol) Ne(v pgty
 }
 
 func (c UserVeryLongColumnIdentifierExactlySixtyThreeCharactersInLCol) In(vs ...pgtype.Text) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c UserVeryLongColumnIdentifierExactlySixtyThreeCharactersInLCol) IsNull() pgb.Expr {

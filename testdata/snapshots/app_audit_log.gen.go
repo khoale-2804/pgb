@@ -34,7 +34,7 @@ func (c AppAuditLogIDCol) Ne(v int64) pgb.Expr {
 }
 
 func (c AppAuditLogIDCol) In(vs ...int64) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "bigserial[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "int8[]" + ")", Args: []any{vs}}
 }
 
 func (c AppAuditLogIDCol) IsNull() pgb.Expr {
@@ -85,7 +85,7 @@ func (c AppAuditLogEntityCol) Ne(v string) pgb.Expr {
 }
 
 func (c AppAuditLogEntityCol) In(vs ...string) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c AppAuditLogEntityCol) IsNull() pgb.Expr {
@@ -129,7 +129,7 @@ func (c AppAuditLogEntityIDCol) Ne(v int64) pgb.Expr {
 }
 
 func (c AppAuditLogEntityIDCol) In(vs ...int64) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int8[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "int8[]" + ")", Args: []any{vs}}
 }
 
 func (c AppAuditLogEntityIDCol) IsNull() pgb.Expr {
@@ -188,7 +188,7 @@ func (c AppAuditLogPayloadCol) NotNull() pgb.Expr {
 }
 
 func (c AppAuditLogPayloadCol) KeyEq(path string, v any) pgb.Expr {
-	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " ->> ?", Args: []any{path, v}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " ->> ? = ?", Args: []any{path, v}}
 }
 
 // At returns the typed accessor for column at.
@@ -208,7 +208,7 @@ func (c AppAuditLogAtCol) Ne(v pgtype.Timestamptz) pgb.Expr {
 }
 
 func (c AppAuditLogAtCol) In(vs ...pgtype.Timestamptz) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "timestamptz[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "timestamptz[]" + ")", Args: []any{vs}}
 }
 
 func (c AppAuditLogAtCol) IsNull() pgb.Expr {

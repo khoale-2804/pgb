@@ -34,7 +34,7 @@ func (c CategoryIDCol) Ne(v int64) pgb.Expr {
 }
 
 func (c CategoryIDCol) In(vs ...int64) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "bigserial[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "int8[]" + ")", Args: []any{vs}}
 }
 
 func (c CategoryIDCol) IsNull() pgb.Expr {
@@ -85,7 +85,7 @@ func (c CategoryNameCol) Ne(v string) pgb.Expr {
 }
 
 func (c CategoryNameCol) In(vs ...string) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c CategoryNameCol) IsNull() pgb.Expr {
@@ -129,7 +129,7 @@ func (c CategoryParentIDCol) Ne(v pgtype.Int8) pgb.Expr {
 }
 
 func (c CategoryParentIDCol) In(vs ...pgtype.Int8) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int8[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "int8[]" + ")", Args: []any{vs}}
 }
 
 func (c CategoryParentIDCol) IsNull() pgb.Expr {

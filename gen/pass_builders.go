@@ -252,9 +252,18 @@ func litCast(c ir.Column, opts Options) string {
 
 // inCast is the array cast for "= ANY" parameters. Text-family columns use
 // text[] (varchar/citext compare against text natively); everything else
-// uses its own base type.
+// uses its own base type. Serial pseudo-types have no array form and cast
+// to their underlying integer instead ("bigserial[]" does not exist).
 func inCast(c ir.Column, opts Options) string {
 	base := strings.ToLower(c.PGType)
+	switch base {
+	case "smallserial":
+		base = "int2"
+	case "serial":
+		base = "int4"
+	case "bigserial":
+		base = "int8"
+	}
 	if textTypes[base] {
 		return "text[]"
 	}
@@ -386,8 +395,10 @@ func emitPredicates(b *strings.Builder, colType string, c ir.Column, goType stri
 		bin("Ne", "!=", "v "+goType, lit("v"))
 	}
 	if caps.in {
-		bin("In", "= ANY", "vs ..."+goType,
-			"pgb.Lit{V: vs, Cast: "+strconv.Quote(inCast(c, opts))+"}")
+		// Raw, not Bin: Postgres needs the parenthesized form
+		// "col = ANY($1::cast[])" — Bin would render "= ANY $1" (42601).
+		fmt.Fprintf(b, "func (c %[1]s) In(vs ...%[2]s) pgb.Expr {\n\treturn pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + \" = ANY(?::\" + %[3]s + \")\", Args: []any{vs}}\n}\n\n",
+			colType, goType, strconv.Quote(inCast(c, opts)))
 	}
 	// IsNull/NotNull exist on every column, value or not.
 	fmt.Fprintf(b, "func (c %[1]s) IsNull() pgb.Expr {\n\treturn pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + \" IS NULL\"}\n}\n\n", colType)
@@ -408,7 +419,7 @@ func emitPredicates(b *strings.Builder, colType string, c ir.Column, goType stri
 		bin("NotILike", "NOT ILIKE", "p string", "pgb.Lit{V: p}")
 	}
 	if caps.json {
-		fmt.Fprintf(b, "func (c %[1]s) KeyEq(path string, v any) pgb.Expr {\n\treturn pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + \" ->> ?\", Args: []any{path, v}}\n}\n\n", colType)
+		fmt.Fprintf(b, "func (c %[1]s) KeyEq(path string, v any) pgb.Expr {\n\treturn pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + \" ->> ? = ?\", Args: []any{path, v}}\n}\n\n", colType)
 	}
 	if caps.contains {
 		bin("Contains", "@>", "v "+goType, lit("v"))

@@ -232,9 +232,10 @@ func (s *Select) emit(e *emitter) {
 			if i > 0 {
 				e.str(", ")
 			}
-			if o.E != nil {
-				o.E.emit(e)
+			if o.E == nil {
+				continue
 			}
+			o.E.emit(e)
 			if o.Desc {
 				e.str(" DESC")
 			} else {

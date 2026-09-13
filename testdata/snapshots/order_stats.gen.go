@@ -33,7 +33,7 @@ func (c OrderStatUserIDCol) Ne(v int64) pgb.Expr {
 }
 
 func (c OrderStatUserIDCol) In(vs ...int64) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int8[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "int8[]" + ")", Args: []any{vs}}
 }
 
 func (c OrderStatUserIDCol) IsNull() pgb.Expr {
@@ -84,7 +84,7 @@ func (c OrderStatOrderCountCol) Ne(v int64) pgb.Expr {
 }
 
 func (c OrderStatOrderCountCol) In(vs ...int64) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "bigint[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "bigint[]" + ")", Args: []any{vs}}
 }
 
 func (c OrderStatOrderCountCol) IsNull() pgb.Expr {
@@ -135,7 +135,7 @@ func (c OrderStatLifetimeValueCol) Ne(v int64) pgb.Expr {
 }
 
 func (c OrderStatLifetimeValueCol) In(vs ...int64) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "bigint[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "bigint[]" + ")", Args: []any{vs}}
 }
 
 func (c OrderStatLifetimeValueCol) IsNull() pgb.Expr {

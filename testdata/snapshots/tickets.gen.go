@@ -34,7 +34,7 @@ func (c TicketIDCol) Ne(v int64) pgb.Expr {
 }
 
 func (c TicketIDCol) In(vs ...int64) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "bigserial[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "int8[]" + ")", Args: []any{vs}}
 }
 
 func (c TicketIDCol) IsNull() pgb.Expr {
@@ -85,7 +85,7 @@ func (c TicketNumberCol) Ne(v int64) pgb.Expr {
 }
 
 func (c TicketNumberCol) In(vs ...int64) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "int8[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "int8[]" + ")", Args: []any{vs}}
 }
 
 func (c TicketNumberCol) IsNull() pgb.Expr {
@@ -136,7 +136,7 @@ func (c TicketSubjectCol) Ne(v string) pgb.Expr {
 }
 
 func (c TicketSubjectCol) In(vs ...string) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c TicketSubjectCol) IsNull() pgb.Expr {
@@ -180,7 +180,7 @@ func (c TicketPriorityCol) Ne(v string) pgb.Expr {
 }
 
 func (c TicketPriorityCol) In(vs ...string) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c TicketPriorityCol) IsNull() pgb.Expr {
@@ -224,7 +224,7 @@ func (c TicketStatusCol) Ne(v string) pgb.Expr {
 }
 
 func (c TicketStatusCol) In(vs ...string) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "text[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "text[]" + ")", Args: []any{vs}}
 }
 
 func (c TicketStatusCol) IsNull() pgb.Expr {
@@ -268,7 +268,7 @@ func (c TicketCreatedAtCol) Ne(v pgtype.Timestamptz) pgb.Expr {
 }
 
 func (c TicketCreatedAtCol) In(vs ...pgtype.Timestamptz) pgb.Expr {
-	return pgb.Bin{Op: "= ANY", L: c.Col, R: pgb.Lit{V: vs, Cast: "timestamptz[]"}}
+	return pgb.Raw{SQL: pgb.QuoteIdent(c.Col.Table, c.Col.Name) + " = ANY(?::" + "timestamptz[]" + ")", Args: []any{vs}}
 }
 
 func (c TicketCreatedAtCol) IsNull() pgb.Expr {

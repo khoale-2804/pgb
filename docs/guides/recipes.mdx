@@ -1,0 +1,608 @@
+---
+title: "Recipes"
+description: "Complete patterns for soft delete, multi-tenancy, cache warming, hybrid search, audit columns, reports, admin tables, and bulk upserts."
+icon: "kitchen-set"
+---
+
+Each recipe is a problem statement plus the complete code and the SQL it emits. Everything runs against the generated `db` package and the [runtime core](/reference/core-api) — no new abstractions, just composition of statics, builders, and handwritten queries.
+
+The running schemas are the [users and orders tables](/generated-code/builders) plus three small additions:
+
+```sql
+CREATE TABLE products (
+    id          bigint PRIMARY KEY,
+    sku         text NOT NULL,
+    title       text NOT NULL,
+    description text NOT NULL,
+    metadata    jsonb NOT NULL,
+    rating      numeric(3,2),
+    in_stock    boolean NOT NULL DEFAULT true
+);
+
+CREATE TABLE tickets (
+    id          bigserial PRIMARY KEY,
+    external_id text        NOT NULL UNIQUE,
+    subject     text        NOT NULL,
+    priority    text        NOT NULL DEFAULT 'normal',
+    status      text        NOT NULL DEFAULT 'open',
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    updated_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE inventory (
+    sku          text PRIMARY KEY,
+    warehouse_id int8 NOT NULL,
+    on_hand      int8 NOT NULL,
+    reserved     int8,
+    restock_at   timestamptz
+);
+```
+
+## Soft delete
+
+**Problem:** rows disappear from the app but stay in the database for audit and recovery. A `deleted_at` timestamp turns `DELETE` into a scoped `UPDATE`.
+
+```sql
+ALTER TABLE users ADD COLUMN deleted_at timestamptz;
+```
+
+Regenerate and the column joins every layer: a `DeletedAt()` descriptor method, predicates, and a `DeletedAt` field on `UserSet`. Deletion is an update that sets it; every read adds an `IS NULL` guard.
+
+<CodeGroup>
+
+```go
+// delete — an UPDATE, not a DELETE
+func SoftDeleteUser(ctx context.Context, exec pgb.DBTX, id int64) error {
+    _, err := db.Users.Update().
+        Set(db.UserSet{DeletedAt: pgb.Set(pgtype.Timestamptz{Time: time.Now(), Valid: true})}).
+        Where(db.Users.ID().Eq(id), db.Users.DeletedAt().IsNull()).
+        Exec(ctx, exec)
+    return err
+}
+```
+
+```sql
+UPDATE public.users
+SET deleted_at = $1
+WHERE id = $2 AND deleted_at IS NULL
+```
+
+```go
+// restore — write the column back to NULL
+func RestoreUser(ctx context.Context, exec pgb.DBTX, id int64) error {
+    _, err := db.Users.Update().
+        Set(db.UserSet{DeletedAt: pgb.Null[pgtype.Timestamptz]()}).
+        Where(db.Users.ID().Eq(id)).
+        Exec(ctx, exec)
+    return err
+}
+```
+
+```sql
+UPDATE public.users
+SET deleted_at = NULL
+WHERE id = $1
+```
+
+```go
+// scoped reads — the guard rides along as an ordinary predicate
+func ListLiveUsers(ctx context.Context, exec pgb.DBTX) ([]db.User, error) {
+    return db.ListUsers(ctx, exec, db.UserFilter{
+        Extra: []core.Expr{db.Users.DeletedAt().IsNull()},
+    }, pgb.Limit(100))
+}
+```
+
+```sql
+SELECT id, email, name, bio, metadata, tags, created_at, last_login_at, deleted_at
+FROM public.users
+WHERE deleted_at IS NULL
+LIMIT $1
+```
+
+</CodeGroup>
+
+The `IS NULL` guard composes everywhere a predicate does — `Where`, `UserFilter.Extra`, `UpdateUsers` where-slices — so "live rows only" is one expression reused, not a convention to remember.
+
+The generated guard still applies to the soft path. A where-slice that is accidentally empty is refused, not fired:
+
+```go
+_, err := db.UpdateUsers(ctx, pool, nil, db.UserSet{
+    DeletedAt: pgb.Set(pgtype.Timestamptz{Time: time.Now(), Valid: true}),
+})
+if errors.Is(err, pgb.ErrNoWhere) {
+    // refused before any SQL was sent — no WHERE, no mass "deletion"
+}
+```
+
+<Warning>
+`db.DeleteUser` and `db.Users.Delete()` still emit a real `DELETE`. Soft delete is a policy, and pgb does not hide the hard path from you — which is what makes GDPR-style erasure a one-liner when a row genuinely must go.
+</Warning>
+
+## Multi-tenant isolation
+
+**Problem:** every row belongs to a `tenant_id`, and every query must say so. The orders table carries `UNIQUE (tenant_id, id)`, which doubles as the composite keyset key.
+
+```go
+// the tenant term is built once, by a function that takes the tenant ID —
+// not by call sites that might forget it
+func tenantScope(tenantID int64, preds ...core.Expr) []core.Expr {
+    return append([]core.Expr{db.Orders.TenantID().Eq(tenantID)}, preds...)
+}
+```
+
+<CodeGroup>
+
+```go
+// paginated listing — the composite key serves the keyset directly
+func ListTenantOrders(ctx context.Context, pool *pgxpool.Pool, tenantID int64, prev string) ([]db.Order, string, bool, error) {
+    return db.Orders.Select().
+        Where(db.Orders.TenantID().Eq(tenantID)).
+        OrderBy(db.Orders.TenantID().Asc(), db.Orders.ID().Asc()).
+        Page(ctx, pool, pgb.CursorOf(prev), 100)
+}
+```
+
+```sql
+-- first page (prev == "": no keyset predicate)
+SELECT id, tenant_id, user_id, status, total, placed_at
+FROM public.orders
+WHERE tenant_id = $1
+ORDER BY tenant_id ASC, id ASC
+LIMIT $2
+
+-- next page
+SELECT id, tenant_id, user_id, status, total, placed_at
+FROM public.orders
+WHERE tenant_id = $1
+  AND (tenant_id, id) > ($2, $3)
+ORDER BY tenant_id ASC, id ASC
+LIMIT $4
+```
+
+```go
+// statics take the tenant term through the filter or the where slice
+func PurgeAbandoned(ctx context.Context, pool *pgxpool.Pool, tenantID int64, cutoff time.Time) (int64, error) {
+    return db.DeleteOrders(ctx, pool, tenantScope(tenantID,
+        db.Orders.Status().Eq("abandoned"),
+        db.Orders.PlacedAt().Lt(cutoff),
+    ))
+}
+```
+
+```sql
+DELETE FROM public.orders
+WHERE tenant_id = $1 AND status = $2 AND placed_at < $3
+```
+
+</CodeGroup>
+
+<Warning>
+`pgb.ErrNoWhere` catches an *empty* where-slice. It cannot catch a slice that has predicates but is missing the tenant term — that query is perfectly valid SQL against the wrong rows. The `tenantScope` helper exists precisely because the tenant predicate should come from one function that receives the tenant ID, never from the call site's good intentions. The same discipline applies to `UserFilter`/`OrderFilter`: always set `TenantID`, or compose the scope into `Extra`.
+</Warning>
+
+## Upsert-with-returning cache warming
+
+**Problem:** a hot listing path reads a small projection of upstream catalog data. Keep it in a local cache table and warm it from the upstream feed — and get the final state of every row back, inserted or updated.
+
+```sql
+CREATE TABLE product_summaries (
+    sku         text        PRIMARY KEY,
+    title       text        NOT NULL,
+    price_cents int8        NOT NULL,
+    warmed_at   timestamptz NOT NULL DEFAULT now()
+);
+```
+
+```go
+type CatalogUpdate struct {
+    SKU        string
+    Title      string
+    PriceCents int64
+}
+
+func WarmSummaries(ctx context.Context, pool *pgxpool.Pool, feed []CatalogUpdate) error {
+    for _, u := range feed {
+        _, err := db.UpsertProductSummary(ctx, pool, db.InsertProductSummaryParams{
+            SKU:        u.SKU,
+            Title:      u.Title,
+            PriceCents: u.PriceCents,
+        }, db.UpsertOpts{
+            Target: []string{"sku"},
+            Action: db.DoUpdate(db.ProductSummarySet{
+                Title:      pgb.Set(u.Title),
+                PriceCents: pgb.Set(u.PriceCents),
+                WarmedAt:   pgb.Set(pgtype.Timestamptz{Time: time.Now(), Valid: true}),
+            }),
+        })
+        if err != nil {
+            return err
+        }
+    }
+    return nil
+}
+```
+
+```sql
+INSERT INTO public.product_summaries (sku, title, price_cents)
+VALUES ($1, $2, $3)
+ON CONFLICT (sku) DO UPDATE
+SET title = EXCLUDED.title, price_cents = EXCLUDED.price_cents, warmed_at = EXCLUDED.warmed_at
+WHERE product_summaries.title IS DISTINCT FROM EXCLUDED.title
+   OR product_summaries.price_cents IS DISTINCT FROM EXCLUDED.price_cents
+   OR product_summaries.warmed_at IS DISTINCT FROM EXCLUDED.warmed_at
+RETURNING sku, title, price_cents, warmed_at
+```
+
+The `RETURNING` row is the final state in both branches: a fresh insert returns the new row, a conflict returns the updated one. A cache view rebuilt from returned rows is always coherent, with no second `SELECT` to confirm what happened.
+
+<Tip>
+The generated `WHERE` on the `DO UPDATE` skips no-op writes. `WarmedAt` changes every call, so the guard never fires on this table — every conflict rewrites. If re-warming an unchanged feed should stay free, drop `WarmedAt` from the action and let the timestamp mean "last real change" instead of "last sync".
+</Tip>
+
+<Warning>
+`db.DoNothing{}` is the wrong action for warming: on conflict nothing is returned and the generated `UpsertProductSummary` reports `pgb.ErrNotFound`. `UpsertOpts.OnSelect: true` (`ON CONFLICT ... DO SELECT`) returns the conflicting row instead of updating it, but is gated behind `target: "19"` — it must be re-verified at PG19 GA, and refuses to generate against a PG18 server.
+</Warning>
+
+For large feeds, see [bulk upsert](#bulk-upsert-with-three-state-patches) below — the loop here is one round trip per row, which is exactly right for warming and exactly wrong for a million-row import.
+
+## Full-text with a trigram fallback
+
+**Problem:** BM25 relevance for real queries, but users also type two-letter fragments. Tokenizers split text into words — a two-character prefix matches nothing useful. Pair the `paradedb` index with a `pg_trgm` index and route by query shape.
+
+```sql
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+CREATE INDEX products_search ON products USING paradedb
+  (id, description::pdb.icu)
+  WITH (key_field='id');
+
+CREATE INDEX products_description_trgm ON products
+  USING gin (description gin_trgm_ops);
+```
+
+Neither index knows the other exists. The planner picks per query: a `|||` predicate activates the [ParadeDB custom scan](/paradedb/architecture), an `ILIKE` predicate uses the trigram index. pgb's two emission paths mirror that split.
+
+<CodeGroup>
+
+```go
+func SearchProducts(ctx context.Context, pool *pgxpool.Pool, q string, limit int) ([]db.ProductHit, error) {
+    // short fragments: trigram path — ILIKE, no relevance order
+    if runes := utf8.RuneCountInString(strings.TrimSpace(q)); runes <= 3 {
+        rows, err := db.Products.Select().
+            Where(db.Products.Description().ILike("%" + q + "%")).
+            OrderBy(db.Products.ID().Asc()).
+            Limit(limit).
+            All(ctx, pool)
+        if err != nil {
+            return nil, err
+        }
+        hits := make([]db.ProductHit, len(rows))
+        for i, r := range rows {
+            hits[i] = db.ProductHit{ID: r.ID, Title: r.Title, Score: 0}
+        }
+        return hits, nil
+    }
+    // real queries: BM25 path — the generated search layer
+    return db.SearchProducts(ctx, pool, db.Products.Description().Match(q), limit)
+}
+```
+
+```sql
+-- short query — trigram index serves this
+SELECT id, sku, title, description, metadata, rating, in_stock
+FROM public.products
+WHERE description ILIKE $1
+ORDER BY id ASC
+LIMIT $2
+
+-- real query — ParadeDB custom scan, Top-K pushdown
+SELECT id, title, pdb.score(id) AS score
+FROM public.products
+WHERE description ||| $1
+ORDER BY pdb.score(id) DESC, id ASC
+LIMIT $2
+```
+
+</CodeGroup>
+
+<Note>
+The `%` wildcards live inside the bound parameter, not the SQL text — the emitter has no string-building escape hatch for values. The trigram index is maintained by ordinary Postgres on the same column the ParadeDB index covers; both update in the same transaction, so the two paths can never disagree about what exists.
+</Note>
+
+For a product UI, the trigram path usually feeds an autocomplete box (order by `id`, freshness irrelevant) while the BM25 path feeds the results page with [score-ordered pagination](/generated-code/pagination).
+
+## Audit columns via defaults and ON CONFLICT
+
+**Problem:** every write should stamp `created_at` / `updated_at`, and nothing should have to remember it. Defaults cover inserts; the upsert action covers the conflict path.
+
+The tickets table declares both columns with `DEFAULT now()`. The generated `INSERT` omits any column with a default, so the insert path needs no audit code at all — the params struct simply has no `CreatedAt`/`UpdatedAt` fields:
+
+```go
+t, err := db.InsertTicket(ctx, pool, db.InsertTicketParams{
+    ExternalID: "zd-4821",
+    Subject:    "Login loop on Safari 17",
+    Priority:   "high",
+})
+fmt.Println(t.CreatedAt.Time, t.UpdatedAt.Time) // both stamped by the server
+```
+
+```sql
+INSERT INTO public.tickets (external_id, subject, priority)
+VALUES ($1, $2, $3)
+RETURNING id, external_id, subject, priority, status, created_at, updated_at
+```
+
+Updates are one `Set` field away. A tiny helper keeps every mutation honest:
+
+```go
+func stamp() core.Set[pgtype.Timestamptz] {
+    return pgb.Set(pgtype.Timestamptz{Time: time.Now(), Valid: true})
+}
+
+func CloseTicket(ctx context.Context, pool *pgxpool.Pool, id int64) (db.Ticket, error) {
+    updated, err := db.Tickets.Update().
+        Set(db.TicketSet{Status: pgb.Set("closed"), UpdatedAt: stamp()}).
+        Where(db.Tickets.ID().Eq(id)).
+        Returning().
+        All(ctx, pool)
+    if err != nil {
+        return db.Ticket{}, err
+    }
+    if len(updated) == 0 {
+        return db.Ticket{}, pgb.ErrNotFound
+    }
+    return updated[0], nil
+}
+```
+
+```sql
+UPDATE public.tickets
+SET status = $1, updated_at = $2
+WHERE id = $3
+RETURNING id, external_id, subject, priority, status, created_at, updated_at
+```
+
+The sync path — tickets arrive from an external system, keyed by `external_id` — is where `ON CONFLICT` must stamp too:
+
+```go
+t, err := db.UpsertTicket(ctx, pool, db.InsertTicketParams{
+    ExternalID: "zd-4821",
+    Subject:    "Login loop on Safari 17",
+    Priority:   "high",
+}, db.UpsertOpts{
+    Target: []string{"external_id"},
+    Action: db.DoUpdate(db.TicketSet{
+        Subject:   pgb.Set("Login loop on Safari 17"),
+        Priority:  pgb.Set("high"),
+        Status:    pgb.Set("open"),
+        UpdatedAt: stamp(),
+    }),
+})
+```
+
+```sql
+INSERT INTO public.tickets (external_id, subject, priority)
+VALUES ($1, $2, $3)
+ON CONFLICT (external_id) DO UPDATE
+SET subject = EXCLUDED.subject, priority = EXCLUDED.priority,
+    status = EXCLUDED.status, updated_at = EXCLUDED.updated_at
+WHERE tickets.subject IS DISTINCT FROM EXCLUDED.subject
+   OR tickets.priority IS DISTINCT FROM EXCLUDED.priority
+   OR tickets.status IS DISTINCT FROM EXCLUDED.status
+   OR tickets.updated_at IS DISTINCT FROM EXCLUDED.updated_at
+RETURNING id, external_id, subject, priority, status, created_at, updated_at
+```
+
+<Note>
+Including `updated_at` in the action defeats the no-op guard — the timestamp always differs, so every conflict rewrites. If an unchanged re-sync should be free on this table, keep `UpdatedAt` out of the action and manage the stamp with a `BEFORE UPDATE` trigger instead. Defaults plus generated sets cover the overwhelming majority of tables without any trigger.
+</Note>
+
+## Window-function report next to generated statics
+
+**Problem:** "the three most recent orders per customer" — a window function, which builders deliberately do not model. Keep it in `queries.sql`; pgb emits a typed wrapper that coexists with the statics.
+
+```sql
+-- name: CustomerRecentOrders :many
+WITH ranked AS (
+    SELECT id, user_id, placed_at,
+           row_number() OVER (PARTITION BY user_id ORDER BY placed_at DESC) AS recency_rank
+    FROM orders
+    WHERE tenant_id = $1
+)
+SELECT id, user_id, placed_at, recency_rank
+FROM ranked
+WHERE recency_rank <= $2
+ORDER BY user_id ASC, recency_rank ASC;
+```
+
+sqlc resolves the query; pass A emits the Row struct and wrapper. Call sites are indistinguishable from statics — same `exec pgb.DBTX` parameter, same explicit scans:
+
+```go
+// generated in db/orders.sql.gen.go
+type CustomerRecentOrdersRow struct {
+    ID          int64
+    UserID      int64
+    PlacedAt    pgtype.Timestamptz
+    RecencyRank int64
+}
+
+func CustomerRecentOrders(ctx context.Context, exec pgb.DBTX, tenantID int64, topN int32) ([]CustomerRecentOrdersRow, error)
+```
+
+Because both layers take the same executor, one report mixes them freely:
+
+```go
+func TenantDigest(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (string, error) {
+    n, err := db.CountOrders(ctx, pool, db.OrderFilter{TenantID: pgb.Opt(tenantID)})
+    if err != nil {
+        return "", err
+    }
+    top, err := db.CustomerRecentOrders(ctx, pool, tenantID, 3)
+    if err != nil {
+        return "", err
+    }
+    var b strings.Builder
+    fmt.Fprintf(&b, "%d orders. Latest per customer:\n", n)
+    for _, r := range top {
+        fmt.Fprintf(&b, "  user %d — order %d, %s\n", r.UserID, r.ID, r.PlacedAt.Time.Format("2006-01-02"))
+    }
+    return b.String(), nil
+}
+```
+
+```sql
+-- the wrapper's statement is exactly what you wrote; sqlc analyzed it,
+-- pgb only wrapped and typed it
+WITH ranked AS (
+    SELECT id, user_id, placed_at,
+           row_number() OVER (PARTITION BY user_id ORDER BY placed_at DESC) AS recency_rank
+    FROM orders
+    WHERE tenant_id = $1
+)
+SELECT id, user_id, placed_at, recency_rank
+FROM ranked
+WHERE recency_rank <= $2
+ORDER BY user_id ASC, recency_rank ASC
+```
+
+<Tip>
+The lane rule from [handwritten queries](/guides/handwritten-queries) applies per statement: window functions, CTE chains, and percentile reports go to `queries.sql`; anything a filter struct or builder can say stays generated. Both compile to the same executor interface, so a report and its CRUD can even share a transaction — pass `tx` to both.
+</Tip>
+
+## Cursor-paginated admin table with filters
+
+**Problem:** an admin listing with optional filters, stable under concurrent inserts, with no `OFFSET` and no giant `COUNT(*)` on every page.
+
+```go
+type AdminUserQuery struct {
+    EmailLike string // "" = no filter; caller supplies wildcards, e.g. "%@corp.io"
+    Tag       string // "" = no filter
+    Prev      string // cursor token; "" on the first page
+}
+
+func AdminUsers(ctx context.Context, pool *pgxpool.Pool, q AdminUserQuery) ([]db.User, string, bool, error) {
+    preds := []core.Expr{}
+    if q.EmailLike != "" {
+        preds = append(preds, db.Users.Email().Like(q.EmailLike))
+    }
+    if q.Tag != "" {
+        preds = append(preds, db.Users.Tags().Contains([]string{q.Tag}))
+    }
+    return db.Users.Select().
+        Where(preds...).
+        OrderBy(db.Users.ID().Desc()).
+        Page(ctx, pool, pgb.CursorOf(q.Prev), 50)
+}
+```
+
+```sql
+-- first page, both filters active
+SELECT id, email, name, bio, metadata, tags, created_at, last_login_at, deleted_at
+FROM public.users
+WHERE email LIKE $1 AND tags @> $2::text[]
+ORDER BY id DESC
+LIMIT $3
+
+-- next page — the cursor's last id extends the same predicate list
+SELECT id, email, name, bio, metadata, tags, created_at, last_login_at, deleted_at
+FROM public.users
+WHERE email LIKE $1 AND tags @> $2::text[] AND id < $3
+ORDER BY id DESC
+LIMIT $4
+```
+
+Three details make this pattern hold up in production:
+
+| detail | why |
+|---|---|
+| `Where(preds...)` with zero predicates emits no WHERE at all | an empty `And{}` is a zero value the emitter skips — no `TRUE` filler, no degenerate plans |
+| `OrderBy(ID().Desc())` sorts by the primary key | the keyset predicate is a single indexed comparison, and new rows landing at the front never shift page boundaries |
+| no `COUNT(*)` alongside the query | the header shows "newest 50" and a Next button driven by `more`; a total would cost a second scan per page for a number admins rarely trust anyway |
+
+Sort-direction toggles change the cursor's sort key. Old tokens fail closed with `pgb.ErrCursorMismatch` — catch it and restart from page one:
+
+```go
+users, next, more, err := AdminUsers(ctx, pool, q)
+if errors.Is(err, pgb.ErrCursorMismatch) {
+    q.Prev = "" // the client mixed sort keys — restart cleanly
+    users, next, more, err = AdminUsers(ctx, pool, q)
+}
+```
+
+## Bulk upsert with three-state patches
+
+**Problem:** warehouse exports arrive as a slice of deltas. Some fields update, some clear to NULL, some are absent — per row. Pointers-on-pointers model this badly; the generated three-state sets model it exactly.
+
+```go
+// the patch reuses the generated set type: pgb.Set writes a value,
+// pgb.Null clears, the zero value skips the column entirely
+type StockDelta struct {
+    SKU         string
+    WarehouseID int64
+    OnHand      core.Set[int64]
+    Reserved    core.Set[int64]
+    RestockAt   core.Set[pgtype.Timestamptz]
+}
+
+func ApplyStockDeltas(ctx context.Context, pool *pgxpool.Pool, deltas []StockDelta) error {
+    return pgb.WithTx(ctx, pool, func(tx pgb.DBTX) error {
+        for _, d := range deltas {
+            var action db.InventorySet
+            if d.OnHand.Defined {
+                action.OnHand = d.OnHand
+            }
+            if d.Reserved.Defined {
+                action.Reserved = d.Reserved
+            }
+            if d.RestockAt.Defined {
+                action.RestockAt = d.RestockAt
+            }
+            _, err := db.UpsertInventory(ctx, tx, db.InsertInventoryParams{
+                SKU:          d.SKU,
+                WarehouseID:  d.WarehouseID,
+                OnHand:       d.OnHand.V,
+            }, db.UpsertOpts{
+                Target: []string{"sku"},
+                Action: db.DoUpdate(action),
+            })
+            if err != nil {
+                return err // the whole export rolls back — deltas are not applied halfway
+            }
+        }
+        return nil
+    })
+}
+```
+
+```sql
+-- one statement per delta, shaped by that delta's patch —
+-- here: set on_hand, clear reserved, leave restock_at alone
+INSERT INTO public.inventory (sku, warehouse_id, on_hand, reserved, restock_at)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (sku) DO UPDATE
+SET on_hand = EXCLUDED.on_hand, reserved = NULL
+WHERE inventory.on_hand IS DISTINCT FROM EXCLUDED.on_hand
+   OR inventory.reserved IS DISTINCT FROM EXCLUDED.reserved
+RETURNING sku, warehouse_id, on_hand, reserved, restock_at
+```
+
+The asymmetry between the two branches is worth knowing precisely:
+
+| branch | how patch semantics apply |
+|---|---|
+| conflict (`DO UPDATE`) | exactly the patch: `Set` writes, `Null` clears, an undefined field is absent from the `SET` list |
+| fresh insert | the params carry plain values; an absent optional field binds as NULL — the sane default for a row that did not exist |
+
+<Note>
+One round trip per row is deliberate here: each row's `SET` list differs, so the statements genuinely differ. When the patch is *uniform* — same fields for every row — collapse to one statement instead: `db.UpdateInventories(ctx, pool, where, set)` updates every matching row in a single round trip, and `db.InsertInventories` bulk-inserts new rows via `unnest`. Pick per situation: differing patches → loop in a transaction; uniform patch → `UpdateXxx`; no conflicts expected → batch insert.
+</Note>
+
+## Where to go next
+
+| need | page |
+|---|---|
+| the `pgb.ErrNoWhere`, `ErrNotFound`, `ErrCursorMismatch` contracts | [runtime core API](/reference/core-api) |
+| keyset pagination internals, composite and `(score, id)` cursors | [pagination](/generated-code/pagination) |
+| `:batchexec` and `:copyfrom` for bulk paths | [handwritten queries](/guides/handwritten-queries) |
+| golden tests that pin all of the above | [testing](/guides/testing) |

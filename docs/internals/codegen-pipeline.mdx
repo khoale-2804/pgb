@@ -1,0 +1,188 @@
+---
+title: "Codegen pipeline"
+description: "Inside the pgb plugin — SchemaIR, the oliphant re-parse, the three codegen passes, file layout, golden tests, and the plugin hook points."
+icon: "diagram-project"
+---
+
+pgb is a sqlc process plugin (`sqlc-gen-pgb`). `sqlc generate` parses and resolves everything it can, hands the result to the plugin over the standard protobuf protocol, and the plugin runs **three passes over one [SchemaIR](/architecture/schema-ir)** to emit the single `db/` package. Parsing and codegen meet only through the IR — which is why the [standalone mode](#the-plugin-hook-points) falls out almost for free.
+
+## The pipeline at a glance
+
+```
+schema.sql + queries.sql + sqlc.yaml
+        │
+        ▼
+sqlc: parse + analyze (catalog, resolved queries)
+        │  GenerateRequest (protobuf, stdin)
+        ▼
+┌─ pgb plugin ─────────────────────────────────────────────┐
+│  0. build SchemaIR                                       │
+│       proto catalog  +  oliphant re-parse of the DDL     │
+│       (+ plugin IR enrichment: Table.Extensions[...])    │
+│  1. pass A — models + handwritten-query wrappers         │
+│  2. pass B — descriptors + predicates + builders         │
+│       (+ plugin method weaves, merged before writing)    │
+│  3. pass C — statics + search layer                      │
+│       (+ plugin static registrations, extra files)       │
+└───────────────────────────────────────────────────────────┘
+        │  GenerateResponse (files on stdout)
+        ▼
+   db/*.gen.go — one package, one type map
+```
+
+The fork relationship is deliberate: **one plugin replaces `gen: go:`**. The plugin protocol hands pgb the same catalog and resolved queries sqlc-gen-go gets, so pass A is a fork of sqlc-gen-go (MIT) for models and query emission — which is what guarantees one type map across the whole package.
+
+## What the request contains — and what it drops
+
+The protobuf `GenerateRequest` carries:
+
+| contents | shape |
+|---|---|
+| catalog | schemas, tables, columns, types, enums — domains already resolved, type overrides already applied |
+| resolved queries | your `queries.sql` with params and result columns **already computed by sqlc's analyzer** |
+| options | the `sqlc.yaml` `options:` block (`package`, `core`, `emit.*`, `paradedb.*`) |
+
+What it does **not** carry: an AST of your queries. sqlc analyzed them; the plugin never re-parses handwritten SQL — that is precisely why pass A can be a fork of sqlc-gen-go and produce the same shapes.
+
+It also drops parts of your schema entirely. The proto catalog has no trace of:
+
+- `CREATE INDEX` — including every `USING paradedb` definition (the search schema, gone)
+- `COMMENT ON` statements — which carry pgb's [directives](/architecture/schema-ir#directives)
+- the `STORED`/`VIRTUAL` kind of generated columns (PG18 virtual is the default kind)
+- default expressions and `UNIQUE ... WITHOUT OVERLAPS` temporal constraints
+
+## The oliphant re-parse
+
+The plugin therefore re-reads your schema files with `sqlc-dev/oliphant` — the pure-Go libpg_query-18 binding sqlc itself uses on main. Same parser, same grammar, no drift. It lifts exactly the facts the proto drops into the IR:
+
+| dropped by the proto | recovered by oliphant | lands in the IR as |
+|---|---|---|
+| `CREATE INDEX ... USING paradedb` | fields, tokenizer casts, JSON paths, `key_field`, `WITH` options | `Table.Search *SearchIndex` |
+| `COMMENT ON TABLE / COLUMN` | the directive strings | `Table.Comment`, `Column.Comment` |
+| generated-column kind | `GENERATED ALWAYS AS ... (STORED\|VIRTUAL)` | `Column.Generated` |
+| default expressions | the default's SQL text | `Column.DefaultExpr` |
+| `UNIQUE (...) WITHOUT OVERLAPS` | the temporal flag | `Column.IsTemporal` |
+
+In v0.1 the `USING paradedb` extraction is built in; under the 2.0 plugin split it becomes [hook 1](#plugin-hook-points), with the SDK shipping the same oliphant helpers.
+
+Failure policy: if oliphant cannot parse a statement the catalog already resolved, that is a **warning**, not an error — the IR degrades to catalog-only, and the search layer is simply not generated for the affected table.
+
+## Pass A — models and query wrappers
+
+Forked sqlc-gen-go behavior, driven straight off the proto contents:
+
+- **`db/models.gen.go`** — one struct per table, `pgtype.*` for nullables, one shared type map with every other pass.
+- **Query wrappers** — for each resolved query, honoring the standard annotations (`:one`, `:many`, `:exec`, `:execrows`, `:batchexec`, `:copyfrom`). A query whose projection differs from the table model gets a per-query Row struct; a full-model projection returns `db.User` values directly.
+- **Explicit positional scans** — `row.Scan(&u.ID, &u.Email, ...)`, no reflection, against the shared type map.
+- The executor parameter is named `exec` in every signature, so call sites can keep using `db.` and never shadow the package.
+
+The consistency guarantee that makes the fork safe: pass A generates scan code *assigning into* the model structs it just emitted. If pgb's type mapping ever disagreed with itself, the generated package would not compile — a mapping drift is a build break, never a silent mis-scan. Columns that degrade to untyped `any` (a `pdb.score()` under sqlc v1.31.1, which does not know ParadeDB functions) surface as explicit `any` fields, nudging a `::float8` cast in the SQL.
+
+## Pass B — descriptors and builders
+
+Stage 1. Per table, `db/<table>.gen.go` gains:
+
+- the package-level descriptor: `var Users = newUserTable("public", "users")`
+- typed column methods: `func (t UserTable) Email() UserEmailCol`
+- **predicate methods by type family** — the IR's `PGType` decides the family, the family decides the method set:
+
+| column family | methods generated |
+|---|---|
+| every column | `Eq`, `Ne`, `In`, `IsNull`/`NotNull` |
+| ordered (ints, numerics, timestamps, dates) | `Gt`, `Lt`, `Lte`, `Gte`, `Between` |
+| text | `Like`, `ILike`, `NotLike` |
+| jsonb | `KeyEq`, search predicates when indexed |
+| array | `Contains` |
+| bm25-indexed columns | the [pg_search predicates](/paradedb/predicates) |
+| `pgb:no_filter` columns | nothing — excluded from predicates and filter structs |
+
+- the statement builders (`Select`, `Update`, `Delete`) with their terminators.
+
+**Method weaving** happens at the end of pass B: each enabled plugin receives the IR and may contribute method additions to the generated table structs — `Score()` on a bm25 table, or a third-party `Bucket()` — merged into the file before anything is written. This is only possible because pgb owns the generated structs; plugin contributions are ordinary methods in the single `db` package, not a parallel tree.
+
+## Pass C — statics and the search layer
+
+Stage 2. Also into `db/<table>.gen.go`:
+
+- **Filters** — `UserFilter` with typed optional fields per column (minus `no_filter` columns), plus the `Extra []core.Expr` escape hatch that composes with builder predicates.
+- **Sets** — `UserSet` with three-state `core.Set` fields (minus `no_patch` columns).
+- **Statics** — `Get`, `List`, `Count`, `Insert`, `InsertBatch`, `Update`, `Upsert`, `Delete`, `CopyFrom`, each with `exec pgb.DBTX` and explicit column lists. `HasDefault` columns are omitted from INSERT column lists; generated columns are omitted from INSERT and UPDATE both.
+- **Scan functions** — the explicit positional scans the builders' terminators reuse.
+
+**The search layer** is the pass C piece the [paradedb index IR](/architecture/schema-ir#the-ir) drives. For a table with `Search *SearchIndex` non-nil, pgb generates into `db/<table>_search.gen.go`:
+
+- the search entry points — `SearchProducts` for ranked queries, `SearchProductsPage` with the `(score, id)` cursor — driven by the `key_field` and the ordered `Fields`;
+- `ProductHit`-style result structs with the score column;
+- predicate methods wired to the tokenizer families recorded per field (`pdb.literal` columns get the `===` family, text columns the `|||` family);
+- all of the ParadeDB SQL emission behind `core/search.go`, the version-gated churn barrier.
+
+A table without a `USING paradedb` index has `Search == nil` and gets no search file at all — no predicates, no statics, no hits type.
+
+## File layout per table
+
+One `db/` package; the filenames tell you which pass produced them:
+
+```
+db/
+  models.gen.go           # pass A — one struct per table, shared by everything
+  users.gen.go            # pass B + C — descriptor, builders, statics for users
+  users_search.gen.go     # pass C — search layer; only for bm25-indexed tables
+  orders.sql.gen.go       # pass A — handwritten-query wrappers (queries.sql touching orders)
+  inventory.gen.go        # pass B + C — a table with no search index and no handwritten queries
+  ...                     # one <table>.gen.go per table, <table>_search.gen.go where indexed
+```
+
+Plugin contributions land beside them as ordinary files naming the same package (`hypertables.gen.go` from a third-party plugin, `users_search.gen.go` from the paradedb layer).
+
+In the plugin repo the passes live in `gen/`: `load_sqlc.go` (proto + options → IR), `load_ddl.go` (oliphant re-parse), `pass_models.go`, `pass_builders.go`, `pass_statics.go` — and `standalone/` holds `pgb-gen`, the oliphant-only entry that builds the same IR from raw DDL and runs the same three passes.
+
+## Where golden tests pin each pass
+
+Determinism ([same IR → byte-identical output](/internals/emitter#determinism)) is what makes snapshot tests meaningful. Each pass has its own pin:
+
+| pass | pinned by | a regression looks like |
+|---|---|---|
+| A — models + wrappers | **fork-parity test**: output diffed against upstream sqlc-gen-go on the same schema | a type-mapping drift shows up as a parity diff — or a build break via the scan-into-model guarantee |
+| B — descriptors + builders | **golden generated-code tests**: `testdata/schema.sql` → committed snapshots (`-update` regenerates) | a descriptor method appears/disappears, or an emitted predicate changes shape |
+| C — statics + search | same golden suite, search files included | an upsert guard, unnest shape, or search cursor drifts |
+| emitter | **round-trip property test**: emitted SQL re-parsed by oliphant must re-parse to the same statement shape | malformed emission caught generically, before any snapshot review |
+
+Golden diffs are reviewable in PRs — a review of generated-code changes is a review of the diff, not a re-audit of thousands of lines.
+
+## Plugin hook points
+
+The three passes expose exactly three hooks. Official plugins (like `pgb-paradedb`) run in-process; third-party plugins are process plugins over the same protobuf pattern sqlc uses — request on stdin, files on stdout.
+
+```
+sqlc generate
+  │
+  ├─ load: proto catalog + options ──────────────▶ SchemaIR
+  │
+  ├─ [hook 1] IR enrichment
+  │     plugins attach namespaced data:
+  │     ir.Table.Extensions["paradedb"] = SearchIndex{...}
+  │
+  ├─ pass A   models + handwritten-query wrappers
+  │
+  ├─ pass B   descriptors + predicates + builders
+  │     └─ [hook 3a] weave — plugin method additions,
+  │        merged into table structs before writing
+  │
+  ├─ pass C   statics + search layer
+  │     └─ [hook 3b] statics — plugin-registered extra
+  │        static functions and additional files
+  │
+  └─ stdout: GenerateResponse ──▶ sqlc writes db/*.gen.go
+```
+
+| hook | when | what a plugin does | today's built-in equivalent |
+|---|---|---|---|
+| 1 — IR enrichment | after the IR is built | parse DDL core ignores, attach `Table.Extensions["paradedb"]` | `USING paradedb` extraction in `load_ddl.go` |
+| 3a — weave | end of pass B | add methods to generated table structs, add files | search predicates and `Score()` on bm25 columns |
+| 3b — statics | pass C | register extra static functions | `SearchProducts` / `SearchProductsPage` generation |
+
+The runtime side closes the loop: a plugin's Go module registers its operator and function vocabulary through the [`DialectExtension` emitter interface](/internals/emitter#the-dialectextension-hook), validated at generate time, so generated code stays ordinary Go calling into a pinned, semver'd runtime.
+
+<Note>
+The exit criterion for the plugin split is byte-identical v0.1 output before and after — provable because every pass is golden-pinned. The architecture is a pure refactor, and the tests are the proof.
+</Note>

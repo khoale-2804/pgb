@@ -1,0 +1,308 @@
+---
+title: "Errors & troubleshooting"
+description: "Sentinel errors, constraint violations, and every failure mode pgb can hand you — with the exact check for each."
+icon: "triangle-exclamation"
+---
+
+pgb keeps the error surface small: three sentinels in `pgb`, and Postgres errors passed through with `%w` wrapping so `errors.Is` / `errors.As` always reach the original. This page is the checklist for every failure mode you will actually hit.
+
+## Sentinel errors
+
+| sentinel | raised when | check with |
+|---|---|---|
+| `pgb.ErrNotFound` | single-row lookups found zero rows: `GetUser`, `UpdateUser`, `UpsertUser` (after `DO NOTHING`), builder `.One()` | `errors.Is` |
+| `pgb.ErrNoWhere` | `UpdateUsers` / `DeleteUsers` called with an empty `where` slice, or a builder `UPDATE`/`DELETE` without `.Where` | `errors.Is` |
+| `pgb.ErrCursorMismatch` | a cursor token used against a sort key that did not produce it — different column, direction, table, or a stale token after a codegen change | `errors.Is` |
+
+All three are plain values compared through the wrap chain. `pgb.ErrNotFound` wraps `pgx.ErrNoRows`, so `errors.Is(err, pgx.ErrNoRows)` matches too — the sentinel is a convenience, not a new type.
+
+### pgb.ErrNotFound
+
+```go
+u, err := db.GetUser(ctx, pool, 4242)
+if errors.Is(err, pgb.ErrNotFound) {
+    // no such user — render a 404
+    return err
+}
+if err != nil {
+    return err   // transport, context, scan — something else went wrong
+}
+```
+
+```sql
+SELECT id, email, name, bio, metadata, tags, created_at, last_login_at
+FROM public.users
+WHERE id = $1
+```
+
+### pgb.ErrNoWhere
+
+`ErrNoWhere` fires before any SQL is sent — a full-table mutation has to opt in explicitly:
+
+```go
+_, err := db.DeleteUsers(ctx, pool, nil)
+if errors.Is(err, pgb.ErrNoWhere) {
+    // refused: pass at least one predicate, or opt in via AllowAll
+}
+```
+
+On builders, `.AllowAll()` is the deliberate opt-in for a table-wide statement:
+
+```go
+n, err := db.Users.Delete().AllowAll().Exec(ctx, pool)
+fmt.Println("deleted", n)   // every row — call it on purpose or not at all
+```
+
+### pgb.ErrCursorMismatch
+
+Failing closed is deliberate: a mismatched keyset predicate could silently skip or repeat rows. Restarting from page one is always correct — callers only need the `errors.Is` branch:
+
+```go
+page, next, more, err := db.Users.Select().
+    OrderBy(db.Users.ID().Asc()).
+    Page(ctx, pool, pgb.CursorOf(prev), 50)
+if errors.Is(err, pgb.ErrCursorMismatch) {
+    page, next, more, err = db.Users.Select().
+        OrderBy(db.Users.ID().Asc()).
+        Page(ctx, pool, pgb.CursorOf(""), 50)   // restart without the stale token
+}
+```
+
+```sql
+SELECT id, email, name, bio, metadata, tags, created_at, last_login_at
+FROM public.users
+WHERE id > $1
+ORDER BY id ASC
+LIMIT $2
+```
+
+## Constraint violations
+
+Constraint failures are not sentinels — they surface as pgx errors wrapping a `*pgconn.PgError`, keyed by a five-character SQLSTATE code:
+
+| SQLSTATE | name | typical pgb call |
+|---|---|---|
+| `23505` | unique_violation | `InsertUser` on a taken email, `UpdateUser` changing a unique column, racing `UpsertUser` inserts |
+| `23503` | foreign_key_violation | `InsertOrder` with a missing parent row, `DeleteUser` with dependent rows |
+| `23514` | check_violation | `Insert`/`Update` writing a value the table's CHECK rejects |
+
+`pgErr.ConstraintName`, `pgErr.TableName`, and `pgErr.Detail` tell you which constraint and what data collided:
+
+```go
+_, err := db.InsertUser(ctx, pool, db.InsertUserParams{
+    Email: "ada@corp.io",
+    Name:  "Ada Lovelace",
+    Tags:  []string{"staff"},
+})
+var pgErr *pgconn.PgError
+if errors.As(err, &pgErr) {
+    switch pgErr.Code {
+    case "23505":
+        fmt.Println("unique:", pgErr.ConstraintName)   // e.g. users_email_key
+    case "23503":
+        fmt.Println("foreign key:", pgErr.ConstraintName)
+    case "23514":
+        fmt.Println("check:", pgErr.ConstraintName)
+    }
+}
+```
+
+### Retry on unique violation
+
+For collisions a caller can resolve — a slug, a username, a generated email — the pattern is a bounded retry that mutates the colliding value:
+
+```go
+// reserveSeat inserts a user keyed on users_email_key; on a racing collision
+// it retries with an incremented suffix instead of failing the request.
+func reserveSeat(ctx context.Context, pool *pgxpool.Pool, name string) (db.User, error) {
+    email := name + "@corp.io"
+    for attempt := 0; ; attempt++ {
+        u, err := db.InsertUser(ctx, pool, db.InsertUserParams{
+            Email: email,
+            Name:  name,
+            Tags:  []string{"beta"},
+        })
+        var pgErr *pgconn.PgError
+        if errors.As(err, &pgErr) &&
+            pgErr.Code == "23505" &&
+            pgErr.ConstraintName == "users_email_key" &&
+            attempt < 3 {
+            email = fmt.Sprintf("%s-%d@corp.io", name, attempt+1)
+            continue
+        }
+        return u, err
+    }
+}
+```
+
+```sql
+INSERT INTO public.users (email, name, tags)
+VALUES ($1, $2, $3)
+RETURNING id, email, name, bio, metadata, tags, created_at, last_login_at
+```
+
+<Tip>
+If the conflict should resolve to "load the existing row instead", skip the retry loop entirely — `UpsertUser` with `UpsertOpts{Target: []string{"email"}, OnSelect: true}` returns the conflicting row in one statement. See [upserts](/generated-code/statics).
+</Tip>
+
+## No rows vs NULL in One()
+
+`One()` draws the line at the row level, and that is the distinction people get backwards:
+
+- **Zero rows** → `pgb.ErrNotFound`.
+- **One row whose columns are NULL** → `nil` error; the scan fills zero values (`pgtype` fields with `Valid: false`, nil pointers).
+
+A row of NULLs is a legitimate result, not an absence. The trap runs the other way too: hand-written aggregates always return exactly one row, so `ErrNotFound` never fires for them, and wrapping a missing value in `COALESCE` converts absence into a value you can no longer distinguish:
+
+```go
+// max(total) returns one row even on an empty table — NULL, not ErrNotFound
+rows, err := db.Orders.Select().
+    Cols(core.Raw("max(total) AS max_total")).
+    Rows(ctx, pool)
+if err != nil {
+    return err
+}
+defer rows.Close()
+
+var maxTotal pgtype.Numeric
+for rows.Next() {
+    if err := rows.Scan(&maxTotal); err != nil {
+        return err
+    }
+}
+if !maxTotal.Valid {
+    // empty table — absence shows up as NULL, not as an error
+}
+```
+
+```sql
+SELECT max(total) AS max_total
+FROM public.orders
+```
+
+<Note>
+If you need "exactly one row or nothing", select a real column set and use `.One()`. Reserve the aggregate path for cases where NULL genuinely means "no rows to aggregate".
+</Note>
+
+## Common failures
+
+| symptom | cause | fix |
+|---|---|---|
+| `pgb.ErrNoWhere` | empty `where` slice on `UpdateUsers` / `DeleteUsers`, or a builder write without `.Where` | pass a predicate, or opt in with `.AllowAll()` |
+| `pgb.ErrCursorMismatch` | token reused across sort keys, tables, or after a cursor-format codegen bump | restart pagination with an empty token |
+| `number of field descriptions must equal number of destinations` | a column was added to the table after generation and hand-written `SELECT *` (or a stale generated struct) now disagrees with the row shape | run `sqlc generate` and redeploy — never widen structs by hand |
+| `cannot scan` / wrong values for numeric, timestamps, JSON | type-map mismatch: the schema column type changed after generation, or handwritten SQL reuses a generated struct with the wrong `pgtype` carrier | check the [type mapping](/reference/type-mapping), then regenerate |
+| `invalid memory alloc request size` or huge memory spike on batch insert | one `InsertUsers` call pushing a multi-gigabyte parameter array | chunk the batch (10k–50k rows is comfortable) or switch to `CopyFromUsers` |
+| slow endpoint doing hundreds of tiny `GetUser` calls | N+1: a loop of per-ID lookups | batch with the filter field or `In()` (below) |
+
+### Scanning a column added after generation
+
+Generated scans are explicit positional `row.Scan(&u.ID, &u.Email, ...)` with explicit column lists — schema additions cannot shift scan positions in generated code. The failure appears at the seams instead: handwritten `SELECT *` fed into a generated struct, or a stale generated package writing `INSERT` lists that miss a new `NOT NULL` column. The fix is always the same direction — regenerate, never hand-patch:
+
+```bash
+sqlc generate
+git diff --stat db/
+```
+
+If the diff shows the new column, ship it; if it shows nothing, your `schema.sql` has drifted from the live database (see [migrations](/guides/migrations)).
+
+### N+1 lookups
+
+```go
+// anti-pattern: one round trip per user
+for _, id := range ids {
+    u, err := db.GetUser(ctx, pool, id)
+    if err != nil {
+        return err
+    }
+    enrich(id, u)   // a 1ms round trip per row, serialized
+}
+```
+
+If the generated filter struct carries a slice field for the column — `UserFilter.Emails []string` in the [statics example](/generated-code/statics) — use it; otherwise compose the predicate with the builder's `In()`:
+
+```go
+users, err := db.Users.Select().
+    Where(db.Users.ID().In(ids...)).
+    All(ctx, pool)
+```
+
+```sql
+SELECT id, email, name, bio, metadata, tags, created_at, last_login_at
+FROM public.users
+WHERE id = ANY ($1)
+```
+
+<Warning>
+Generated `ListUsers` without a `Limit` option returns every matching row. Bound result sizes at the call site — `pgb.Limit(n)` on the static layer, `.Limit(n)` on the builder.
+</Warning>
+
+## Debugging: seeing the SQL
+
+pgb emits real SQL with bound parameters, so what you see in logs maps 1:1 to the Go + SQL pairs in these docs. The pgx v5 way is a `QueryTracer` on the pool config:
+
+```go
+type queryLogTracer struct{}
+
+type queryStart struct {
+    at   time.Time
+    sql  string
+    args []any
+}
+
+type queryStartKey struct{}
+
+func (queryLogTracer) TraceQueryStart(
+    ctx context.Context, _ *pgx.Conn, data pgx.TraceQueryStartData,
+) context.Context {
+    return context.WithValue(ctx, queryStartKey{}, queryStart{
+        at:   time.Now(),
+        sql:  data.SQL,
+        args: data.Args,
+    })
+}
+
+func (queryLogTracer) TraceQueryEnd(
+    ctx context.Context, _ *pgx.Conn, data pgx.TraceQueryEndData,
+) {
+    st := ctx.Value(queryStartKey{}).(queryStart)
+    log.Printf("sql=%s args=%v took=%s err=%v",
+        st.sql, st.args, time.Since(st.at), data.Err)
+}
+```
+
+Wire it in and every generated call logs its statement, arguments, and duration:
+
+```go
+cfg, err := pgxpool.ParseConfig(os.Getenv("DATABASE_URL"))
+if err != nil {
+    log.Fatalf("parse config: %v", err)
+}
+cfg.ConnConfig.Tracer = queryLogTracer{}
+pool, err := pgxpool.NewWithConfig(ctx, cfg)
+if err != nil {
+    log.Fatalf("connect: %v", err)
+}
+defer pool.Close()
+```
+
+One logged line for `ListUsers`:
+
+```text
+sql=SELECT id, email, name, bio, metadata, tags, created_at, last_login_at FROM public.users WHERE email LIKE $1 AND created_at > $2 LIMIT $3 args=[%@corp.io 2026-09-01 00:00:00 +0000 UTC 20] took=1.4ms err=<nil>
+```
+
+<Note>
+Codebases still on pgx v4 use `pgxpool.Config.AfterQuery` for the same effect — one hook, no tracer type. The pgb side is identical either way: the executor is just a `pgb.DBTX`.
+</Note>
+
+<Tip>
+Copy the logged SQL straight into `EXPLAIN (ANALYZE, BUFFERS)` to audit index usage — the workflow is in [indexes & performance](/docs/performance).
+</Tip>
+
+## See also
+
+- [Static functions — error handling](/generated-code/statics) — the table form of this page inside the CRUD walkthrough.
+- [Runtime core API — errors](/reference/core-api) — sentinel definitions and the `DBTX` wrap guarantee.
+- [Pagination — ErrCursorMismatch](/generated-code/pagination) — why cursor failures fail closed.
+- [Migrations](/guides/migrations) — the stale-generated-code failure class starts here.

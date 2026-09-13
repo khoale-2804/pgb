@@ -23,26 +23,22 @@
             "pages": ["welcome/quickstart"]
           },
           {
-            "group": "Architecture",
-            "pages": ["architecture/overview", "architecture/schema-ir"]
+            "group": "Core concepts",
+            "pages": ["architecture/overview", "architecture/schema-ir", "docs/performance"]
+          },
+          {
+            "group": "Generated code",
+            "pages": [
+              "generated-code/models",
+              "generated-code/builders",
+              "generated-code/statics",
+              "generated-code/pagination",
+              "docs/errors"
+            ]
           },
           {
             "group": "Explanation",
             "pages": ["guides/risks-faq"]
-          }
-        ]
-      },
-      {
-        "tab": "Generated code",
-        "icon": "code",
-        "groups": [
-          {
-            "group": "Stage 1 — builders",
-            "pages": ["generated-code/models", "generated-code/builders"]
-          },
-          {
-            "group": "Stage 2 — static functions",
-            "pages": ["generated-code/statics", "generated-code/pagination"]
           }
         ]
       },
@@ -62,6 +58,10 @@
               "paradedb/aggregations",
               "paradedb/hybrid-search"
             ]
+          },
+          {
+            "group": "Performance",
+            "pages": ["paradedb/performance"]
           }
         ]
       },
@@ -74,22 +74,25 @@
             "pages": ["reference/config", "reference/directives", "reference/type-mapping"]
           },
           {
+            "group": "Runtime core",
+            "pages": ["reference/core-api"]
+          },
+          {
             "group": "Versions",
             "pages": ["postgres/version-gates", "reference/support-matrix"]
           },
           {
-            "group": "Runtime core",
-            "pages": ["reference/core-api"]
-          }
-        ]
-      },
-      {
-        "tab": "Resources",
-        "icon": "toolbox",
-        "groups": [
+            "group": "Internals",
+            "pages": ["internals/emitter", "internals/codegen-pipeline"]
+          },
           {
             "group": "Guides",
-            "pages": ["guides/handwritten-queries", "guides/testing"]
+            "pages": [
+              "guides/handwritten-queries",
+              "guides/testing",
+              "guides/migrations",
+              "guides/recipes"
+            ]
           },
           {
             "group": "Project",

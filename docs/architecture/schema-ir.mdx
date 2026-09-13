@@ -93,6 +93,92 @@ What codegen emits from that IR:
 - **`db/tags.gen.go`** — the `db.Tags` descriptor with `ID()` / `Name()` / `Color()` column methods, the `TagSelect` builder, and statics `GetTag` / `ListTags` / `CountTags` / `InsertTag` / `UpdateTag` / `DeleteTag`; `color` is omitted from the INSERT column list because `HasDefault` is set.
 - **No `tags_search.gen.go`** — `Search` is nil, so the search layer is skipped entirely for this table; no search predicates, no `SearchTags`, no `ProductHit`-style results.
 
+## Worked example: two tables end to end
+
+The single-table example above shows one column's facts; this one shows the whole IR — two tables, a foreign key, a directive, and one `USING paradedb` index — and exactly what each pass emits from it.
+
+The input `schema.sql`:
+
+```sql
+CREATE TABLE users (
+    id    bigserial PRIMARY KEY,
+    email text NOT NULL UNIQUE,
+    bio   text
+);
+
+CREATE TABLE products (
+    id          bigserial PRIMARY KEY,
+    user_id     bigint NOT NULL REFERENCES users(id),
+    title       text NOT NULL,
+    description text NOT NULL,
+    rating      integer NOT NULL DEFAULT 0
+);
+
+CREATE INDEX products_search ON products USING paradedb
+  (id, title, description::pdb.icu, rating)
+  WITH (key_field='id');
+
+COMMENT ON COLUMN users.bio IS 'pgb:no_patch';
+```
+
+The complete IR pgb builds from it — the sqlc catalog supplies tables, columns, types, nullability, and defaults; the oliphant re-parse supplies the index DDL and the `COMMENT ON` directive, neither of which survives into the proto:
+
+```go
+ir.Schema{
+    DefaultSchema: "public",
+    Tables: []ir.Table{
+        {
+            Schema:     "public",
+            Name:       "users",
+            PrimaryKey: []string{"id"},
+            Uniques:    [][]string{{"email"}},
+            Columns: []ir.Column{
+                {Name: "id",    PGType: "int8", NotNull: true, HasDefault: true, DefaultExpr: "nextval('users_id_seq'::regclass)"},
+                {Name: "email", PGType: "text", NotNull: true},
+                {Name: "bio",   PGType: "text", Comment: "pgb:no_patch"},
+            },
+            ForeignKeys: nil,
+            Search:      nil, // no USING paradedb index on users
+        },
+        {
+            Schema:     "public",
+            Name:       "products",
+            PrimaryKey: []string{"id"},
+            Columns: []ir.Column{
+                {Name: "id",          PGType: "int8", NotNull: true, HasDefault: true, DefaultExpr: "nextval('products_id_seq'::regclass)"},
+                {Name: "user_id",     PGType: "int8", NotNull: true},
+                {Name: "title",       PGType: "text", NotNull: true},
+                {Name: "description", PGType: "text", NotNull: true},
+                {Name: "rating",      PGType: "int4", NotNull: true, HasDefault: true, DefaultExpr: "0"},
+            },
+            // detected from REFERENCES, kept inert in v1
+            ForeignKeys: []ir.ForeignKey{{Columns: []string{"user_id"}, RefTable: "users", RefColumns: []string{"id"}}},
+            Search: &ir.SearchIndex{
+                Name:     "products_search",
+                Using:    "paradedb",
+                KeyField: "id",
+                Fields: []ir.SearchField{
+                    {Column: "id"},                                          // key field
+                    {Column: "title", PGType: "text"},                       // no cast → default tokenizer (unicode)
+                    {Column: "description", Tokenizer: "icu", PGType: "text"},
+                    {Column: "rating", PGType: "numeric"},                   // numeric family → fast field; int4range casts on search-side ranges
+                },
+                Options: map[string]string{"key_field": "id"},
+            },
+        },
+    },
+}
+```
+
+What each pass emits from exactly this IR:
+
+- **Pass A — `db/models.gen.go`**: `type User struct { ID int64; Email string; Bio pgtype.Text }` and `type Product struct { ID int64; UserID int64; Title string; Description string; Rating int32 }`; `UserFilter`/`ProductFilter` (every column of each table — `pgb:no_patch` hides a column from updates, not from filters); `UserSet` **without** `Bio` versus `ProductSet` with all five columns; `InsertUserParams`/`InsertProductParams` — `rating` omitted from insert params (`HasDefault`), `bio` present as an optional write; the explicit-position `scanUser`/`scanProduct` funcs. No handwritten-query wrappers here — this schema has no `queries.sql`.
+- **Pass B — `db/users.gen.go` + `db/products.gen.go`**: the `db.Users` descriptor (`ID()`/`Email()`/`Bio()`) and `db.Products` descriptor (`ID()`/`UserID()`/`Title()`/`Description()`/`Rating()`), the `UserSelect`/`ProductSelect` builders, and predicates by type family — `Rating()` gets the ordered family (`Eq`/`Gt`/`Between`), `Title()`/`Description()` the text family (`Like`/`ILike`). The search family appears **only on indexed columns**: `Title().Match(...)`, `Description().Match(...)`, `Rating().RangeTerm(...)` on `db.Products`; nothing search-shaped on `db.Users`, because `Search` is nil.
+- **Pass C — `db/users.gen.go` + `db/products.gen.go` statics, plus `db/products_search.gen.go`**: `GetUser`/`ListUsers`/`CountUsers`/`InsertUser`/`InsertUsers`/`UpdateUser`/`UpdateUsers`/`DeleteUser`/`DeleteUsers` and the same nine for products; then the search layer for `products` only — `SearchProducts(ctx, pool, q, limit)` and its paged variant. No `SearchProductsHybrid`: hybrid search needs an indexed vector column, and this index has none. Search predicates compose only from the four indexed fields (`id`, `title`, `description`, `rating`) — `user_id` is a plain filter column, never a search predicate, because the index does not cover it.
+- **No `users_search.gen.go`** — `Search` is nil, so pass C skips the search layer for `users` entirely.
+
+The same three passes run unchanged whether this IR came from the sqlc plugin or the standalone `pgb-gen` mode — that is the point of routing all facts through it.
+
 ## Where each fact comes from
 
 | fact | source | why |

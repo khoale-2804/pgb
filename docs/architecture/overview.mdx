@@ -39,6 +39,42 @@ db/  — ONE generated package (config package: db), flat files:
                 pgx scan helpers, pg_search predicate emitters
 ```
 
+### Stage by stage
+
+The same pipeline, as a table. Ownership is exact — each artifact has one author, which is what makes the type map checkable and the emitter swappable:
+
+| stage | input | output | owned by |
+|---|---|---|---|
+| parse + analyze | `schema.sql`, `queries.sql` | resolved catalog (tables, columns, types, enums) + typed queries | sqlc (libpg_query 18 via sqlc-dev/oliphant) |
+| schema re-parse | `schema.sql` | index DDL, generated-column kinds, `COMMENT ON` directives — everything the proto drops | pgb `load_ddl` (oliphant) |
+| IR build | catalog proto + re-parse artifacts | [SchemaIR](/architecture/schema-ir) | pgb plugin |
+| pass A | IR + catalog | `models.gen.go` — structs, params, filters, sets, scan funcs — plus handwritten-query wrappers | pass A |
+| pass B | IR | `users.gen.go` — descriptors, column predicates, builders | pass B |
+| pass C | IR | statics on `users.gen.go` + `products_search.gen.go` — the search layer, only for indexed tables | pass C |
+| runtime | calls from generated code | expression tree → SQL text, pgx scan helpers, pg_search predicate emitters | `core/` (handwritten, stable across generations) |
+
+Passes A–C each read the same IR and emit disjoint files, so regeneration is order-independent and a failure in one pass cannot leave a half-typed artifact behind.
+
+### One column's journey: `rating`
+
+Concretely, one column through every stage. The input is a minimal table:
+
+```sql
+CREATE TABLE products (
+    id     bigserial PRIMARY KEY,
+    title  text NOT NULL,
+    rating integer NOT NULL
+);
+```
+
+1. **Catalog proto.** sqlc parses and analyzes the table; the plugin request carries `column { name: "rating" type: "pg_catalog.int4" is_not_null: true }` — the type already resolved, sqlc's overrides already applied.
+2. **IR.** The IR build records `ir.Column{Name: "rating", PGType: "int4", NotNull: true}` — no default, no directive, not temporal. If `products` carried a `USING paradedb` index listing `rating`, the same pass appends `ir.SearchField{Column: "rating", PGType: "numeric"}` to `Search.Fields` — the numeric family that later drives the `int4range` cast on search-side range predicates.
+3. **Pass A — model, filter, insert param, scan position.** The type map says int4 → `int32`, so pass A emits `Product.Rating int32`, `ProductFilter.Rating *int32`, `InsertProductParams.Rating int32` (NOT NULL with no default → a required param), and rating's slot in `scanProduct` — its ordinal position in the explicit column list every generated `SELECT` emits, so `ALTER TABLE ... ADD COLUMN` cannot shift it.
+4. **Pass B — descriptor method.** `db.Products.Rating()` returns a typed column wrapper with the ordered-family predicates (`Eq`, `Ne`, `In`, `Gt`, `Between`). No search methods appear — this minimal table has no paradedb index.
+5. **Pass C — INSERT list.** The generated `INSERT INTO products` names `(title, rating)` explicitly — `rating` because it has no default, `id` omitted because `bigserial` does — and `RETURNING` fills the model through `scanProduct`'s positions. The statics `InsertProduct`/`InsertProducts` bind `Rating` as a positional parameter.
+
+One override in sqlc.yaml (`pgb:type=` on the column, or the config equivalent) would change stops 3 and 5 **and** the pass-B scan target in a single regeneration — the one-type-map guarantee from the decisions below, visible per column.
+
 ## Decisions worth knowing
 
 ### One plugin replaces `gen: go:`
@@ -70,6 +106,6 @@ ParadeDB churned its API twice in 2025 (`paradedb.*` → `pdb.*`, `USING bm25` �
 
 ## Non-goals
 
-- No ORM: no relationships, eager loading, hooks, identity map, or unit-of-work.
-- No migrations tool.
-- One dialect only: Postgres (version-gated), not MySQL/SQLite.
+- No ORM: no relationships, eager loading, hooks, identity map, or unit-of-work — every one of those needs a mutable runtime session, and pgb's surface is deliberately stateless functions over a thin `core/`.
+- No migrations tool — schema is an input pgb reads, never state it owns; versioning belongs to your migration tool, and pgb simply regenerates against whatever schema it points at.
+- One dialect only: Postgres (version-gated), not MySQL/SQLite — the type map, version gates, and the entire search emitter are Postgres-deep (`pdb.*` operators, `pgtype`, planner pushdown), and a second dialect would fork all three.

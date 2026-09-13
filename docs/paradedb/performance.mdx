@@ -1,0 +1,181 @@
+---
+title: "Performance tuning"
+description: "Operator-level tuning for pg_search through pgb — index design for query shapes, Top-K sizing, segment and layer knobs, GUCs, and the EXPLAIN checklist."
+icon: "rocket"
+---
+
+pgb's generated SQL already rides pg_search's pushdown paths — the wins on this page come from two places: the index DDL you feed pgb, and a handful of server knobs. The mechanics (what a segment physically is, why pushdown happens at all) live in [ParadeDB architecture](/paradedb/architecture); this page is the operator checklist. The pgb-side half — pooling, scan iteration, choosing `List` vs `Search` — is covered by [Performance](/docs/performance).
+
+## Design the index for your query shapes
+
+Everything starts at the `USING paradedb` DDL — it *is* the search schema, and pgb generates the search surface from it column by column ([DDL extraction](/paradedb/index-ddl)). Two decisions dominate performance.
+
+### Tokenizer per predicate family
+
+Match each column's tokenizer to the predicates you will actually run against it. A mismatch either misses rows or bloats the index:
+
+| you will run | index with | why it is the fast choice |
+|---|---|---|
+| exact lookups — IDs, SKUs, brands, JSON attributes | `::pdb.literal` (or `literal_normalized` for case-insensitive) | one token per value; the `===` term family (`db.Products.Sku().Exact(...)`) hits the term dictionary directly |
+| prose / free text | `::pdb.icu` for multilingual content, default `unicode` otherwise | segmentation quality decides recall; a stemmer filter widens it without index cost |
+| autocomplete / prefix-as-you-type | `ngram` / `edge_ngram` (+ `lowercase_ngram`) | every prefix exists as a token — at the cost of a much larger index and flatter BM25 spread, so reserve it for the fields that need it |
+| code and case-sensitive identifiers | `::pdb.literal` | no lowercasing, one token per value |
+
+The full tokenizer matrix — cast spellings, token filters, one column with two tokenizers — is in [tokenizers](/paradedb/tokenizers). The performance rule is just: `literal` for exact, `icu`/`unicode` for prose, `ngram`/`edge_ngram` only where autocomplete demands it.
+
+### Fast fields for filters, sorts, and aggregates
+
+The columnar half of each segment exists only for indexed columns, and it is what pushed-down range filters, `ORDER BY`, and `pdb.agg` aggregations read:
+
+- Columns indexed **without a tokenizer cast** — numerics, booleans, timestamps — are fast fields automatically. `rating` in the products index serves `Rating().RangeTerm(...)`, sort orders, and `{"avg": {"field": "rating"}}` straight from the columnar half.
+- **Text and JSON columns** serve sorts, aggregations, and join keys only as fast fields — add the `fast=true` tokenizer option (e.g. `title::pdb.simple('fast=true')`) when a text column feeds any of those.
+- Every indexed column lives inside the index (it is a covering index), so widening an index is a **rebuild**, not an incremental add — get the column list right the first time ([architecture: covering index](/paradedb/architecture#covering-index)).
+
+pgb enforces the boundary from the code side: search predicate methods are generated only on indexed columns, and pgb never emits a predicate against a column the index does not cover. The DDL is where the performance ceiling is set.
+
+## Top-K: small LIMITs and an indexed tiebreak
+
+Every generated search ends in an ordered `LIMIT` — that is what routes the query into `SegmentedTopKExec`, the per-segment top-k heap that prunes candidates during the scan instead of scoring and sorting the whole table. Work scales roughly with `LIMIT × segment count`, not with table size:
+
+```go
+q := db.And(
+    db.Products.Description().Match("running shoes"),
+    db.Products.Rating().RangeTerm(pgtype.Range[int32]{
+        Lower:     4,
+        LowerType: pgtype.Inclusive,
+    }, "Intersects"),
+)
+
+rows, err := db.SearchProducts(ctx, pool, q, 10)
+```
+
+Three sizing rules:
+
+1. **Keep LIMITs page-sized.** A `LIMIT 100000` turns the per-segment heap into a 100k-row structure per segment — at that size the Top-K advantage is gone and you are paying index overhead for what is really an export. Page sizes in the tens are the sweet spot.
+2. **Exports are List queries, not searches.** Pulling a whole table or a large filtered slice is the generated `List` path — plain Postgres, no scoring:
+
+   ```go
+   rows, err := db.ListProducts(ctx, pool, db.ProductFilter{InStock: pgb.Opt(true)})
+   ```
+3. **The tiebreak column must be indexed.** pgb emits `ORDER BY pdb.score(id) DESC, id ASC` — the `id` tiebreak is what makes pagination stable, and it must appear in the index for Top-K to engage ([scoring](/paradedb/scoring), [pagination](/generated-code/pagination)). The same holds for any hand-written `ORDER BY`: a non-indexed sort column means no Top-K pushdown.
+
+## Segment and layer tuning
+
+The index is an LSM tree: writes append to one mutable segment, which freezes at `mutable_segment_rows` and merges in the background layer by layer. Defaults fit most workloads; here is the sizing table by write throughput:
+
+| write profile | `mutable_segment_rows` | why |
+|---|---|---|
+| ordinary OLTP (app-driven row inserts) | leave the default **1,000** | small statements share one mutable segment; freezing at 1k keeps reads fast |
+| nightly bulk loads / backfills | **10,000–100,000** during the load, restore after | fewer, larger frozen segments; far less background merge churn |
+| continuous heavy ingest (thousands of rows/s) | **50,000+** | amortizes freezes — at the cost of a slower-to-search mutable segment and more RAM |
+
+Per-index, with a complete load script:
+
+```sql
+ALTER INDEX products_search SET (mutable_segment_rows = 50000);
+
+-- run the bulk load / backfill here
+INSERT INTO products (id, title, description, rating)
+SELECT g, 'Item ' || g, 'a searchable description for item ' || g, 4
+FROM generate_series(1, 1000000) g;
+
+ALTER INDEX products_search RESET (mutable_segment_rows);
+```
+
+The other knobs:
+
+| knob | default | touch it |
+|---|---|---|
+| `background_layer_sizes` | `100KB, 1MB, 10MB, 100MB, 1GB, 10GB` | almost never — trim only to bound background merge work; `0` disables background merging |
+| `layer_sizes` | unset (foreground merging off) | keep unset — it moves merging into the write path; use only as back pressure when segments outpace merges |
+| `work_mem` | 15MB minimum enforced | raise (`SET work_mem = '64MB'`) for the session doing bulk maintenance; values below 15MB are silently raised |
+
+Read-heavy workloads usually need none of this — the defaults already favor read latency, and compaction runs outside the query path.
+
+## GUCs
+
+Two server settings matter at the session or database level:
+
+| GUC | effect |
+|---|---|
+| `paradedb.enable_join_custom_scan` | gates join pushdown — off means every join falls back to a normal Postgres plan even when all four requirements hold ([join requirements](/paradedb/architecture#join-pushdown-requirements)) |
+| `paradedb.global_mutable_segment_rows` | database-wide override for `mutable_segment_rows` — its default `-1` defers to per-index settings; any other value wins over them |
+
+```sql
+SET paradedb.enable_join_custom_scan = on;
+SET paradedb.global_mutable_segment_rows = -1;  -- per-index settings decide
+```
+
+Version availability for both GUCs is tracked in the [support matrix](/reference/support-matrix) — pgb targets pg_search 0.25.9+ with the 0.26-rc gate.
+
+## When the custom scan does not fire
+
+ParadeDB's planner hook activates **only when a ParadeDB operator or `pdb.*` function is in the query**. Knowing the non-firing shapes saves an afternoon of EXPLAIN staring.
+
+**No operator — plain Postgres plan.** A filter-only query against an indexed table never touches the index:
+
+```sql
+EXPLAIN SELECT id, rating FROM products WHERE rating > 4.0;
+--  Seq Scan on products  (cost=0.00..22.50 rows=310 width=16)
+--    Filter: (rating > 4.0)
+```
+
+If you want a pure-filter query served from the columnar half, generate an operator: the search builder's `.ForceIndex()` emits `id @@@ pdb.all()` exactly for this ([aggregations](/paradedb/aggregations) uses the same trick for filter-free aggregation queries).
+
+**Mixed predicates.** An operator plus a predicate on a **non-indexed** column still fires the custom scan — the operator is present — but the non-indexed filter cannot evaluate inside the index, so the plan either filters on the Postgres side of the boundary or declines the pushdown for that shape. The fix is the DDL: index the column (and rebuild, since the index is covering). Generated code cannot drift into this — pgb only generates search predicates on indexed columns — but a raw `core.Expr` composed through a filter's `Extra` escape hatch, or a handwritten query, can.
+
+**Non-firing sort.** `ORDER BY` on a non-indexed column with a `LIMIT` keeps the custom scan for the filter but loses the Top-K executor — you get a full sort above the scan node instead of `SegmentedTopKExec` lines.
+
+### The EXPLAIN checklist
+
+Run `EXPLAIN (ANALYZE, VERBOSE)` and check, in order:
+
+| look for | it means |
+|---|---|
+| `Custom Scan (ParadeDB Base Scan)` node | the operator activated — no node means no ParadeDB operator in the query |
+| `Exec Method: SegmentedTopKExec` | ORDER BY + LIMIT pushed down into the top-k executor |
+| `TopK Order By:` / `TopK Limit:` | match your clause — a plain `Sort` node above the scan means the ordering was not pushed |
+| `Segment Count: n` | how many segments the query touches — a big count on a quiet table means compaction lag or `mutable_segment_rows` too low |
+| `Tantivy Query:` | the exact query sent to the index — verify each predicate translated as intended |
+
+Worked example — a text match, a fast-field range, and the score ordering, all pushed down:
+
+```sql
+EXPLAIN (ANALYZE, VERBOSE)
+SELECT id, title, pdb.score(id) AS score
+FROM products
+WHERE description @@@ 'running shoes'
+  AND rating >= 4.0
+ORDER BY pdb.score(id) DESC, id ASC
+LIMIT 10;
+```
+
+```ini
+Limit  (cost=10.00..10.03 rows=10 width=64) (actual time=1.912..1.918 rows=10 loops=1)
+  ->  Custom Scan (ParadeDB Base Scan) on public.products  (cost=10.00..10.03 rows=10 width=64) (actual time=1.910..1.916 rows=10 loops=1)
+        Table: products
+        Index: products_search
+        Segment Count: 3
+        Exec Method: SegmentedTopKExec
+        Scores: true
+           TopK Order By: pdb.score(id) DESC, id ASC
+           TopK Limit: 10
+        Tantivy Query: {"with_index":{"query":{"boolean":{"sub_queries":[{"term":{"field":"description","value":"running shoes"}},{"range":{"field":"rating","greater_than_or_eq":4.0}}]}}}}
+Planning Time: 0.241 ms
+Execution Time: 2.084 ms
+```
+
+All five checks pass: the custom scan node is present, the executor is `SegmentedTopKExec`, the Top-K lines mirror `ORDER BY pdb.score(id) DESC, id ASC LIMIT 10`, three segments are touched, and the Tantivy query shows both predicates — the text term and the fast-field range — evaluated inside the index.
+
+## Write-heavy vs read-heavy
+
+| profile | index DDL | knobs | avoid |
+|---|---|---|---|
+| write-heavy (ingest, logs, feeds) | fewest tokenizers that work — `literal` where possible, no `ngram` on wide text; index only the fast fields you query | raise `mutable_segment_rows` during loads; `work_mem` up for bulk sessions | `layer_sizes` (foreground merging would tax every write) |
+| read-heavy (search UI, dashboards, facets) | richer tokenizers on prose, `fast=true` on any text you sort, aggregate, or join on; boosts live in the query, not the index | defaults usually right; keep segments consolidated by leaving background merging enabled | tiny `mutable_segment_rows` — many small frozen segments multiply per-segment work in every Top-K scan |
+
+Batch inserts are the other lever on the write path: `db.InsertProducts(ctx, pool, ps)` sends many rows per statement, and the mutable segment buffers across statements regardless — so small transactions stay cheap too ([the write path, concretely](/paradedb/architecture#writes-a-concrete-session)).
+
+## What Enterprise adds
+
+Nothing on this page is license-gated — every knob and every pushdown path above is Community (AGPL-3.0). The split is deployment topology only: Community runs the paradedb index on the primary ("cluster size 1"), while Enterprise adds high availability and **read replicas of the paradedb index** — so offloading index-heavy reads to replicas is an Enterprise capability, not a setting. Full comparison in [architecture: license split](/paradedb/architecture#license-split).

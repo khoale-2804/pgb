@@ -543,6 +543,7 @@ pgb/
   standalone/              # pgb-gen: oliphant-only entry, same IR/passes
   internal/golden/         # golden files + runner
   example/                 # demo schema (incl. USING paradedb DDL) + docker-compose + e2e
+  docs/                    # Mintlify site (3 tabs: Docs / ParadeDB / Reference; 35 pages incl. errors, performance, migrations, recipes, internals)
   Makefile                 # sqlc@main install, generate, test, compose-up
 ```
 
@@ -581,7 +582,7 @@ Marked as the post-v0.1 expansion. Three components, phased; the sqlc-plugin pat
 
 **P1 — declarative multi-file schema DSL (`pgb/*.pgb`).** Prisma-style `model` declarations with first-class ParadeDB annotations (`@search(tokenizer:, path:, alias:)`, `@@paradedb(keyField:)`) — no other schema language can express a search index. Lossless projection to PG18/19 DDL (generated columns, temporal constraints, ranges). DSL parser → the same SchemaIR; SQL-first `schema.sql` path unchanged. Exit: DSL → identical codegen output as the SQL path on the same schema.
 
-**P2 — encoded IR artifact + `pgb migrate`.** Every generation writes `.pgb/schema.bin` (protobuf SchemaIR + pgb version + content hash — the DMMF/migration-lock analogy). Companion tool diffs artifact vs live catalog **in a shadow database** (Prisma Migrate approach): `pgb migrate dev` (auto-apply in dev, destructive changes confirmed interactively), `pgb migrate deploy` (explicit, reviewable SQL for prod), `pgb migrate diff`, `pgb migrate status` (drift report). The diff engine is the hard part: full `pg_catalog` coverage — oliphant-informed catalog work pointed IR→catalog (reverse of §4). Exit: shadow-DB diff correct on the integration schema set; dev/deploy flow e2e.
+**P2 — encoded IR artifact + `pgb migrate`.** Every generation writes `.pgb/schema.bin` (protobuf SchemaIR + pgb version + content hash — the DMMF/migration-lock analogy). Companion tool diffs artifact vs live catalog **in a shadow database** (Prisma Migrate approach): `pgb migrate dev` (auto-apply in dev, destructive changes confirmed interactively), `pgb migrate deploy` (explicit, reviewable SQL for prod), `pgb migrate diff`, `pgb migrate status` (drift report). The diff engine is the hard part: full `pg_catalog` coverage — oliphant-informed catalog work pointed IR→catalog (reverse of §4). Exit: shadow-DB diff correct on the integration schema set; dev/deploy flow e2e. Until then, v0.1 documents the interim story in `guides/migrations` (goose/golang-migrate loop).
 
 **P3 — relation-aware ORM client (pure Go, pgx-native).** Relations promoted from non-goal: `@relation(fields:, references:)` in the DSL, generated `client.User.FindMany(User.Where(...)).Include(User.Include.Posts()).Take(n).Exec(ctx)`. Eager loading via `pgx.Batch` pipelining (one round trip per include level — no N+1, no Rust engine process like Prisma). Statics/builders/search from v0.1 unchanged — the ORM adds traversal on top. Exit: Include-based loading with zero N+1 in tests.
 
@@ -611,3 +612,4 @@ Concise engineering version of `docs/reference/support-matrix.mdx` (the user-fac
 ## Changelog
 
 - 2026-09-13 (b): generated output consolidated into ONE package db (dbgen + models_package retired); executor param renamed exec; docs IA reorganized (Postgres tab folded into Reference).
+- 2026-09-13 (c): docs IA consolidated to 3 tabs (Generated code folded into Docs, Resources into Reference); 7 new pages (errors, performance, migrations, recipes, internals/emitter, internals/codegen-pipeline, paradedb/performance).

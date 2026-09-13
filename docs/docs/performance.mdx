@@ -1,0 +1,150 @@
+---
+title: "Indexes & performance"
+description: "What indexes the generated layer expects, why emitted SQL is sargable by construction, and an EXPLAIN workflow to audit it."
+icon: "gauge-high"
+---
+
+pgb emits clean SQL, but it cannot create indexes. Every generated function is written against an index you are expected to have; when the index is missing, the SQL is still correct — just slow. This page maps each generated shape to the index it assumes, explains why the SQL stays sargable, and gives the `EXPLAIN` workflow for auditing both.
+
+## Indexes the generated layer expects
+
+| generated shape | SQL shape | index expected |
+|---|---|---|
+| `GetUser`, `UpdateUser`, `DeleteUser` | `WHERE id = $1` | the primary key (automatic) |
+| `GetUserByEmail`, unique-filter lookups | `WHERE email = $1` | unique btree on that column |
+| `ListUsers` with filters | `WHERE email LIKE $1 AND created_at > $2` | btree per frequently filtered column |
+| keyset pagination on a unique key | `WHERE id > $1 ORDER BY id ASC LIMIT $2` | btree on the keyset column, in keyset order |
+| search pages (score + id tiebreak) | `ORDER BY pdb.score(id) DESC, id ASC LIMIT $3` | `USING paradedb` index, plus the btree on the `id` tiebreak |
+| joins on FK columns (e.g. `orders.user_id`) | `WHERE user_id = $1` | btree on the FK side |
+
+Only the primary key is automatic. The rest is plain `CREATE INDEX` work:
+
+```sql
+CREATE UNIQUE INDEX users_email_key   ON public.users (email);
+CREATE INDEX users_created_at_idx     ON public.users (created_at);
+CREATE INDEX orders_user_id_idx       ON public.orders (user_id);
+```
+
+<Note>
+The paradedb index itself is declared in `schema.sql` as `USING paradedb` DDL and pgb generates the search layer from it — see [index DDL](/paradedb/index-ddl). Deep pg_search tuning (segment sizing, tokenizer choices, layer merges) lives in [ParadeDB performance](/paradedb/performance); this page stays on the Postgres side.
+</Note>
+
+## Sargable by construction
+
+Generated filters compose the WHERE clause structurally: each non-nil filter field contributes exactly one `column operator parameter` predicate, and filters are ANDed. Two properties fall out for free:
+
+- **No functions on the indexed column.** A predicate like `WHERE lower(email) = $1` or `WHERE date(created_at) = $1` cannot use a plain btree, because the planner sees an expression, not the column. pgb emits the bare column (`email LIKE $1`, `created_at > $2`) and leaves the value as a bound parameter — the index stays usable.
+- **No OR-across-columns traps.** Optional filters never widen into disjunctions over unrelated columns, which would defeat index selection and row estimates.
+
+The contrast is the hand-written sqlc pattern for optional filters:
+
+```sql
+-- the anti-pattern: one query, every filter optional
+SELECT id, email, name FROM public.users
+WHERE (@email IS NULL OR email = @email)
+  AND (@created_after IS NULL OR created_at > @created_after)
+```
+
+```sql
+-- what pgb emits for UserFilter{EmailLike: pgb.Opt("%@corp.io"), CreatedAfter: pgb.Opt(since)}
+SELECT id, email, name, bio, metadata, tags, created_at, last_login_at
+FROM public.users
+WHERE email LIKE $1 AND created_at > $2
+```
+
+With `OR` per filter, the planner either builds a generic plan that must handle every combination or falls back to re-planning per call — and row estimates degrade either way. The generated clause is fixed per call shape, so the planner sees an ordinary conjunctive predicate with normal statistics.
+
+<Warning>
+The escape hatches — `Filter.Extra []core.Expr` and `core.Raw` — can emit anything, including predicates that kill index usage. They are your code: apply the same sargability standard there that pgb applies for you.
+</Warning>
+
+One caveat the generator cannot fix: `EmailLike` with a leading wildcard (`"%@corp.io"`) is not btree-sargable in any form. For substring search on a hot column, add a `pg_trgm` GIN index and keep the `LIKE`; for real relevance ranking, that column belongs in a paradedb index instead.
+
+## LIMIT and Top-K
+
+`LIMIT` turns a sorted scan into a cheap one whenever the ORDER BY matches an index: Postgres walks the index in order and stops after the requested rows, so `ListUsers(ctx, pool, db.UserFilter{}, pgb.Limit(20))` with keyset pagination on `id` reads 21 index entries, not the table.
+
+Search functions rely on the same mechanics twice. The emitted `ORDER BY pdb.score(id) DESC, id ASC LIMIT $n` is a Top-K shape, and pg_search executes it as a segmented top-K heap inside the index rather than scoring every match — the `(score, id)` composite is why the `id` tiebreak column must be indexed for Top-K execution. Keep a `LIMIT` on every search call: unbounded searches forfeit the pushdown and force full scoring.
+
+```go
+hits, err := db.SearchProducts(ctx, pool, "runing shoes", db.SearchOpts{
+    Fuzzy:   1,
+    Snippet: "description",
+    Limit:   20,   // Top-K stays a Top-K
+})
+```
+
+```sql
+SELECT id, seller_id, title, pdb.score(id) AS score
+FROM public.products
+WHERE description === $1::pdb.fuzzy(1)
+ORDER BY pdb.score(id) DESC, id ASC
+LIMIT $2
+```
+
+<Note>
+pg_search version-specific tuning — mutable segment thresholds, layer sizes, work_mem floors — is out of scope here. See [ParadeDB performance](/paradedb/performance).
+</Note>
+
+## The EXPLAIN workflow
+
+Take the SQL from your query logs (see [errors → debugging](/docs/errors) for the tracer) and audit it in three steps:
+
+1. **Plan shape** — `Index Scan` or `Index Only Scan` is what you want for point reads and keyset pages; `Seq Scan` on a large table means a missing (or unusable) index. `Bitmap Heap Scan` is fine for filters that match a moderate fraction of the table.
+2. **Estimate vs actual rows** — `rows=` in the plan node versus `actual rows=`. A large skew means stale statistics: run `ANALYZE public.users`.
+3. **Loops and buffers** — `loops=` multiplies per-iteration cost (a nested loop with a bad outer estimate is the classic N+1 signature); `Buffers: shared read=` shows physical I/O.
+
+Concrete example — `ListUsers` filtering on `created_at` with no supporting index:
+
+```sql
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT id, email, name, bio, metadata, tags, created_at, last_login_at
+FROM public.users
+WHERE created_at > $1
+ORDER BY id ASC
+LIMIT $2;
+```
+
+```text
+Limit (cost=0.00..358.21 rows=20) (actual time=41.902..41.910 rows=20 loops=1)
+  ->  Sort (cost=358.16..369.41 rows=4500 width=120) (actual time=41.898..41.903 rows=20 loops=1)
+        Sort Key: id
+        Sort Method: top-N heapsort  Memory Usage: 27kB
+        ->  Seq Scan on users (cost=0.00..242.00 rows=4500 width=120)
+            (actual time=0.021..33.580 rows=4382 loops=1)
+            Filter: (created_at > '2026-09-01 00:00:00+00'::timestamp with time zone)
+            Rows Removed by Filter: 15618
+            Buffers: shared hit=142 read=98
+Planning Time: 0.145 ms
+Execution Time: 41.943 ms
+```
+
+The `Seq Scan` plus `Rows Removed by Filter` is the tell — Postgres read all 20,000 rows to serve 20. Add the index and re-run:
+
+```sql
+CREATE INDEX users_created_at_idx ON public.users (created_at);
+ANALYZE public.users;
+```
+
+```text
+Limit (cost=0.29..108.71 rows=20) (actual time=0.118..0.174 rows=20 loops=1)
+  ->  Index Scan using users_pkey on users (cost=0.29..24280.02 rows=4500 width=120)
+      (actual time=0.116..0.169 rows=20 loops=1)
+        Filter: (created_at > '2026-09-01 00:00:00+00'::timestamp with time zone)
+        Buffers: shared hit=5
+Planning Time: 0.231 ms
+Execution Time: 0.192 ms
+```
+
+Index scan, single-digit buffer hits, 200x faster — and the estimate (4500) is close enough to actual (4382) that the planner's join and cost choices downstream stay trustworthy.
+
+<Warning>
+`EXPLAIN` without `ANALYZE` shows only estimates — always audit with `ANALYZE, BUFFERS`. It executes the query, so on write statements wrap the run in `BEGIN` / `ROLLBACK`.
+</Warning>
+
+## See also
+
+- [Static functions](/generated-code/statics) — the CRUD shapes whose SQL this page audits.
+- [Pagination](/generated-code/pagination) — keyset cursors and the `(score, id)` composite.
+- [ParadeDB performance](/paradedb/performance) — pg_search index internals and tuning.
+- [Postgres version gates](/postgres/version-gates) — which plan features require which server version.

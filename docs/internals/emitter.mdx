@@ -1,0 +1,205 @@
+---
+title: "Emitter internals"
+description: "How the expression tree becomes byte-identical SQL — the walk, parameter assignment, quoting, casts, Raw renumbering, and the dialect extension boundary."
+icon: "code"
+---
+
+The emitter is the single funnel between pgb and Postgres: one pass over an [`Expr` tree](/reference/core-api#expression-tree) that fills a `strings.Builder` and an ordered `args []any`. Every layer — statics, builders, handwritten wrappers' helper predicates — compiles to a tree and emits through it. That funnel is why pgb can promise two things at once: no value ever lands in SQL text, and the same tree always produces byte-identical SQL.
+
+## The walk
+
+Each `Expr` implements `emit(*emitter)`. The emitter is a tiny struct: the builder, the args slice, the dialect (operator whitelist), and the current parameter count. Emission is depth-first, left-to-right, single pass — there is no analysis phase, no rewrite phase, no second look at anything.
+
+```go
+type emitter struct {
+    sb     strings.Builder
+    args   []any
+    n      int      // parameters emitted so far
+    dialect Dialect // operator/function whitelist, core + registered extensions
+}
+
+func (e *emitter) param(v any, cast string) string {
+    e.n++
+    e.args = append(e.args, v)
+    if cast != "" {
+        return fmt.Sprintf("$%d::%s", e.n, cast)
+    }
+    return fmt.Sprintf("$%d", e.n)
+}
+```
+
+`Bin` renders `L Op R`, `And`/`Or` join their parts (parenthesizing a nested `Or`), `Not` wraps in `NOT (...)`, `Col` renders the (quoted-on-demand) identifier, and `Lit` registers a parameter. That is the entire grammar.
+
+### Worked trace
+
+The composed `Where` from the [builders page](/generated-code/builders):
+
+```go
+active, err := db.Users.Select().
+    Where(
+        db.Or(
+            db.Users.Email().Like("%@corp.io"),
+            db.Users.Email().Like("%@example.com"),
+        ),
+        db.Users.LastLoginAt().Gte(since),
+        db.Users.Tags().Contains([]string{"beta"}),
+    ).
+    OrderBy(db.Users.ID().Asc()).
+    All(ctx, pool)
+```
+
+The descriptors never see SQL — they build a tree:
+
+```go
+core.And{Parts: []core.Expr{
+    core.Or{Parts: []core.Expr{
+        core.Bin{Op: "LIKE", L: core.Col{Table: "public", Name: "users.email"}, R: core.Lit{V: "%@corp.io"}},
+        core.Bin{Op: "LIKE", L: core.Col{Table: "public", Name: "users.email"}, R: core.Lit{V: "%@example.com"}},
+    }},
+    core.Bin{Op: ">=", L: core.Col{Table: "public", Name: "users.last_login_at"}, R: core.Lit{V: since}},
+    core.Bin{Op: "@>", L: core.Col{Table: "public", Name: "users.tags"}, R: core.Lit{V: []string{"beta"}, Cast: "text[]"}},
+}}
+```
+
+The walk, step by step — the buffer column shows what is appended, the args column shows the slice growing:
+
+| step | node | buffer appends | args after |
+|---|---|---|---|
+| 1 | `And` (top) | — recurse into parts, no parens | `[]` |
+| 2 | `Or` (nested) | `(` | `[]` |
+| 3 | `Bin{"LIKE"}` left side | `email LIKE ` | `[]` |
+| 4 | `Lit{"%@corp.io"}` | `$1` | `["%@corp.io"]` |
+| 5 | `Or` separator | ` OR ` | `["%@corp.io"]` |
+| 6 | `Bin{"LIKE"}` second left | `email LIKE ` | `["%@corp.io"]` |
+| 7 | `Lit{"%@example.com"}` | `$2` | `["%@corp.io", "%@example.com"]` |
+| 8 | `Or` close | `)` | unchanged |
+| 9 | `And` separator | ` AND ` | unchanged |
+| 10 | `Bin{">="}` whole | `last_login_at >= $3` | `[..., since]` |
+| 11 | `And` separator | ` AND ` | unchanged |
+| 12 | `Bin{"@>"}` whole | `tags @> $4::text[]` | `[..., []string{"beta"}]` |
+
+The statement builder wraps this emitted fragment with the SELECT head and tail it owns:
+
+```sql
+SELECT id, email, name, bio, metadata, tags, created_at, last_login_at
+FROM public.users
+WHERE (email LIKE $1 OR email LIKE $2)
+  AND last_login_at >= $3
+  AND tags @> $4::text[]
+ORDER BY id ASC
+```
+
+Parameter numbering falls out of the walk order — depth-first, left-to-right — so `$n` is assigned the moment a value is reached, and the args slice is append-only. Nothing is ever emitted out of order, which is why nothing ever needs to be renumbered. Except `Raw` — see [Raw compositing](#raw-compositing-and-renumbering).
+
+## Identifier quoting
+
+Identifiers come from the [SchemaIR](/architecture/schema-ir), not from user input, so the emitter can quote on demand instead of quoting everything:
+
+| identifier | emitted | why |
+|---|---|---|
+| `public.users` | `public.users` | lowercase, no special chars — no quotes needed |
+| `users.email` | `email` (unqualified in WHERE) | the statement's FROM pins the table; qualification only when ambiguous |
+| a column named `order` | `"order"` | reserved keyword |
+| a table named `User` | `"User"` | mixed case folds without quotes |
+| a column named `price$` | `"price$"` | special character |
+
+The rule is the standard Postgres one: quote unless the identifier is entirely lowercase and unreserved. Generated code satisfies it trivially because the IR holds the exact spelling from the DDL — the emitter never corrects case, it preserves it.
+
+## Cast emission
+
+Two mechanisms, one syntax shape.
+
+**Parameter casts** — `Lit.Cast` is a hint rendered as `$n::<cast>`. It appears when the parameter's Postgres type cannot be inferred from context or from the Go type alone:
+
+| situation | emission | reason |
+|---|---|---|
+| array predicate (`tags @> [...]`) | `$4::text[]` | pgx must encode the Go slice as an array, not `''` |
+| **empty** Go slice | `$1::text[]` | without the cast an empty slice has no element type to infer from |
+| string bound against `interval` (`now() - $2::interval`) | `$2::interval` | the SQL context says interval, the Go value is a string |
+| plain `time.Time`, `int64`, `string` | `$3` | pgx's type map already encodes it correctly |
+
+The empty-slice case is the one that bites hand-rolled SQL — a naive `fmt.Sprintf` produces a bare `$1`, pgx cannot type it, and the query fails only when someone filters by an empty set. The emitter's cast makes the empty case byte-identical to the populated one.
+
+**Expression casts** — the `Cast{E, To}` node renders `(<inner>)::<To>` and is how the [ParadeDB scoring casts](/paradedb/predicates) compose:
+
+```go
+db.Products.Title().Match("shoes").Boost(2.0)
+// (title::pdb.boost(2.0)) ||| $1 — the cast is part of the tree, not the value
+```
+
+## Determinism
+
+Same tree in, byte-identical SQL out. This is a property of construction, not discipline:
+
+- **Single pass, fixed order.** Depth-first, left-to-right; parameters numbered on arrival. No output depends on evaluation order of anything external.
+- **No maps in the emission path.** Column order, field order, and set order come from the IR's slices, which preserve DDL order. Nothing iterates a Go map to produce SQL.
+- **No environment.** The emitter reads no config, no clock, no locale. `now()` in SQL is Postgres's business, not the emitter's.
+
+Three test layers pin it (see [codegen pipeline](/internals/codegen-pipeline#where-golden-tests-pin-each-pass)):
+
+1. **Golden generated-code tests** — `testdata/schema.sql` → committed snapshots of every generated file; a diff is reviewable in the PR.
+2. **Round-trip property test** — emitted SQL is fed back through oliphant (the same PG18 parser pgb uses for DDL) and must re-parse to the same statement shape, catching malformed emission generically.
+3. **Golden SQL in examples** — every SQL block on this docs site is generated output, so prose and behavior cannot drift apart.
+
+Determinism is also the exit criterion for bigger changes: the 2.0 plugin split ships only when output is byte-identical before and after.
+
+## Raw compositing and renumbering
+
+`core.Raw(sql, args...)` is an ordinary `Expr`, so it composes into any predicate or projection position. Its SQL is opaque — the emitter appends it verbatim except for one transformation: **placeholder renumbering**.
+
+The contract for Raw authors: write the SQL self-contained, with `$1..$m` referring to the Raw's own args in order. When the walk reaches the Raw, the emitter shifts every `$n` token in the string by the number of parameters already emitted, then appends the Raw's args:
+
+```go
+Where(
+    db.Products.Description().Match("shoes"),   // emits $1
+    core.Raw("rating > $1 AND created_at > now() - $2::interval",
+        minRating, window),                     // $1 → $2, $2 → $3
+)
+```
+
+```sql
+WHERE description ||| $1
+  AND rating > $2 AND created_at > now() - $3::interval
+```
+
+The offset shift is why Raw fragments never collide with generated parameters, no matter where they compose — middle of a WHERE, inside an `Or`, as a projection. Two rules keep it safe:
+
+- Every `$n`-shaped token in a Raw string is treated as a placeholder. Never write `$1`-looking text that is not one (no dollar-quoted strings containing `$1`).
+- Values go in `Args`, always. The renumbering pass knows the arg count; a value concatenated into the SQL string is invisible to it and to the injection guarantee below.
+
+<Note>
+A Raw whose args arrive via `Raw(sql, args...)` participates in the same determinism guarantees as generated code — same tree, same byte-identical output. Only the string itself is trusted as structure.
+</Note>
+
+## The injection boundary
+
+The emitter splits the world into **structure** (emitted into SQL text) and **values** (always bound). The split is enforced by construction:
+
+| input | kind | source |
+|---|---|---|
+| table/column identifiers | structure | SchemaIR — from your DDL, never from user input |
+| operators (`=`, `LIKE`, `\|\|\|`, `@>`) | structure | generated code and the dialect whitelist |
+| function names (`pdb.score`, `count`) | structure | generated code and the dialect whitelist |
+| cast targets (`text[]`, `pdb.fuzzy(0.3)`) | structure | generated code |
+| predicate values | value → `$n` | your call site |
+| `Raw` args | value → `$n` | your call site |
+| `Raw` SQL string | structure | your hands — the one place trust shifts to the author |
+
+A descriptor predicate physically cannot smuggle a value into the text: identifiers are IR constants and every `Lit` becomes a parameter. The one exception is deliberate — `Raw`'s SQL string is developer-authored structure, and the [core API](/reference/core-api#raw-compositing) says so plainly: values concatenated into a Raw string are outside the guarantee.
+
+## The DialectExtension hook
+
+The core emitter only emits operators and functions it knows. Plugin runtimes widen that vocabulary through a `DialectExtension` registration — operator tokens, function names, cast shapes — and the emitter validates against the union:
+
+```go
+// the shape of the registration (see /future/plugins for the full system)
+pgb.RegisterDialect(pgb.DialectExtension{
+    Operators: []string{"|||", "&&&", "###", "===", "@@@", "##", "##>"},
+    Functions: []string{"pdb.score", "pdb.match", "pdb.snippet", "pdb.agg"},
+    Casts:     []string{"pdb.fuzzy", "pdb.boost", "pdb.slop", "pdb.whitespace"},
+})
+```
+
+Validation happens at **generate time**: if generated code tries to emit an operator that is neither core nor registered by an enabled extension, codegen fails naming the operator. A typo'd operator or a missing plugin dependency is a build-time error, never a runtime surprise — the same fail-closed philosophy as the cursor mismatch sentinel.
+
+Through v0.1 the pg_search vocabulary lives in `core/search.go` behind the `paradedb.version` gate — the churn barrier that keeps the rest of the emitter generic Postgres. The `DialectExtension` interface is that barrier's extracted form: [how the hook points fit the pipeline](/internals/codegen-pipeline#plugin-hook-points), and the [plugin system](/future/plugins) around them.

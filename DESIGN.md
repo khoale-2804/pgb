@@ -45,7 +45,9 @@ schema.sql (+ queries.sql)                       sqlc.yaml (options = pgb config
 └──────────────┬───────────────────────────────────────────────────┘
                │ GenerateResponse { File{name, contents} }
                ▼
-        db/ (models + query wrappers)      dbgen/ (builders + statics)
+        db/  — ONE generated package:
+               models.gen.go · <table>.gen.go per table (descriptors +
+               builders + statics) · <table>_search.gen.go
                │ imports (runtime only)
                ▼
         core/ — handwritten runtime: expression tree, SQL emitter,
@@ -138,11 +140,10 @@ sql:
     schema: schema.sql
     queries: queries.sql          # optional, handwritten only
     codegen:
-      - out: dbgen
+      - out: db
         plugin: pgb
         options:
-          package: dbgen
-          models_package: db
+          package: db
           core: github.com/you/pgb/core
           target: "18"            # emitter dialect gate: "18" | "19"
           paradedb:
@@ -159,7 +160,7 @@ plugins:
     process: { cmd: sqlc-gen-pgb }
 ```
 
-Run `sqlc generate` → `db/` + `dbgen/` appear. Handwritten `.sql` queries get typed wrappers from the same plugin (pass A), so `gen: go:` is simply not configured.
+Run `sqlc generate` → the single `db/` package appears. Models, query wrappers, descriptors, builders, and static functions are emitted into ONE package (`db`) — one type map end-to-end; the executor param is named `exec` in generated signatures so call sites never shadow the package. Handwritten `.sql` queries get typed wrappers from the same plugin (pass A), so `gen: go:` is simply not configured.
 
 **Version note (2026-09-13):** the PG18 parser (oliphant) and unknown-function tolerance are merged on sqlc **main**, not in any release (latest release v1.31.1). Until the next tagged release, the Makefile installs sqlc from main: `go install github.com/sqlc-dev/sqlc/cmd/sqlc@main`. On v1.31.1 the schema still parses (PG17 grammar handles all of it, including `USING paradedb`), but handwritten queries touching `pdb.*` fail analysis — with main they degrade to untyped `any` columns (main-branch behavior, unreleased — confidence medium).
 
@@ -353,11 +354,11 @@ type ProductHit struct {
     Snippet map[string]string   // per snippet'd field
 }
 
-func SearchProducts(ctx context.Context, db pgb.DBTX, q string, o SearchOpts) ([]ProductHit, error)
+func SearchProducts(ctx context.Context, exec pgb.DBTX, q string, o SearchOpts) ([]ProductHit, error)
 // SELECT id, name, pdb.score(id) AS score, pdb.snippet(description, start_tag => '<em>') AS snip
 // FROM products WHERE description ||| $1 ORDER BY pdb.score(id) DESC, id LIMIT $2
 
-func SearchProductsHybrid(ctx context.Context, db pgb.DBTX, q string, vec []float32, o HybridOpts) ([]ProductHit, error)
+func SearchProductsHybrid(ctx context.Context, exec pgb.DBTX, q string, vec []float32, o HybridOpts) ([]ProductHit, error)
 ```
 
 Hybrid emits the documented RRF pattern (0.26-rc improves execution — vector pushdown for RRF and vector tiebreak ordering — which our shape benefits from automatically):
@@ -390,9 +391,9 @@ Requires the `vector` type override + `vector_dim` config to type `$2::vector`; 
 
 ---
 
-## 9. Generated code — stage 1: descriptors + builders (`dbgen/`)
+## 9. Generated code — stage 1: descriptors + builders (`db` package)
 
-Per table `users` (files: `dbgen/users.gen.go`, plus `dbgen/users_search.gen.go` when indexed):
+Per table `users` (files: `db/users.gen.go`, plus `db/users_search.gen.go` when indexed):
 
 ```go
 // Descriptors — package-level, immutable
@@ -431,19 +432,19 @@ func (c UserBioCol) Match(q string) core.Expr
 Statement builders — fluent, terminators execute:
 
 ```go
-u, err := dbgen.Users.Select().
-    Where(dbgen.Or(
-        dbgen.Users.Email().Like("%@corp"),
-        dbgen.Users.CreatedAt().Gte(since))).
-    OrderBy(dbgen.Users.CreatedAt().Desc()).
+u, err := db.Users.Select().
+    Where(db.Or(
+        db.Users.Email().Like("%@corp"),
+        db.Users.CreatedAt().Gte(since))).
+    OrderBy(db.Users.CreatedAt().Desc()).
     Limit(20).
-    All(ctx, db)                       // ([]db.User, error)
+    All(ctx, pool)                       // ([]db.User, error)
 
-dbgen.Users.Select().Where(...).Count(ctx, db)         // (int64, error)
-dbgen.Users.Select().Where(...).Exists(ctx, db)        // (bool, error)
-dbgen.Users.Select().Where(...).One(ctx, db)           // (db.User, error) — errors if >1
-dbgen.Users.Delete().Where(...).Exec(ctx, db)          // (int64, error)
-dbgen.Users.Update().Set(Email, v).Where(...).Returning().All(ctx, db)
+db.Users.Select().Where(...).Count(ctx, pool)         // (int64, error)
+db.Users.Select().Where(...).Exists(ctx, pool)        // (bool, error)
+db.Users.Select().Where(...).One(ctx, pool)           // (db.User, error) — errors if >1
+db.Users.Delete().Where(...).Exec(ctx, pool)          // (int64, error)
+db.Users.Update().Set(Email, v).Where(...).Returning().All(ctx, pool)
 ```
 
 **Safety guard:** `Update`/`Delete` with an empty WHERE return `pgb.ErrNoWhere` — full-table mutations require `.AllowAll()` explicitly. (Runtime guard, not a type machine — kept simple on purpose.)
@@ -451,20 +452,20 @@ dbgen.Users.Update().Set(Email, v).Where(...).Returning().All(ctx, db)
 Keyset pagination (`emit.keyset`, requires a unique sortable key or `(score, id)` composite for search):
 
 ```go
-rows, next, more, err := dbgen.Users.Select().OrderBy(dbgen.Users.ID().Asc()).
-    Page(ctx, db, pgb.CursorOf(prev), 50)
+rows, next, more, err := db.Users.Select().OrderBy(db.Users.ID().Asc()).
+    Page(ctx, pool, pgb.CursorOf(prev), 50)
 ```
 
 ---
 
-## 10. Generated code — stage 2: static functions (`dbgen/users.gen.go`)
+## 10. Generated code — stage 2: static functions (`db/users.gen.go`)
 
 The "never write manual sqlc for CRUD" layer:
 
 ```go
-func GetUser(ctx context.Context, db pgb.DBTX, id int64) (db.User, error)             // pgb.ErrNotFound
-func ListUsers(ctx context.Context, db pgb.DBTX, f UserFilter, o ...pgb.ListOpt) ([]db.User, error)
-func CountUsers(ctx context.Context, db pgb.DBTX, f UserFilter) (int64, error)
+func GetUser(ctx context.Context, exec pgb.DBTX, id int64) (db.User, error)             // pgb.ErrNotFound
+func ListUsers(ctx context.Context, exec pgb.DBTX, f UserFilter, o ...pgb.ListOpt) ([]db.User, error)
+func CountUsers(ctx context.Context, exec pgb.DBTX, f UserFilter) (int64, error)
 
 type UserFilter struct {
     ID           *int64
@@ -475,8 +476,8 @@ type UserFilter struct {
     Extra        []core.Expr        // escape hatch — composes with the generated filters
 }
 
-func InsertUser(ctx context.Context, db pgb.DBTX, p InsertUserParams) (db.User, error)
-func InsertUsers(ctx context.Context, db pgb.DBTX, ps []InsertUserParams) ([]db.User, error)
+func InsertUser(ctx context.Context, exec pgb.DBTX, p InsertUserParams) (db.User, error)
+func InsertUsers(ctx context.Context, exec pgb.DBTX, ps []InsertUserParams) ([]db.User, error)
     // INSERT … SELECT * FROM unnest($1::text[], $2::timestamptz[], …) RETURNING <explicit cols>
     // arbitrary batch size + RETURNING; pgx.CopyFrom variant opt-in for pure bulk (no RETURNING)
 
@@ -485,16 +486,16 @@ type UserSet struct {                       // three-state via core.Set[T]
     Bio     core.Set[string]
 }
 
-func UpdateUser(ctx context.Context, db pgb.DBTX, id int64, s UserSet) (db.User, error)
-func UpdateUsers(ctx context.Context, db pgb.DBTX, where []core.Expr, s UserSet) (int64, error)
-func UpsertUser(ctx context.Context, db pgb.DBTX, p InsertUserParams, o UpsertOpts) (db.User, error)
+func UpdateUser(ctx context.Context, exec pgb.DBTX, id int64, s UserSet) (db.User, error)
+func UpdateUsers(ctx context.Context, exec pgb.DBTX, where []core.Expr, s UserSet) (int64, error)
+func UpsertUser(ctx context.Context, exec pgb.DBTX, p InsertUserParams, o UpsertOpts) (db.User, error)
     // ON CONFLICT (email) DO UPDATE SET … WHERE … RETURNING …
     // UpsertOpts.OnSelect on target 19 → ON CONFLICT DO SELECT RETURNING
-func DeleteUser(ctx context.Context, db pgb.DBTX, id int64) error
-func DeleteUsers(ctx context.Context, db pgb.DBTX, where []core.Expr) (int64, error)
+func DeleteUser(ctx context.Context, exec pgb.DBTX, id int64) error
+func DeleteUsers(ctx context.Context, exec pgb.DBTX, where []core.Expr) (int64, error)
 
-func SearchUsers(ctx context.Context, db pgb.DBTX, q string, o UserSearchOpts) ([]UserHit, error)        // §8.4
-func SearchUsersHybrid(ctx context.Context, db pgb.DBTX, q string, vec []float32, o UserHybridOpts) ([]UserHit, error)
+func SearchUsers(ctx context.Context, exec pgb.DBTX, q string, o UserSearchOpts) ([]UserHit, error)        // §8.4
+func SearchUsersHybrid(ctx context.Context, exec pgb.DBTX, q string, vec []float32, o UserHybridOpts) ([]UserHit, error)
 ```
 
 Every function: explicit column lists, bound args, `pgb.ErrNotFound` sentinel wrapping `pgx.ErrNoRows`, tx-compatible via `DBTX`.
@@ -604,3 +605,9 @@ Concise engineering version of `docs/reference/support-matrix.mdx` (the user-fac
 | pgb targets | 0.25.9+ / 0.26-rc | v2 operator API (§8) |
 
 **Deprecation mechanism (PROPOSED).** (a) config `target` gate — hard error on unsupported emitter/feature combos, warning when a target nears EOL (within ~6 months); (b) `paradedb.version` gate — validation against known releases, error on unsupported combos; (c) codegen deprecation warnings emitted as comments in generated files one MINOR before a drop; (d) N-2 support window proposal — a Postgres major or ParadeDB floor is dropped only in a pgb MAJOR release, announced one MINOR ahead.
+
+---
+
+## Changelog
+
+- 2026-09-13 (b): generated output consolidated into ONE package db (dbgen + models_package retired); executor param renamed exec; docs IA reorganized (Postgres tab folded into Reference).

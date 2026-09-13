@@ -4,59 +4,97 @@ description: "Every pgb option in the sqlc.yaml codegen block."
 icon: "sliders"
 ---
 
-pgb is configured entirely through the `options:` block of its `codegen:` entry in sqlc.yaml (they arrive in the plugin as JSON bytes in `PluginOptions`):
+pgb is configured entirely through the `options:` block of its `codegen:` entry in sqlc.yaml (they arrive in the plugin as JSON bytes in `PluginOptions`).
+
+## The full config
+
+Every pgb option, annotated. If a key is not on this page, it does not exist — there is no `models_package`; everything lands in the single package named by `package`.
 
 ```yaml
+# sqlc.yaml — every pgb option, annotated
+version: '2'
+
+sql:
+  - engine: postgresql            # pgb is PostgreSQL-only
+    schema: schema.sql            # parsed with the PG18 parser (oliphant); COMMENT ON pgb: directives live here
+    queries: queries.sql          # optional — handwritten :one/:many/:exec queries
+    codegen:
+      - out: db                   # all generated files land under ./db — one directory, one package
+        plugin: pgb
+        options:
+          package: db             # the ONE generated Go package: models, handwritten-query
+                                  # wrappers, descriptors + builders, and statics share it
+          core: github.com/your-org/pgb/core
+                                  # import path of the handwritten runtime core —
+                                  # pgb.DBTX, pgb.Set, core.Expr, the emitter. Required.
+          target: "18"            # SQL emitter dialect gate: "18" (default) or "19" (beta gate —
+                                  # non-search emission only until ParadeDB ships PG19 binaries)
+          nullability: pgtype     # nullable columns as pgtype.Timestamptz &c (default),
+                                  # or "pointers" for *string / *time.Time
+          paradedb:
+            version: "0.26"       # pg_search emitter gate — tracks 0.26-rc on a 0.25.9+ floor;
+                                  # legacy values warn, unknown values error
+          emit:
+            batch: true           # InsertXxx batch functions (unnest-based) — on by default
+            keyset: true          # cursor pagination helpers (Page + pgb.CursorOf)
+            hybrid: true          # SearchXxxHybrid when a vector column exists
+            merge: false          # MERGE builder (PG17+) — off by default
+          include_defaults: false # false: default-bearing columns are omitted from INSERT lists
+          vector_dim:             # dimension for $n::vector param casts in hybrid search, per
+            products: 768         # table — must match the column's declared vector(n)
+          overrides:              # Go type overrides, sqlc-gen-go compatible
+            - db_type: vector     # whole Postgres type
+              go_type: github.com/pgvector/pgvector-go.Vector
+            - column: products.metadata   # single table.column
+              go_type: map[string]any
+
+plugins:
+  - name: pgb
+    process: { cmd: sqlc-gen-pgb }  # or wasm: { url: ..., sha256: ... } for distributed installs
+```
+
+## Minimal vs full
+
+The full config above adds nothing the defaults don't already cover — it exists to be annotated. The minimal config is genuinely short; the only required key is `core`, because pgb will not guess an import path for the runtime:
+
+```yaml
+# minimal — package db, target "18", pgtype nullability, batch/keyset/hybrid on
+version: '2'
 sql:
   - engine: postgresql
     schema: schema.sql
-    queries: queries.sql
     codegen:
-      - out: dbgen
+      - out: db
         plugin: pgb
         options:
-          package: dbgen
-          models_package: db
           core: github.com/your-org/pgb/core
-          target: "18"
-          nullability: pgtype
-          paradedb:
-            version: "0.26"
-          emit:
-            batch: true
-            keyset: true
-            hybrid: true
-            merge: false
-          include_defaults: false
-          vector_dim:
-            products: 768
-          overrides:
-            - db_type: vector
-              go_type: github.com/pgvector/pgvector-go.Vector
-            - column: products.metadata
-              go_type: map[string]any
 plugins:
   - name: pgb
     process: { cmd: sqlc-gen-pgb }
 ```
 
+Grow it only when a default stops fitting: switch `target` when you adopt PG19, add `paradedb.version` when you search, add `overrides` when a column type deserves a better Go type.
+
 ## Options
 
-| key | type | default | meaning |
-|---|---|---|---|
-| `package` | string | `dbgen` | package name of the generated builder/static layer |
-| `models_package` | string | `db` | package (and import path fallback) for the models layer |
-| `core` | string | — | import path of the handwritten `core` runtime |
-| `target` | `"18"` \| `"19"` | `"18"` | SQL emitter dialect gate — errors on unsupported feature combos (e.g. search emission with `target: "19"` until ParadeDB ships PG19 binaries); warns when the target major is within ~6 months of EOL — see [version gates](/postgres/version-gates) and the [support matrix](/reference/support-matrix) |
-| `nullability` | `pgtype` \| `pointers` | `pgtype` | representation of nullable columns |
-| `paradedb.version` | string | `"0.26"` | gate for the pg_search emitter; validated against known pg_search releases — `"0.26"` tracks 0.26-rc on a 0.25.9+ floor; unsupported combos error, near-EOL/legacy values warn |
-| `emit.batch` | bool | `true` | generate `InsertXxx` batch functions (unnest-based) |
-| `emit.keyset` | bool | `true` | generate cursor pagination helpers |
-| `emit.hybrid` | bool | `true` | generate `SearchXxxHybrid` when a vector column exists |
-| `emit.merge` | bool | `false` | generate the MERGE builder (PG17+) |
-| `include_defaults` | bool | `false` | include default-bearing columns in INSERT column lists |
-| `vector_dim` | map table→int | — | dimension for `$n::vector` param casts in hybrid search |
-| `overrides` | list | — | per-`db_type` or per-`column` Go type overrides, sqlc-gen-go compatible |
+| key | type | default | common values | meaning |
+|---|---|---|---|---|
+| `package` | string | `db` | `db` (near-universal), `sqlc` (drop-in migration from sqlc-gen-go) | Name of the ONE generated package. Models, handwritten-query wrappers, descriptors + builders, and static functions are all emitted into it — one type map, end to end |
+| `core` | string | — | `github.com/your-org/pgb/core`; a fork path pinned with a Go `replace` | Import path of the handwritten runtime core (`pgb.DBTX`, `pgb.Set`, `core.Expr`, the emitter). Generated files import it; required, no default |
+| `target` | `"18"` \| `"19"` | `"18"` | `"18"` (ParadeDB binaries exist — the safe default), `"19"` (beta gate, non-search emission only) | SQL emitter dialect gate — errors on unsupported feature combos (e.g. search emission with `target: "19"` until ParadeDB ships PG19 binaries); warns when the target major is within ~6 months of EOL — see [version gates](/postgres/version-gates) and the [support matrix](/reference/support-matrix) |
+| `nullability` | `pgtype` \| `pointers` | `pgtype` | `pgtype` (pgx-native, `.Valid` checks), `pointers` (`*string` / `*time.Time`, nil checks) | Representation of nullable columns — see [type mapping](/reference/type-mapping) |
+| `paradedb.version` | string | `"0.26"` | `"0.26"` (recommended — tracks 0.26-rc on a 0.25.9+ floor), `"0.25"` (legacy, warns) | Gate for the pg_search emitter; validated against known pg_search releases — unsupported combos error, legacy values warn — see the [support matrix](/reference/support-matrix) |
+| `emit.batch` | bool | `true` | `true` unless you never bulk insert | Generate `InsertXxx` batch functions (unnest-based) |
+| `emit.keyset` | bool | `true` | `true` when you paginate | Generate cursor pagination helpers — see [pagination](/generated-code/pagination) |
+| `emit.hybrid` | bool | `true` | `true` when a vector column exists | Generate `SearchXxxHybrid` when a vector column exists |
+| `emit.merge` | bool | `false` | `true` on PG17+ targets that want MERGE | Generate the MERGE builder (PG17+) |
+| `include_defaults` | bool | `false` | `false` (leaner INSERT lists), `true` (every column explicit) | Include default-bearing columns in INSERT column lists |
+| `vector_dim` | map table→int | — | `768`, `1536`, `3072` — match your embedding model | Dimension for `$n::vector` param casts in hybrid search; must match the column's declared `vector(n)` |
+| `overrides` | list | — | see [type mapping](/reference/type-mapping) for the recipe list | Per-`db_type` or per-`column` Go type overrides, sqlc-gen-go compatible |
+
+<Note>
+`package: db` is one package for everything: `db/models.gen.go`, the handwritten-query wrappers, the per-table descriptors and builders, and the static functions. There is no separate models package to import or keep in sync — the drift pgb exists to prevent is structural, not conventional.
+</Note>
 
 ## Overrides
 
@@ -71,7 +109,7 @@ overrides:
       import: map[string]any                 # or a full spec: import + package + type
 ```
 
-Overrides apply to the model field, the filter field, and the scan target at once — one type map, remember.
+Overrides apply to the model field, the filter field, and the scan target at once — one type map, remember. A [`pgb:type=` directive](/reference/directives) on the same column wins on conflict.
 
 ## Plugin declaration
 
@@ -86,4 +124,4 @@ Process plugins run as executables with the method name as `argv[1]`; sqlc pipes
 
 ## Do not configure `gen: go:`
 
-pgb emits the models layer itself. Configuring both would produce two model sets from two type maps — the drift pgb exists to prevent.
+pgb emits the models layer itself, into the same `package` as everything else. Configuring both would produce two model sets from two type maps — the drift pgb exists to prevent.

@@ -37,9 +37,105 @@ SearchIndex{
 - **Scoring** — `key_field` from `WITH` feeds `pdb.score(...)`. pgb prefers the primary key if `key_field` is absent; ParadeDB's one-index-per-table rule is enforced at parse time.
 - **`key_field` uniqueness caveat** — ParadeDB currently requires the key field to be UNIQUE and the first indexed column (a removal is in progress upstream). pgb parses tolerantly and warns, but emits `pdb.score` against the declared key field either way.
 
+## Three realistic definitions
+
+**1. Ecommerce products** — tokenizer casts per column and JSON aliases for attributes inside `metadata`:
+
+```sql
+CREATE TABLE products (
+  id          bigint PRIMARY KEY,
+  sku         text NOT NULL,
+  title       text NOT NULL,
+  description text NOT NULL,
+  metadata    jsonb NOT NULL,
+  rating      numeric(3,2),
+  in_stock    boolean NOT NULL DEFAULT true
+);
+
+CREATE INDEX products_search ON products USING paradedb
+  (id,
+   sku::pdb.literal,                                        -- one token per value; the === family
+   title::pdb.simple('stemmer=english', 'ascii_folding=true'),
+   description::pdb.icu,                                    -- robust multilingual segmentation
+   (metadata->'brand')::pdb.literal('alias=json_brand'),
+   (metadata->'color')::pdb.literal('alias=json_color'),
+   rating,
+   in_stock)
+  WITH (key_field='id');
+```
+
+This is the index the [SchemaIR](/architecture/schema-ir) records for it — the fuller version of the minimal example at the top of this page:
+
+```go
+SearchIndex{
+    Name:     "products_search",
+    Using:    "paradedb",
+    KeyField: "id",
+    Fields: []SearchField{
+        {Column: "id"},
+        {Column: "sku", Tokenizer: "literal", PGType: "text"},
+        {Column: "title", Tokenizer: "simple", Options: "stemmer=english, ascii_folding=true", PGType: "text"},
+        {Column: "description", Tokenizer: "icu", PGType: "text"},
+        {Path: "metadata->'brand'", Alias: "json_brand", Tokenizer: "literal", PGType: "jsonb"},
+        {Path: "metadata->'color'", Alias: "json_color", Tokenizer: "literal", PGType: "jsonb"},
+        {Column: "rating", PGType: "numeric"},
+        {Column: "in_stock", PGType: "boolean"},
+    },
+}
+```
+
+**2. Documentation corpus** — stemming for prose plus an edge-ngram autocomplete variant of the same column, with the plain field left un-aliased so `ORDER BY`/`GROUP BY` can still reference `title` directly:
+
+```sql
+CREATE TABLE docs (
+  id    int PRIMARY KEY,
+  title text NOT NULL,
+  body  text NOT NULL
+);
+
+CREATE INDEX docs_search ON docs USING paradedb
+  (id,
+   title::pdb.simple('stemmer=english'),                    -- un-aliased: the field's primary identity
+   title::pdb.edge_ngram(2, 12, 'alias=title_autocomplete'), -- search-as-you-type variant
+   body::pdb.simple('stemmer=english', 'ascii_folding=true'))
+  WITH (key_field='id');
+```
+
+**3. Hybrid table** — pgvector's `vector` type indexed inside the same index with the cosine opclass (pgvector is a required dependency since 0.25.0; only `vector` is indexable — not `halfvec`/`sparsevec`/`bit`):
+
+```sql
+CREATE EXTENSION IF NOT EXISTS vector;
+
+CREATE TABLE articles (
+  id        bigint PRIMARY KEY,
+  title     text NOT NULL,
+  body      text NOT NULL,
+  embedding vector(768) NOT NULL
+);
+
+CREATE INDEX articles_search ON articles USING paradedb
+  (id,
+   title::pdb.unicode_words,     -- explicit spelling of the default tokenizer
+   body::pdb.unicode_words,
+   embedding vector_cosine_ops)  -- L2 is the default metric; cosine here
+  WITH (key_field='id');
+```
+
+The distance opclass is baked into the index definition — switching `vector_cosine_ops` to `vector_ip_ops` is a rebuild, not an `ALTER`.
+
 ## Covering-index semantics
 
 A `USING paradedb` index is covering: every indexed column is stored inside the index, so predicates and scoring resolve without heap fetches. The flip side: adding a column to an existing index requires a `REINDEX` — the search schema lives in the index, not the table.
+
+<Tip title="Migration checklist: widening a search index">
+Every change to the search layer is a rebuild, never an `ALTER`:
+
+1. Adding, removing, retokenizing, or re-aliasing a column all mean drop + `CREATE INDEX ... USING paradedb` (REINDEX semantics) — the segment files physically contain the old field set.
+2. Plan the window: the index is not usable while the rebuild runs; watch it with `pg_stat_progress_create_index` (below).
+3. Fold new columns into the existing definition — one index per table, so a second `USING paradedb` index is not an option (pgb rejects it at parse time).
+4. Changing a vector distance opclass (`vector_cosine_ops` → `vector_ip_ops`) is also a rebuild — the metric is baked into the segments.
+5. Re-run pgb after the migration so the [SchemaIR](/architecture/schema-ir) picks up the new field set, and review the regenerated-code diff like any other schema change.
+</Tip>
 
 ## Supported index shapes
 
@@ -53,7 +149,23 @@ A `USING paradedb` index is covering: every indexed column is stored inside the 
 
 ## Build monitoring
 
-Index builds report through Postgres's standard `pg_stat_progress_create_index` view — large builds are visible with the same tooling as any other index.
+Index builds report through Postgres's standard `pg_stat_progress_create_index` view — large builds are visible with the same tooling as any other index:
+
+```sql
+SELECT phase, blocks_done, blocks_total, tuples_done, tuples_total
+FROM pg_stat_progress_create_index
+WHERE index_relid = 'products_search'::regclass;
+```
+
+```ini
+     phase      | blocks_done | blocks_total | tuples_done | tuples_total
+----------------+-------------+--------------+-------------+--------------
+ building index |      412348 |       611900 |     1832000 |      2741000
+```
+
+<Note>
+When the index contains vector fields, progress may appear to "stop" at intervals. That is expected: vectors are clustered with k-means at those points, which is computationally expensive but not stalled.
+</Note>
 
 ## Tokenizer casts
 

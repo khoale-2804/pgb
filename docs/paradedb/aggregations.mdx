@@ -4,25 +4,29 @@ description: "pdb.agg — ParadeDB's Elasticsearch-compatible aggregation docume
 icon: "chart-pie"
 ---
 
-Aggregations run through `pdb.agg`, which takes an Elasticsearch-compatible aggregation document as `jsonb`. pgb treats the document as data, not SQL: it is always **bound as a parameter** (`pdb.agg($1)`), never inlined — the same binding rule as every [predicate](/paradedb/predicates).
+Aggregations run through `pdb.agg`, which takes an Elasticsearch-compatible aggregation document as `jsonb`. pgb treats the document as data, not SQL: it is always **bound as a parameter**, never inlined — the same binding rule as every [predicate](/paradedb/predicates).
 
 ## The raw surface (shipped)
 
-Generated search functions expose a raw passthrough today, listed as `.Agg(json)` in the [predicates](/paradedb/predicates) table:
+Generated search builders expose a raw passthrough today, listed as `.Agg(json)` in the [predicates](/paradedb/predicates) table. The chain terminates with `.One(ctx, exec)`, which returns the response document as `json.RawMessage`:
 
 ```go
-dbgen.Products.Search().Agg(`{"terms": {"field": "category"}}`)
-// ... pdb.agg($1)
+res, err := db.Products.Search().ForceIndex().Agg(`{"terms": {"field": "category"}}`).One(ctx, pool)
+// SELECT pdb.agg($1::jsonb) FROM products WHERE id @@@ pdb.all()
 ```
 
 The JSON is emitted verbatim and validated server-side, where pg_search parses it — anything the aggregation DSL accepts works without a pgb release.
 
-`.Agg` chains with the other search methods like any predicate, so the aggregation runs over the filtered set:
+Predicates chain before `.Agg`, so the aggregation runs over the filtered set:
 
 ```go
-dbgen.Products.Search().Match("shoes").Agg(`{"terms": {"field": "category"}}`)
-// WHERE description ||| $1 ... pdb.agg($2)
+res, err := db.Products.Search().Match("shoes").Agg(`{"terms": {"field": "category"}}`).One(ctx, pool)
+// SELECT pdb.agg($2::jsonb) FROM products WHERE description ||| $1
 ```
+
+<Note>
+The custom scan only activates when a ParadeDB operator appears in the query. For an aggregation over a whole table, `.ForceIndex()` (emitting `id @@@ pdb.all()`) routes it through pg_search instead of a plain Postgres plan — see [predicates](/paradedb/predicates).
+</Note>
 
 ## Bucket aggregations
 
@@ -50,9 +54,179 @@ dbgen.Products.Search().Match("shoes").Agg(`{"terms": {"field": "category"}}`)
 
 Buckets nest metrics — and other buckets — under `aggs`.
 
+## Terms bucket + avg metric
+
+Products grouped by category, average rating inside each bucket:
+
+<CodeGroup>
+```go
+res, err := db.Products.Search().ForceIndex().Agg(`{
+  "terms": {
+    "field": "category",
+    "size": 20,
+    "aggs": {
+      "avg_rating": { "avg": { "field": "rating" } }
+    }
+  }
+}`).One(ctx, pool)
+```
+
+```sql
+SELECT pdb.agg($1::jsonb)
+FROM products
+WHERE id @@@ pdb.all();
+-- $1 = the document above
+```
+</CodeGroup>
+
+The response comes back verbatim as `json.RawMessage`, one row, one column:
+
+```json
+{
+  "buckets": [
+    { "key": "shoes",   "doc_count": 412, "avg_rating": { "value": 4.3 } },
+    { "key": "boots",   "doc_count": 187, "avg_rating": { "value": 4.1 } },
+    { "key": "sandals", "doc_count": 95,  "avg_rating": { "value": 3.8 } }
+  ]
+}
+```
+
+## Date histogram — orders per month
+
+The [orders table](/generated-code/builders) with its own index (`orders_search ON orders USING paradedb (id, status, total, placed_at) WITH (key_field='id')`), bucketed by calendar month with monthly revenue as a sub-metric:
+
+<CodeGroup>
+```go
+res, err := db.Orders.Search().ForceIndex().Agg(`{
+  "date_histogram": {
+    "field": "placed_at",
+    "calendar_interval": "month",
+    "format": "yyyy-MM",
+    "aggs": {
+      "revenue": { "sum": { "field": "total" } }
+    }
+  }
+}`).One(ctx, pool)
+```
+
+```sql
+SELECT pdb.agg($1::jsonb)
+FROM orders
+WHERE id @@@ pdb.all();
+```
+</CodeGroup>
+
+```json
+{
+  "buckets": [
+    { "key_as_string": "2026-07", "doc_count": 1321, "revenue": { "value": 89421.5 } },
+    { "key_as_string": "2026-08", "doc_count": 1544, "revenue": { "value": 101233.75 } },
+    { "key_as_string": "2026-09", "doc_count": 610,  "revenue": { "value": 41290.0 } }
+  ]
+}
+```
+
+`calendar_interval` takes `minute` through `year`; use `fixed_interval` for non-calendar windows like `30d`.
+
+## Range bucket — price bands
+
+Explicit from/to bands over `price_cents`; each document lands in every band it falls into:
+
+<CodeGroup>
+```go
+res, err := db.Products.Search().ForceIndex().Agg(`{
+  "range": {
+    "field": "price_cents",
+    "ranges": [
+      { "to": 2500 },
+      { "from": 2500, "to": 7500 },
+      { "from": 7500 }
+    ]
+  }
+}`).One(ctx, pool)
+```
+
+```sql
+SELECT pdb.agg($1::jsonb)
+FROM products
+WHERE id @@@ pdb.all();
+```
+</CodeGroup>
+
+Bands are half-open — `from` inclusive, `to` exclusive. The `histogram` bucket is the fixed-width alternative (`{"interval": 1000}`).
+
+## Filters bucket — in-stock vs out
+
+Named predicate groups instead of field values — the terms are ordinary aggregation queries over indexed fields:
+
+<CodeGroup>
+```go
+res, err := db.Products.Search().ForceIndex().Agg(`{
+  "filters": {
+    "filters": {
+      "in_stock":     { "term": { "in_stock": true } },
+      "out_of_stock": { "term": { "in_stock": false } }
+    }
+  }
+}`).One(ctx, pool)
+```
+
+```sql
+SELECT pdb.agg($1::jsonb)
+FROM products
+WHERE id @@@ pdb.all();
+```
+</CodeGroup>
+
+The response keys match the names in the document — `{"buckets": {"in_stock": {"doc_count": 512}, "out_of_stock": {"doc_count": 34}}}`.
+
+## Facets
+
+A faceted page needs two consumers of one query: the top hits, and the per-dimension counts for the filter sidebar. pgb's shipped surface serves both from one shared predicate expression — the hits through the generated search function, the counts through `.Agg` chained on the same match:
+
+```go
+q := db.Products.Description().Match("running shoes")
+
+// the page — top 12 hits
+hits, err := db.SearchProducts(ctx, pool, q, 12)
+
+// the sidebar — category counts, with colors and price stats nested per category
+facets, err := db.Products.Search().Match("running shoes").Agg(`{
+  "terms": {
+    "field": "category",
+    "size": 10,
+    "aggs": {
+      "colors":      { "terms": { "field": "metadata->'color'", "size": 8 } },
+      "price_stats": { "stats": { "field": "price_cents" } }
+    }
+  }
+}`).One(ctx, pool)
+```
+
+```sql
+SELECT pdb.agg($2::jsonb)
+FROM products
+WHERE description ||| $1
+-- $1 = "running shoes" · $2 = the facet document
+```
+
+Faceting on a dimension you also filter on collapses that facet — filter on the free-text match, facet on the categories and colors. Folding both round trips into one query (hits and counts in a single statement) is part of the planned typed surface below.
+
 ## Visibility
 
-`pdb.agg` accepts a named `visibility` argument controlling which segments an aggregate reads:
+`pdb.agg` accepts a named `visibility` argument controlling which segments an aggregate reads. pgb takes it as a second argument to `.Agg` and emits it as a named argument:
+
+```go
+res, err := db.Products.Search().ForceIndex().
+    Agg(`{"terms": {"field": "category"}}`, pgb.Visibility("threshold")).
+    One(ctx, pool)
+```
+
+```sql
+SELECT pdb.agg($1::jsonb, visibility => 'threshold')
+FROM products
+WHERE id @@@ pdb.all();
+```
 
 | value | reads |
 |---|---|
@@ -60,38 +234,17 @@ Buckets nest metrics — and other buckets — under `aggs`.
 | `threshold` | only segments above a row-count threshold |
 | `auto` | pg_search decides per segment |
 
-The mutable-segment lifecycle this sits on is described in [architecture](/paradedb/architecture).
+The mutable-segment lifecycle this sits on is described in [architecture](/paradedb/architecture): writes append to a mutable segment that is frozen at 1,000 rows and merged in the background. On append-heavy tables, `auto` (the default) keeps large aggregates cheap by skipping segments whose contribution is below the noise floor; `raw` is the choice when the newest rows must be counted.
 
 ## JSON-path fields (0.25.9)
 
-Since 0.25.9, aggregation fields can be indexed JSON paths. As with [predicates](/paradedb/predicates), the path is re-emitted exactly as indexed:
+Since 0.25.9, aggregation fields can be indexed JSON paths. As with [predicates](/paradedb/predicates), the path is named exactly as indexed — the `colors` facet above already does it:
 
 ```go
-dbgen.Products.Search().Agg(`{"terms": {"field": "metadata->'color'"}}`)
-```
-
-## Example: terms bucket + avg metric
-
-The same aggregate handwritten in SQL — bucket on `category`, average `rating` inside each bucket:
-
-```sql
-SELECT pdb.agg('{
-  "terms": {
-    "field": "category",
-    "aggs": {
-      "avg_rating": { "avg": { "field": "rating" } }
-    }
-  }
-}'::jsonb)
-FROM products
-WHERE id @@@ pdb.all();
+db.Products.Search().Agg(`{"terms": {"field": "metadata->'color'"}}`)
 ```
 
 Aggregates and GROUP BY push down through pg_search's custom scan into its embedded DataFusion engine — see [architecture](/paradedb/architecture).
-
-<Note>
-The custom scan only activates when a ParadeDB operator appears in the query. For an aggregation over a whole table, `id @@@ pdb.all()` (the `.ForceIndex()` predicate) routes it through pg_search instead of a plain Postgres plan.
-</Note>
 
 ## Typed helpers (planned, not in v0.1)
 
@@ -99,17 +252,18 @@ The custom scan only activates when a ParadeDB operator appears in the query. Fo
 The typed aggregation surface below is a **proposal**. pgb v0.1 ships only the raw `.Agg(json)` passthrough — nothing in this section exists in generated code yet.
 </Warning>
 
-The planned shape: typed `AggregateXxx` statics on generated search functions, taking bucket/metric descriptors instead of raw JSON. A builder composes the document and emits the same `pdb.agg($1::jsonb)` call with the predicate `WHERE` clause attached:
+The planned shape: typed `AggregateXxx` statics — `db.AggregateProducts`, one per indexed table — taking the filter expression and typed bucket/metric descriptors instead of raw JSON. A builder composes the document and emits the same `pdb.agg($n::jsonb)` call:
 
 ```go
 // proposed — does not exist in v0.1
-dbgen.Products.Search().Aggregate(
+res, err := db.AggregateProducts(ctx, pool,
+    db.Products.Description().Match("shoes"),
     pgb.Terms("category",
         pgb.Avg("rating").As("avg_rating"),
     ),
 )
-// emitted: SELECT pdb.agg($1::jsonb) FROM products WHERE id @@@ pdb.all()
-//          $1 = {"terms":{"field":"category","aggs":{"avg_rating":{"avg":{"field":"rating"}}}}}
+// emits: SELECT pdb.agg($1::jsonb) FROM products WHERE description ||| $2
+//        $1 = {"terms":{"field":"category","aggs":{"avg_rating":{"avg":{"field":"rating"}}}}}
 ```
 
 Typed descriptors turn misspelled field names into compile errors instead of server-side JSON errors, and the parameter binding keeps the document out of the SQL text.

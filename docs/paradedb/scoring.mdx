@@ -1,6 +1,6 @@
 ---
 title: "Scoring & snippets"
-description: "pdb.score(key_field), ORDER BY score, and the snippet/highlight family with named arguments."
+description: "pdb.score(key_field), ORDER BY score with Top-K pushdown, and the snippet/highlight family — one worked example, end to end."
 icon: "star"
 ---
 
@@ -9,28 +9,77 @@ icon: "star"
 `pdb.score(...)` is emitted against the index's `key_field` (from `WITH (key_field='id')` or the table's primary key):
 
 ```go
-dbgen.Users.Score()        // Call{Fn: "pdb.score", Args: [Users.ID]}  →  pdb.score(id)
+db.Products.Score()        // Call{Fn: "pdb.score", Args: [Products.ID]}  →  pdb.score(id)
 ```
 
-Generated search functions always select and order by it:
+Generated search functions always select and order by it. The full surface — predicate, score, snippet, and highlight projections in one call:
+
+```go
+func SearchProducts(ctx context.Context, exec pgb.DBTX, q core.Expr, limit int,
+    projections ...core.Expr) ([]db.ProductHit, error)
+```
+
+## Worked example — score, snippet, highlight
+
+Search for "running shoes" with the title boosted, an `<em>` snippet around each description match, and the title returned with `<strong>` highlights:
+
+<CodeGroup>
+```go
+q := db.And(
+    db.Products.Title().Match("running shoes").Boost(2.0),
+    db.Products.Description().Match("running shoes"),
+)
+
+hits, err := db.SearchProducts(ctx, pool, q, 20,
+    db.Products.Description().Snippet(pgb.StartTag("<em>"), pgb.MaxChars(150)),
+    db.Products.Title().Highlight(pgb.StartTag("<strong>"), pgb.EndTag("</strong>")),
+)
+if err != nil {
+    return err
+}
+for _, h := range hits {
+    fmt.Printf("%.3f  %s  %s\n", h.Score, h.Product.Title, h.Snippet["description"])
+}
+```
 
 ```sql
-SELECT id, name,
+SELECT id, seller_id, title, description, category, rating,
+       price_cents, in_stock, metadata, created_at,
        pdb.score(id) AS score,
-       pdb.snippet(description, start_tag => '<em>') AS snip
+       pdb.snippet(description, start_tag => '<em>', max_num_chars => 150) AS snip,
+       pdb.highlight(title, start_tag => '<strong>', end_tag => '</strong>') AS hl
 FROM products
-WHERE description ||| $1
+WHERE (title ||| $1::pdb.boost(2) AND description ||| $2)
 ORDER BY pdb.score(id) DESC, id ASC
-LIMIT $2
+LIMIT $3
+-- $1 = $2 = "running shoes" · $3 = 20
+```
+</CodeGroup>
+
+Snippet and highlight options that are developer constants (the tags) are emitted as literals; numeric options ride as bound parameters where ParadeDB accepts them. The generated `*Hit` result struct carries everything per field:
+
+```go
+type ProductHit struct {
+    Product   db.Product
+    Score     float64
+    Snippet   map[string]string // one entry per snippet'd column — "description" here
+    Highlight map[string]string // one entry per highlighted column — "title" here
+}
 ```
 
+`pdb.highlight` returns the whole field value with the tags inserted; `pdb.snippet` returns a fragment trimmed around the best match, bounded by `max_num_chars`.
+
+## ORDER BY score — the indexed tiebreak
+
 <Warning>
-The tiebreaker column (`id`) must be indexed for ParadeDB's Top-K execution. pgb emits `pdb.score(id) DESC, id ASC` by default, and pagination uses the `(score, id)` composite — see [Pagination](/generated-code/pagination).
+The tiebreaker column (`id`) must be indexed for ParadeDB's Top-K execution. pgb emits `pdb.score(id) DESC, id ASC` by default, and pagination builds on the same `(score, id)` composite — see [Pagination](/generated-code/pagination).
 </Warning>
 
 <Note>
-`ORDER BY` on the score — or on any indexed field — combined with `LIMIT n` is pushed down to ParadeDB's `SegmentedTopKExec` top-K executor: the candidate set is pruned during the scan instead of fully sorted (see [architecture](/paradedb/architecture)). Vector tiebreak ordering for this shape arrives with pg_search 0.26-rc.
+`ORDER BY` on the score — or on any indexed field — combined with `LIMIT n` is pushed down to ParadeDB's `SegmentedTopKExec` top-K executor: the candidate set is pruned during the scan instead of fully sorted. This is why every generated search ends in an ordered `LIMIT` and never emits an unbounded scored scan (see [architecture](/paradedb/architecture)). Vector tiebreak ordering for this shape arrives with pg_search 0.26-rc.
 </Note>
+
+Ties are broken by `id ASC` because BM25 scores collide constantly on short queries — without the tiebreak, consecutive pages could repeat or skip rows. The keyset cursors pgb generates carry the `(score, id)` pair; that pagination is pgb's own layer on top, not a ParadeDB feature.
 
 ## Snippets & highlights
 
@@ -38,21 +87,39 @@ Named arguments are bound parameters where pgb can, literals where ParadeDB requ
 
 | method | emits |
 |---|---|
-| `.Snippet(StartTag("<em>"), MaxChars(150))` | `pdb.snippet(description, start_tag => ..., end_tag => ..., max_num_chars => ...)` |
-| `.Snippets(pgb.LimitN(5), SortBy("score"))` | `pdb.snippets(description, "limit" => 5, sort_by => 'score')` |
+| `.Snippet(pgb.StartTag("<em>"), pgb.MaxChars(150))` | `pdb.snippet(description, start_tag => ..., end_tag => ..., max_num_chars => ...)` |
+| `.Snippets(pgb.LimitN(5), pgb.SortBy("score"))` | `pdb.snippets(description, "limit" => 5, sort_by => 'score')` |
 | `.SnippetPositions()` | `pdb.snippet_positions(description)` |
-| `.Highlight(StartTag("<em>"))` | `pdb.highlight(description, start_tag => ..., end_tag => ...)` |
+| `.Highlight(pgb.StartTag("<em>"))` | `pdb.highlight(description, start_tag => ..., end_tag => ...)` |
 
-Snippets are not supported for fuzzy predicates (ParadeDB limitation). The generated `*Hit` result struct carries them per field:
+`.Snippets` returns several fragments per row (the `"limit" => 5` cap); `.SnippetPositions` returns token offsets instead of text, for client-side highlighting.
+
+<Warning>
+Snippets are not supported for fuzzy predicates — a ParadeDB limitation. A query containing a `::pdb.fuzzy(n)` clause silently returns empty snippet columns for the fields involved; keep snippet projections on exactly-matched fields.
+</Warning>
+
+## Boost strategy
+
+Term-level boosts live on predicates (`::pdb.boost(n)`), so the weighting is part of the query, not the index. A starting point that holds up in practice:
+
+| field | boost | why |
+|---|---|---|
+| `title` | 2.0 | matches in the title are the strongest intent signal |
+| `description` | 1.0 | the baseline — every matching row gets this for free |
+| `category` (exact `===`) | 3.0 | an exact facet hit should outrank any fuzzy prose match |
 
 ```go
-type ProductHit struct {
-    Product  db.Product
-    Score    float64
-    Snippet  map[string]string   // populated per snippet'd field
-}
+q := db.Or(
+    db.Products.Title().Match("running shoes").Boost(2.0),
+    db.Products.Description().Match("running shoes").Boost(1.0),
+    db.Products.Category().Exact("shoes").Boost(3.0),
+)
+// title ||| $1::pdb.boost(2) OR description ||| $2::pdb.boost(1)
+// OR category === $3::pdb.boost(3)
 ```
 
-## Boosting at the scorer level
+Boosts multiply the clause's score contribution — they are relative, so tune them against real queries, not in isolation.
 
-Term-level boosts live on predicates (`::pdb.boost(2)`); constant-score fallback is available as the `::pdb.const(1)` cast and as the `pdb.const_score` builder — `dbgen.Users.ConstScore(1.0)` emits `pdb.const_score(id, 1.0)` (to be verified). Both are literal-side forms, handled by the same emitter path as [predicates](/paradedb/predicates).
+## Constant scores
+
+When a clause should compete by membership rather than by BM25 weight, `pdb.const_score` pins its contribution to a fixed value — `db.Products.ConstScore(1.0)` emits `pdb.const_score(id, 1.0)` (to be verified). Use it for lanes whose relevance is binary — an exact SKU lookup folded into a prose query, a "sponsored" marker — so they neither drown out nor vanish under the scored lanes. Both this and the predicate-level `::pdb.boost(n)` cast are literal-side forms, handled by the same emitter path as [predicates](/paradedb/predicates).

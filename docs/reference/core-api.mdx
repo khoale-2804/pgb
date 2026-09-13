@@ -26,6 +26,64 @@ type Raw   struct{ SQL string; Args []any }
 
 You rarely construct these directly — the generated descriptors do — but `Raw` composes into any expression position.
 
+## Raw compositing
+
+`core.Raw(sql, args...)` is an ordinary `Expr`, so it appears anywhere a predicate or projection can. Its SQL is opaque to the builder; its args stay bound and are renumbered along with every generated parameter in the same pass.
+
+**Inside `Where`** — composes with generated predicates without placeholder collisions (`$1` inside a Raw refers to that Raw's own args):
+
+```go
+cheap, err := db.Products.Select().
+    Where(
+        db.Products.Description().Match("shoes"),              // $1
+        core.Raw("rating > $1 AND created_at > now() - $2::interval",
+            minRating, window),                                // renumbered to $2, $3
+    ).
+    OrderBy(db.Products.ID().Asc()).
+    All(ctx, pool)
+```
+
+```sql
+SELECT id, seller_id, title, description, category, rating, price_cents, in_stock, metadata, created_at, embedding
+FROM public.products
+WHERE description ||| $1
+  AND rating > $2 AND created_at > now() - $3::interval
+ORDER BY id ASC
+```
+
+**As a column expression** — the alias lives inside the Raw string, because Raw is opaque; scan through the `Rows` terminator:
+
+```go
+rows, err := db.Products.Select().
+    Cols(
+        db.Products.ID(),
+        db.Products.Title(),
+        core.Raw("rating * 10 AS rating_scaled"),
+    ).
+    Where(db.Products.Rating().Gte(4)).
+    Rows(ctx, pool)
+if err != nil {
+    return err
+}
+defer rows.Close()
+
+type scaled struct {
+    ID           int64
+    Title        string
+    RatingScaled int64
+}
+for rows.Next() {
+    var s scaled
+    if err := rows.Scan(&s.ID, &s.Name, &s.RatingScaled); err != nil {
+        return err
+    }
+}
+```
+
+<Warning>
+User-controlled values go in `Args`, never interpolated into the SQL string. The emitter guarantees bound parameters only for what flows through `Args` — a value concatenated into `Raw`'s SQL text is outside that guarantee.
+</Warning>
+
 ## Emitter guarantees
 
 - **Every value is a bound parameter.** The emitter walks the tree, renders `$1..$n`, and collects args in order. No user value is ever stringified into the SQL text — injection bugs are structurally impossible.
@@ -51,6 +109,54 @@ type DBTX interface {
 func WithTx[T any](ctx context.Context, db DBTX, fn func(DBTX) (T, error)) (T, error)
 ```
 
+The contract is one line: the closure returns `nil` and `WithTx` commits; it returns an error and `WithTx` rolls back. Inside, every generated function takes the handed `DBTX` — statics, builders, and handwritten wrappers all run on `tx` unchanged:
+
+```go
+func ShipOrder(ctx context.Context, pool *pgxpool.Pool, orderID int64) (db.Order, error) {
+    return pgb.WithTx(ctx, pool, func(tx pgb.DBTX) (db.Order, error) {
+        o, err := db.Orders.Select().
+            Where(db.Orders.ID().Eq(orderID)).
+            ForUpdate().
+            One(ctx, tx) // row lock for the duration of the tx
+        if err != nil {
+            return db.Order{}, err // → ROLLBACK
+        }
+        if o.Status != "paid" {
+            return db.Order{}, fmt.Errorf("order %d is %q, not paid", o.ID, o.Status)
+        }
+        updated, err := db.Orders.Update().
+            Set(db.OrderSet{Status: pgb.Set("shipped")}).
+            Where(db.Orders.ID().Eq(orderID)).
+            Returning().
+            All(ctx, tx)
+        if err != nil {
+            return db.Order{}, err // → ROLLBACK
+        }
+        _, err = db.UpdateUser(ctx, tx, updated[0].UserID, db.UserSet{
+            LastLoginAt: pgb.Set(pgtype.Timestamptz{Time: time.Now(), Valid: true}),
+        })
+        if err != nil {
+            return db.Order{}, err // → ROLLBACK — including the shipped status
+        }
+        return updated[0], nil // nil error → COMMIT, all three writes
+    })
+}
+```
+
+```sql
+BEGIN;
+SELECT id, tenant_id, user_id, status, total, placed_at
+FROM public.orders WHERE id = $1 FOR UPDATE;
+UPDATE public.orders SET status = $1 WHERE id = $2
+RETURNING id, tenant_id, user_id, status, total, placed_at;
+UPDATE public.users SET last_login_at = $1 WHERE id = $2
+RETURNING id, email, name, bio, metadata, tags, created_at, last_login_at;
+COMMIT;
+-- any error before COMMIT → ROLLBACK, all writes undone
+```
+
+A `DBTX` may itself be a transaction, so `WithTx` composes: a closure that receives `tx` can open a nested `pgb.WithTx(ctx, tx, ...)` for a sub-unit of work. `pgx.BeginFunc` is the equivalent with `pgx.Tx` instead of `DBTX` — see [statics → transactions](/generated-code/statics).
+
 ## Scanning
 
 Generated per-model scan functions use **explicit positional** `row.Scan(&u.ID, &u.Email, ...)` with the pgx type map — no reflection. Combined with explicit column lists (never `SELECT *`), schema additions cannot shift scan positions.
@@ -62,6 +168,41 @@ Generated per-model scan functions use **explicit positional** `row.Scan(&u.ID, 
 | `pgb.ErrNotFound` | single-row lookup found nothing (wraps `pgx.ErrNoRows`) |
 | `pgb.ErrNoWhere` | UPDATE/DELETE attempted without a WHERE (use `.AllowAll()`) |
 | `pgb.ErrCursorMismatch` | cursor built for a different sort key |
+
+All three match with `errors.Is` — pgb wraps driver errors with `%w`, so checks traverse to the sentinel no matter how deep the wrap:
+
+```go
+o, err := db.Orders.Select().
+    Where(db.Orders.ID().Eq(orderID)).
+    One(ctx, pool)
+switch {
+case errors.Is(err, pgb.ErrNotFound):
+    return ErrOrderNotFound // render a 404
+case err != nil:
+    return err
+}
+```
+
+```go
+_, err := db.Users.Delete().Exec(ctx, pool) // no Where
+if errors.Is(err, pgb.ErrNoWhere) {
+    // refused before any SQL was sent — pass a predicate or AllowAll()
+}
+```
+
+```go
+page, _, _, err := db.Users.Select().
+    OrderBy(db.Users.ID().Asc()).
+    Page(ctx, pool, pgb.CursorOf(prev), 50)
+if errors.Is(err, pgb.ErrCursorMismatch) {
+    // token from a different sort key or a stale codegen — restart without it
+    page, _, _, err = db.Users.Select().
+        OrderBy(db.Users.ID().Asc()).
+        Page(ctx, pool, pgb.CursorOf(""), 50)
+}
+```
+
+`pgb.ErrNotFound` wraps `pgx.ErrNoRows`, so `errors.Is(err, pgx.ErrNoRows)` matches as well — the sentinel is a convenience, not a new type. For Postgres constraint violations use `errors.As` with `*pgconn.PgError` (see [statics → error handling](/generated-code/statics)).
 
 ## Where the pg_search emission lives
 

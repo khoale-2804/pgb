@@ -6,9 +6,36 @@ icon: "wrench"
 
 Stage 1 generates the typed glue over the handwritten runtime core: one **descriptor** per table, predicate methods per column (by type family), and chainable statement builders whose terminators execute.
 
+## The running schema
+
+Examples on this page use two tables:
+
+```sql
+CREATE TABLE users (
+    id            bigserial PRIMARY KEY,
+    email         text        NOT NULL UNIQUE,
+    name          text        NOT NULL,
+    bio           text,
+    metadata      jsonb,
+    tags          text[],
+    created_at    timestamptz NOT NULL DEFAULT now(),
+    last_login_at timestamptz
+);
+
+CREATE TABLE orders (
+    id        bigserial PRIMARY KEY,
+    tenant_id int8          NOT NULL,
+    user_id   int8          NOT NULL REFERENCES users(id),
+    status    text          NOT NULL,
+    total     numeric(12,2) NOT NULL,
+    placed_at timestamptz   NOT NULL DEFAULT now(),
+    UNIQUE (tenant_id, id)
+);
+```
+
 ## Descriptors
 
-For a table `users`, `dbgen/users.gen.go` contains:
+For a table `users`, `db/users.gen.go` contains:
 
 ```go
 // Descriptors — package-level, immutable
@@ -47,39 +74,350 @@ func (c UserBioCol) Match(q string) core.Expr
 
 Columns marked `pgb:no_filter` generate no predicate methods.
 
-## Statement builders
+## SELECT — where, order, limit, offset
 
-Fluent, composable, terminators execute against any `pgb.DBTX`:
+`db.Users.Select()` starts a builder; a **terminator** executes it. Every value is a bound `$n` parameter — nothing is ever stringified into the SQL text.
 
 ```go
-u, err := dbgen.Users.Select().
-    Where(dbgen.Or(
-        dbgen.Users.Email().Like("%@corp.io"),
-        dbgen.Users.CreatedAt().Gte(since))).
-    OrderBy(dbgen.Users.CreatedAt().Desc()).
+users, err := db.Users.Select().
+    Where(db.Users.Email().Like("%@corp.io")).
+    OrderBy(db.Users.CreatedAt().Desc()).
     Limit(20).
-    All(ctx, db)                       // ([]db.User, error)
-
-dbgen.Users.Select().Where(...).Count(ctx, db)         // (int64, error)
-dbgen.Users.Select().Where(...).Exists(ctx, db)        // (bool, error)
-dbgen.Users.Select().Where(...).One(ctx, db)           // (db.User, error) — errors if >1
-dbgen.Users.Delete().Where(...).Exec(ctx, db)          // (int64, error)
-dbgen.Users.Update().Set(...).Where(...).Returning().All(ctx, db)
+    All(ctx, pool)
 ```
 
-Supports `DistinctOn`, `Group`/`Having`, `ForUpdate`-style locking, and CTEs via the core statement types.
+```sql
+SELECT id, email, name, bio, metadata, tags, created_at, last_login_at
+FROM public.users
+WHERE email LIKE $1
+ORDER BY created_at DESC
+LIMIT $2
+```
 
-## Safety guard
+`Where` accepts variadic predicates, ANDed together; `db.And` / `db.Or` group them explicitly:
+
+```go
+active, err := db.Users.Select().
+    Where(
+        db.Or(
+            db.Users.Email().Like("%@corp.io"),
+            db.Users.Email().Like("%@example.com"),
+        ),
+        db.Users.LastLoginAt().Gte(since),
+        db.Users.Tags().Contains([]string{"beta"}),
+    ).
+    OrderBy(db.Users.ID().Asc()).
+    All(ctx, pool)
+```
+
+```sql
+SELECT id, email, name, bio, metadata, tags, created_at, last_login_at
+FROM public.users
+WHERE (email LIKE $1 OR email LIKE $2)
+  AND last_login_at >= $3
+  AND tags @> $4::text[]
+ORDER BY id ASC
+```
+
+`Offset` composes with `Limit` for classic windowing (for anything larger, prefer [keyset pagination](/generated-code/pagination)):
+
+```go
+older, err := db.Users.Select().
+    Where(db.Users.CreatedAt().Lt(cutoff)).
+    OrderBy(db.Users.ID().Asc()).
+    Limit(50).
+    Offset(100).
+    All(ctx, pool)
+```
+
+```sql
+SELECT id, email, name, bio, metadata, tags, created_at, last_login_at
+FROM public.users
+WHERE created_at < $1
+ORDER BY id ASC
+LIMIT $2 OFFSET $3
+```
+
+## DISTINCT ON
+
+```go
+latest, err := db.Orders.Select().
+    DistinctOn(db.Orders.UserID()).
+    Where(db.Orders.Status().Eq("paid")).
+    OrderBy(db.Orders.UserID().Asc(), db.Orders.PlacedAt().Desc()).
+    All(ctx, pool)
+```
+
+```sql
+SELECT DISTINCT ON (user_id) id, tenant_id, user_id, status, total, placed_at
+FROM public.orders
+WHERE status = $1
+ORDER BY user_id ASC, placed_at DESC
+```
+
+Postgres requires the `DISTINCT ON` expressions to match the leftmost `ORDER BY` terms — the builder emits them exactly as you chain them, so keep that invariant yourself.
+
+## GROUP BY + HAVING
+
+Aggregate expressions are ordinary `core.Expr` values: numeric columns generate `Count()` / `Sum()` wrappers that compose into the projection, `Having`, and `OrderBy` like any predicate. Because an aggregate projection no longer matches the `db.Order` model, the `.Rows` terminator hands back the raw `pgx.Rows` for custom scanning:
+
+```go
+type TenantSpend struct {
+    TenantID   int64
+    OrderCount int64
+    Revenue    pgtype.Numeric
+}
+
+rows, err := db.Orders.Select().
+    Cols(
+        db.Orders.TenantID(),
+        db.Orders.ID().Count().As("order_count"),
+        db.Orders.Total().Sum().As("revenue"),
+    ).
+    Group(db.Orders.TenantID()).
+    Having(db.Orders.ID().Count().Gt(5)).
+    OrderBy(db.Orders.Total().Sum().Desc()).
+    Rows(ctx, pool)
+if err != nil {
+    return err
+}
+defer rows.Close()
+
+var spend []TenantSpend
+for rows.Next() {
+    var s TenantSpend
+    if err := rows.Scan(&s.TenantID, &s.OrderCount, &s.Revenue); err != nil {
+        return err
+    }
+    spend = append(spend, s)
+}
+if err := rows.Err(); err != nil {
+    return err
+}
+```
+
+```sql
+SELECT tenant_id, count(id) AS order_count, sum(total) AS revenue
+FROM public.orders
+GROUP BY tenant_id
+HAVING count(id) > $1
+ORDER BY sum(total) DESC
+```
+
+## CTEs
+
+A builder statement is itself a value, so it can be passed as a CTE body. `core.Raw` composes into any expression position (its args stay bound) for the subquery half:
+
+```go
+recent := db.Orders.Select().
+    Cols(db.Orders.UserID()).
+    Where(db.Orders.PlacedAt().Gte(since))
+
+active, err := db.Users.Select().
+    With(db.CTE("recent_orders", recent)).
+    Where(core.Raw("id IN (SELECT user_id FROM recent_orders)")).
+    OrderBy(db.Users.ID().Asc()).
+    All(ctx, pool)
+```
+
+```sql
+WITH recent_orders AS (
+    SELECT user_id
+    FROM public.orders
+    WHERE placed_at >= $1
+)
+SELECT id, email, name, bio, metadata, tags, created_at, last_login_at
+FROM public.users
+WHERE id IN (SELECT user_id FROM recent_orders)
+ORDER BY id ASC
+```
+
+## Row locking — ForUpdate
+
+`ForUpdate` appends the lock clause; it only makes sense inside a transaction, and the builder takes the tx as its executor like any other `pgb.DBTX`:
+
+```go
+err := pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
+    o, err := db.Orders.Select().
+        Where(db.Orders.ID().Eq(orderID)).
+        ForUpdate().
+        One(ctx, tx)
+    if err != nil {
+        return err
+    }
+    _, err = db.Orders.Update().
+        Set(db.OrderSet{Status: pgb.Set("shipped")}).
+        Where(db.Orders.ID().Eq(orderID)).
+        Exec(ctx, tx)
+    return err
+})
+```
+
+```sql
+SELECT id, tenant_id, user_id, status, total, placed_at
+FROM public.orders
+WHERE id = $1
+FOR UPDATE
+```
+
+```sql
+UPDATE public.orders
+SET status = $1
+WHERE id = $2
+```
+
+`.SkipLocked()` and `.NoWait()` chain after `ForUpdate()` and emit `FOR UPDATE SKIP LOCKED` / `FOR UPDATE NOWAIT`.
+
+## Terminators
+
+| terminator | returns | emitted shape |
+|---|---|---|
+| `All(ctx, exec)` | `([]db.User, error)` | the full SELECT |
+| `One(ctx, exec)` | `(db.User, error)` | adds `LIMIT 2`; zero rows → `pgb.ErrNotFound`, two rows → error |
+| `Count(ctx, exec)` | `(int64, error)` | `SELECT count(*)` |
+| `Exists(ctx, exec)` | `(bool, error)` | `SELECT EXISTS (...)` |
+| `Exec(ctx, exec)` | `(int64, error)` | rows affected (update/delete) |
+| `Rows(ctx, exec)` | `(pgx.Rows, error)` | raw cursor for custom projections |
+| `Page(ctx, exec, cur, limit)` | rows + cursor + more | see [Pagination](/generated-code/pagination) |
+
+```go
+users, err := db.Users.Select().
+    Where(db.Users.Tags().Contains([]string{"beta"})).
+    OrderBy(db.Users.ID().Asc()).
+    All(ctx, pool)
+```
+
+```sql
+SELECT id, email, name, bio, metadata, tags, created_at, last_login_at
+FROM public.users
+WHERE tags @> $1::text[]
+ORDER BY id ASC
+```
+
+```go
+u, err := db.Users.Select().
+    Where(db.Users.Email().Eq("ada@corp.io")).
+    One(ctx, pool)
+if errors.Is(err, pgb.ErrNotFound) {
+    // no such user
+}
+```
+
+```sql
+SELECT id, email, name, bio, metadata, tags, created_at, last_login_at
+FROM public.users
+WHERE email = $1
+LIMIT 2
+```
+
+```go
+n, err := db.Users.Select().
+    Where(db.Users.LastLoginAt().Gte(since)).
+    Count(ctx, pool)
+```
+
+```sql
+SELECT count(*)
+FROM public.users
+WHERE last_login_at >= $1
+```
+
+```go
+active, err := db.Users.Select().
+    Where(db.Users.LastLoginAt().Gte(since)).
+    Exists(ctx, pool)
+```
+
+```sql
+SELECT EXISTS (
+    SELECT 1 FROM public.users WHERE last_login_at >= $1
+)
+```
+
+Updates and deletes share the same `Set` structs as the static layer — `db.UserSet` with its three-state `core.Set` fields:
+
+```go
+n, err := db.Users.Update().
+    Set(db.UserSet{Bio: pgb.Set("Principal engineer")}).
+    Where(db.Users.Tags().Contains([]string{"staff"})).
+    Exec(ctx, pool)
+```
+
+```sql
+UPDATE public.users
+SET bio = $1
+WHERE tags @> $2::text[]
+```
+
+```go
+updated, err := db.Users.Update().
+    Set(db.UserSet{Bio: pgb.Set("Principal engineer")}).
+    Where(db.Users.Tags().Contains([]string{"staff"})).
+    Returning().
+    All(ctx, pool)
+```
+
+```sql
+UPDATE public.users
+SET bio = $1
+WHERE tags @> $2::text[]
+RETURNING id, email, name, bio, metadata, tags, created_at, last_login_at
+```
+
+```go
+deleted, err := db.Users.Delete().
+    Where(db.Users.LastLoginAt().Lt(cutoff), db.Users.Bio().IsNull()).
+    Exec(ctx, pool)
+```
+
+```sql
+DELETE FROM public.users
+WHERE last_login_at < $1 AND bio IS NULL
+```
+
+## The ErrNoWhere guard
 
 `Update` and `Delete` with an **empty WHERE** return `pgb.ErrNoWhere`. Full-table mutations are explicit:
 
 ```go
-dbgen.Users.Delete().AllowAll().Exec(ctx, db)          // deliberate
+_, err := db.Users.Delete().Exec(ctx, pool)
+if errors.Is(err, pgb.ErrNoWhere) {
+    // refused at runtime — no WHERE, no mutation
+}
+
+n, err := db.Users.Delete().AllowAll().Exec(ctx, pool)
+```
+
+```sql
+-- AllowAll() emits the unguarded statement:
+DELETE FROM public.users
 ```
 
 <Note>
 This is a runtime guard, not a type machine. It keeps the builder API readable; the failure mode of forgetting a WHERE is a clean error at the call site, not a truncated table.
 </Note>
+
+## Statics ride the same core
+
+Stage 2's static functions do not have a private SQL path — `ListUsers`, `UpdateUsers`, and friends compile their filters down to the same expression tree and emit through the same [core emitter](/reference/core-api). That makes the two layers freely combinable: a predicate built on a descriptor feeds `UserFilter.Extra`, and anything the filter struct can't express stays composable:
+
+```go
+users, err := db.ListUsers(ctx, pool, db.UserFilter{
+    EmailLike: pgb.Opt("%@corp.io"),
+    Extra: []core.Expr{
+        db.Users.Tags().Contains([]string{"beta"}),
+        db.Users.LastLoginAt().Gte(since),
+    },
+})
+```
+
+```sql
+SELECT id, email, name, bio, metadata, tags, created_at, last_login_at
+FROM public.users
+WHERE email LIKE $1 AND tags @> $2::text[] AND last_login_at >= $3
+```
+
+The same expression values can also be built once and passed to a builder's `Where` — one predicate vocabulary, two execution shapes.
 
 ## What stage 1 never does
 

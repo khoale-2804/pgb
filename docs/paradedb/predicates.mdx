@@ -1,10 +1,30 @@
 ---
 title: "Search predicates"
-description: "The complete v2 operator vocabulary as typed Go methods — match, phrase, fuzzy, regex, term sets, proximity, boost."
+description: "The complete v2 operator vocabulary as typed Go methods — match, phrase, fuzzy, term sets, range terms, proximity, and external-index filters."
 icon: "filter"
 ---
 
-Search predicate methods are generated only on columns that appear in a `USING paradedb` index. Each method emits the v2 operator SQL with the query **bound as a parameter** — values are never inlined. The table below is the core surface; the sections that follow complete the v2 vocabulary — phrase and regex variants, both proximity operators, aliases, and external-index filters.
+Search predicate methods are generated only on columns that appear in a `USING paradedb` index. Each method emits the v2 operator SQL with the query **bound as a parameter** — values are never inlined. This page works through every operator with a Go call and the SQL it emits, then composes them into one boolean query.
+
+## The running example
+
+All snippets use the [quickstart](/welcome/quickstart) products table with a search index covering the fields the examples exercise:
+
+```sql
+CREATE INDEX products_search ON products USING paradedb
+  (id,
+   title,
+   description::pdb.icu,
+   category::pdb.literal,                                    -- one token per value: the === family
+   rating,
+   price_cents,
+   created_at,
+   in_stock,
+   (metadata->'color')::pdb.literal('alias=json_color'))
+  WITH (key_field='id');
+```
+
+## Quick reference
 
 | method | emits | notes |
 |---|---|---|
@@ -12,65 +32,298 @@ Search predicate methods are generated only on columns that appear in a `USING p
 | `.MatchAll(q)` | `description &&& $1` | match-all (token AND) |
 | `.Phrase(q, pgb.Slop(2))` | `description ### $1::pdb.slop(2)` | order + position aware |
 | `.Exact(v)` | `category === $1` | exact token, case-sensitive |
-| `.ExactAny(vs)` | `category === $1::text[]` | term set — any of, via array RHS |
-| `.Fuzzy(q, 1, pgb.Prefix())` | `description === $1::pdb.fuzzy(1, true)` | max distance 2; attach points beyond `===` to be verified against 0.26-rc docs |
-| `.Regex(p)` | `description @@@ pdb.regex($1)` | |
+| `.ExactAny(vs)` | `category === $1::text[]` | term set — any of, via array right-hand side |
+| `.Fuzzy(q, 1, pgb.Prefix())` | `description === $1::pdb.fuzzy(1, true)` | max distance 2; cast spelling to be verified against 0.26-rc docs |
+| `.Regex(p)` | `description @@@ pdb.regex($1)` | generic operator family |
 | `.RangeTerm(r, "Intersects")` | `rating @@@ pdb.range_term($1::int4range, 'Intersects')` | also `Contains`, `Within` |
-| `.Proximity(a, b, n)` | `$1 ## n ## $2` | and `##>` |
-| `.ForceIndex()` | `id @@@ pdb.all()` | forces ParadeDB execution / Top-K routing (used on the vector lane) |
+| `.Proximity(a, b, n)` | `$1 ## n ## $2` | ordered companion emits `##>` |
+| `.ForceIndex()` | `id @@@ pdb.all()` | forces ParadeDB execution / Top-K routing |
 | `.Parse(q, pgb.Lenient)` | `description @@@ pdb.parse($1, lenient => true)` | full query-string syntax |
-| `.MoreLikeThis(3)` | `... pdb.more_like_this(3)` | |
-| `.Agg(json)` | `... pdb.agg($1)` | raw aggregation JSON |
+| `.MoreLikeThis(3)` | `... pdb.more_like_this(3)` | shape pinned by golden tests |
+| `.Agg(json)` | `... pdb.agg($1)` | raw aggregation JSON — [aggregations](/paradedb/aggregations) |
 
-## Boost
+## Match — ||| (match-any)
 
-Boost is a **cast on the right-hand side**, chainable on any predicate:
+A document matches when **any token** of the query matches the field; BM25 ranks rows with more or rarer token hits higher. This is the default "search box" predicate.
 
+<CodeGroup>
 ```go
-dbgen.Products.Description().Match("shoes").Boost(2.0)
-// description ||| $1::pdb.boost(2)
+q := db.Products.Description().Match("trail running shoes")
 
-dbgen.Products.Description().Regex("key.*").Boost(2.0)
-// description @@@ pdb.regex($1)::pdb.boost(2)
+hits, err := db.SearchProducts(ctx, pool, q, 20)
 ```
 
-The same right-hand-side position takes the vocabulary's other casts — `::pdb.fuzzy(n)`, `::pdb.slop(n)`, and `::pdb.whitespace`, the last re-tokenizing a literal on whitespace boundaries before it is matched.
-
-## Boolean logic
-
-Compound queries are plain SQL — `AND` / `OR` / `NOT` between predicates, combined with the core expression tree:
-
-```go
-dbgen.Or(
-    dbgen.Products.Description().Match("running shoes"),
-    dbgen.And(
-        dbgen.Products.Category().Exact("shoes"),
-        dbgen.Products.Description().Fuzzy("shose", 1, pgb.Prefix()).Boost(2.0),
-    ),
-    dbgen.Not(dbgen.Products.InStock().Exact(false)),
-)
+```sql
+SELECT id, seller_id, title, description, category, rating,
+       price_cents, in_stock, metadata, created_at,
+       pdb.score(id) AS score
+FROM products
+WHERE description ||| $1
+ORDER BY pdb.score(id) DESC, id ASC
+LIMIT $2
+-- $1 = "trail running shoes" · $2 = 20
 ```
+</CodeGroup>
+
+## Match-all — &&&
+
+The conjunction: **every token** of the query must appear. Use it when the words are a specification, not a suggestion.
+
+<CodeGroup>
+```go
+q := db.Products.Title().MatchAll("waterproof hiking boots")
+```
+
+```sql
+WHERE title &&& $1
+-- $1 = "waterproof hiking boots"
+```
+</CodeGroup>
+
+## Phrase — ###
+
+Order and position aware: the tokens must appear as a phrase, and `::pdb.slop(n)` allows up to `n` positions of movement between them. `pgb.Slop(0)` is exact adjacency.
+
+<CodeGroup>
+```go
+q := db.Products.Description().Phrase("running shoes", pgb.Slop(2))
+```
+
+```sql
+WHERE description ### $1::pdb.slop(2)
+-- $1 = "running shoes"
+```
+</CodeGroup>
+
+## Term — === (exact)
+
+Single-token equality, case-sensitive, against fields tokenized with one token per value (`::pdb.literal`). This is the facet-filter predicate — category, SKU, brand.
+
+<CodeGroup>
+```go
+q := db.Products.Category().Exact("shoes")
+```
+
+```sql
+WHERE category === $1
+-- $1 = "shoes"
+```
+</CodeGroup>
+
+### Term sets — === with an array right-hand side
+
+`ExactAny` binds a Go slice as an array parameter; the field matches **any** of the terms. The emitter adds the `$n::text[]` cast so pgx encodes the slice natively.
+
+<CodeGroup>
+```go
+q := db.Products.Category().ExactAny([]string{"shoes", "boots", "sandals"})
+```
+
+```sql
+WHERE category === $1::text[]
+-- $1 = {"shoes","boots","sandals"}
+```
+</CodeGroup>
+
+### Fuzzy — ::pdb.fuzzy(n)
+
+Fuzzy matching rides the same operator with the `::pdb.fuzzy(n)` cast: per-token edit distance up to `n` (ParadeDB caps it at 2). `pgb.Prefix()` adds the prefix flag, extending matches to token prefixes — the typo-tolerant lane of the [boolean example](#boolean-logic) below.
+
+<CodeGroup>
+```go
+q := db.Products.Description().Fuzzy("runing shose", 1, pgb.Prefix())
+```
+
+```sql
+WHERE description === $1::pdb.fuzzy(1, true)
+-- $1 = "runing shose"
+```
+</CodeGroup>
+
+<Note>
+The argument order and the prefix flag's position inside the cast are pinned by golden tests in the repo; they are confirmed against the 0.26-rc documentation during milestone M3 (see the note at the end of this page).
+</Note>
+
+## Generic — @@@
+
+`@@@` is the generic match operator: wherever a predicate is not a plain token comparison, it degrades to `field @@@ pdb.<builder>(...)` with the argument still bound.
+
+<CodeGroup>
+```go
+db.Products.Description().Regex("water.*proof")
+// description @@@ pdb.regex($1)
+
+db.Products.Description().Parse("running AND (shoes OR boots) -trail", pgb.Lenient)
+// description @@@ pdb.parse($1, lenient => true)
+```
+</CodeGroup>
+
+`Parse` takes ParadeDB's full query-string syntax; `pgb.Lenient` sets the named `lenient => true` flag so syntax errors degrade to partial matches instead of failing the query.
 
 ## Phrase & regex variants
 
 | method | emits | notes |
 |---|---|---|
-| `.RegexPhrase(ps)` | `description @@@ pdb.regex_phrase($1)` | ordered sequence of regexes |
+| `.RegexPhrase(ps)` | `description @@@ pdb.regex_phrase($1)` | ordered sequence of regexes, one per position |
 | `.PhrasePrefix(q)` | `description @@@ pdb.phrase_prefix($1)` | phrase whose final term prefix-matches |
+| `.MoreLikeThis(3)` | `... pdb.more_like_this(3)` | more-like-this over the row's indexed fields (to be verified) |
 | `.ProxRegex(a, b, n)` | `$1 ## n ## $2` with regex operands (to be verified) | regex terms under proximity |
 
-## Proximity operators
+<CodeGroup>
+```go
+q := db.Products.Description().RegexPhrase([]string{"run.ing", "sho.s"})
+```
 
-`.Proximity` (above) emits `##` — both operands within n tokens of each other. Its companion `##>` is the ordered form: the left operand must precede the right within n tokens (to be verified).
+```sql
+WHERE description @@@ pdb.regex_phrase($1)
+-- $1 = the regex slice, bound as a text[] parameter
+```
+</CodeGroup>
+
+## Range terms — pdb.range_term
+
+`RangeTerm` filters on the column's value as a range predicate. The bind cast follows the column's type family:
+
+<CodeGroup>
+```go
+// integer column → int4range: ratings 3 (inclusive) to 5 (exclusive)
+q := db.Products.Rating().RangeTerm(pgtype.Range[int32]{
+    Lower:     3,
+    Upper:     5,
+    LowerType: pgtype.Inclusive,
+    UpperType: pgtype.Exclusive,
+}, "Intersects")
+```
+
+```sql
+WHERE rating @@@ pdb.range_term($1::int4range, 'Intersects')
+```
+</CodeGroup>
+
+<CodeGroup>
+```go
+// timestamptz column → tstzrange: everything created in the last week
+q := db.Products.CreatedAt().RangeTerm(pgtype.Range[pgtype.Timestamptz]{
+    Lower:     pgtype.Timestamptz{Time: weekAgo, Valid: true},
+    LowerType: pgtype.Inclusive,
+}, "Intersects")
+```
+
+```sql
+WHERE created_at @@@ pdb.range_term($1::tstzrange, 'Intersects')
+```
+</CodeGroup>
+
+The mode is the second argument — bound as a literal because ParadeDB requires it:
+
+| mode | matches when |
+|---|---|
+| `Intersects` (default) | the value's range overlaps `$1` |
+| `Contains` | the value's range covers all of `$1` |
+| `Within` | the value's range lies inside `$1` |
+
+| column type | emitted cast |
+|---|---|
+| `int2` / `int4` | `int4range` |
+| `int8` | `int8range` |
+| `numeric` / `float` | `numrange` |
+| `timestamp` | `tsrange` |
+| `timestamptz` | `tstzrange` |
+| `date` | `daterange` |
+
+## Proximity — ## and ##>
+
+`.Proximity(a, b, n)` emits `##`: both operands must occur within `n` tokens of each other, in either order. Its companion `##>` is the ordered form — the left operand must precede the right within `n` tokens (to be verified).
+
+<CodeGroup>
+```go
+q := db.Products.Description().Proximity("waterproof", "leather", 3)
+```
+
+```sql
+WHERE $1 ## 3 ## $2
+-- $1 = "waterproof" · $2 = "leather"
+```
+</CodeGroup>
+
+## Boost
+
+Boost is a **cast on the right-hand side**, chainable on any predicate:
+
+<CodeGroup>
+```go
+db.Products.Title().Match("shoes").Boost(2.0)
+// title ||| $1::pdb.boost(2)
+
+db.Products.Description().Regex("key.*").Boost(2.0)
+// description @@@ pdb.regex($1)::pdb.boost(2)
+```
+</CodeGroup>
+
+The same right-hand-side position takes the vocabulary's other casts:
+
+| cast | attaches to | meaning |
+|---|---|---|
+| `::pdb.boost(n)` | any predicate | multiplies the clause's score contribution |
+| `::pdb.fuzzy(n[, true])` | `===` | per-token edit distance up to n (max 2); the flag extends matches to prefixes |
+| `::pdb.slop(n)` | `###` | allowed positions of movement between phrase tokens |
+| `::pdb.whitespace` | term and phrase literals | re-tokenizes the right-hand side on whitespace boundaries before matching |
+
+## Boolean logic
+
+Compound queries are plain SQL — `AND` / `OR` / `NOT` between predicates, combined with the core expression tree (`db.And`, `db.Or`, `db.Not`). A realistic user search: the words matched against title (boosted) and description, a fuzzy fallback lane for typos, the selected category as an exact facet filter, and out-of-stock rows excluded.
+
+<CodeGroup>
+```go
+q := db.And(
+    // the user's words — title counts double, description is the baseline
+    db.Or(
+        db.Products.Title().Match("running shoes").Boost(2.0),
+        db.Products.Description().Match("running shoes").Boost(1.0),
+    ),
+    // typo tolerance on the same words, OR'd in as a fallback lane
+    db.Products.Description().Fuzzy("runing shose", 1, pgb.Prefix()),
+    // facet filter — the selected category, exact token
+    db.Products.Category().Exact("shoes"),
+    // never show out-of-stock rows
+    db.Not(db.Products.InStock().Exact(false)),
+)
+
+hits, err := db.SearchProducts(ctx, pool, q, 20)
+```
+
+```sql
+SELECT id, seller_id, title, description, category, rating,
+       price_cents, in_stock, metadata, created_at,
+       pdb.score(id) AS score
+FROM products
+WHERE ((title ||| $1::pdb.boost(2) OR description ||| $2::pdb.boost(1))
+       OR description === $3::pdb.fuzzy(1, true))
+  AND category === $4
+  AND NOT (in_stock === $5)
+ORDER BY pdb.score(id) DESC, id ASC
+LIMIT $6
+-- $1 = $2 = "running shoes" · $3 = "runing shose"
+-- $4 = "shoes" · $5 = false · $6 = 20
+```
+</CodeGroup>
+
+The whole tree executes inside the ParadeDB custom scan, and the `ORDER BY pdb.score(id) DESC, id ASC LIMIT $6` tail rides Top-K pushdown — see [scoring](/paradedb/scoring) and [architecture](/paradedb/architecture).
 
 ## JSON-path fields
 
-For an indexed path like `(metadata->'color')::pdb.literal('alias=json_color')`, the generated predicate re-emits the same path expression:
+For an indexed path like `(metadata->'color')::pdb.literal('alias=json_color')`, the generated predicate re-emits the same path expression — so the predicate matches exactly what the index covers:
 
+<CodeGroup>
 ```go
-dbgen.Products.Metadata().SearchExact("json_color", "red")
-// metadata->'color' === $1
+q := db.Products.Metadata().SearchExact("json_color", "red")
 ```
+
+```sql
+WHERE metadata->'color' === $1
+-- $1 = "red"
+```
+</CodeGroup>
 
 ## Aliased fields
 
@@ -78,7 +331,26 @@ The `.Alias(name, q)` builder targets an index-declared alias by name instead of
 
 ## External-index filters
 
-Since pg_search 0.25.5, filters on columns indexed by *other* index types push down into the ParadeDB scan — ltree ancestry (`path <@ $1`) and PostGIS-style geometric operators. pgb emits these as ordinary SQL in the same generated query; no special predicate surface is required.
+Since pg_search 0.25.5, filters on columns indexed by *other* index types push down into the ParadeDB scan — ltree ancestry (`path <@ $1`) and PostGIS-style geometric operators. pgb emits these as ordinary SQL in the same generated query via `db.Raw`, no special predicate surface required:
+
+<CodeGroup>
+```go
+// category_path is a GiST-indexed ltree column — not part of the paradedb index
+q := db.And(
+    db.Products.Description().Match("running"),
+    db.Raw("category_path <@ $1", "sports.running"),
+)
+
+hits, err := db.SearchProducts(ctx, pool, q, 20)
+```
+
+```sql
+WHERE description ||| $1 AND category_path <@ $2
+-- $1 = "running" · $2 = "sports.running"
+```
+</CodeGroup>
+
+The emitter renumbers `Raw`'s placeholders into the composed statement's parameter order, so raw fragments bind like everything else. The custom scan still activates because a ParadeDB operator is present in the query.
 
 <Note>
 Shapes marked "to be verified" are pinned by golden tests in the repo; they are confirmed against the 0.26-rc documentation during milestone M3 and any drift lands in `core/search.go` only.

@@ -43,6 +43,173 @@ Arrays map to `[]T` of the element type (`text[]` → `[]string`).
 | `pgtype` (default) | `pgtype.Timestamptz`, `pgtype.Numeric`, … |
 | `pointers` | `*string`, `*time.Time`, … |
 
+## Mapping in practice
+
+One table carrying one column of every tricky family, and the Go that reads and writes each:
+
+```sql
+CREATE TABLE documents (
+    id         uuid          NOT NULL DEFAULT gen_random_uuid(),
+    price      numeric(12,2) NOT NULL,
+    note       text,
+    meta       jsonb,
+    tags       text[],
+    updated_at timestamptz,
+    embedding  vector(384)
+);
+
+COMMENT ON COLUMN documents.embedding IS 'pgb:type=github.com/pgvector/pgvector-go.Vector';
+```
+
+```go
+type Document struct {
+    ID        uuid.UUID          // uuid — github.com/google/uuid
+    Price     pgtype.Numeric     // numeric — exact decimal, never a float
+    Note      pgtype.Text        // nullable text
+    Meta      []byte             // jsonb — raw bytes unless overridden
+    Tags      []string           // text[]
+    UpdatedAt pgtype.Timestamptz // nullable timestamp
+    Embedding pgvector.Vector    // via the directive (vector has no default Go type)
+}
+```
+
+### Money — `numeric(12,2)`
+
+Write with the exact-decimal constructor; floats cannot represent money:
+
+```go
+db.UpdateDocument(ctx, pool, doc.ID, db.DocumentSet{
+    Price: pgb.Set(pgtype.Numeric{Int: big.NewInt(19999), Exp: -2, Valid: true}), // 199.99
+})
+```
+
+```go
+if v, err := doc.Price.Value(); err == nil {
+    fmt.Println(v.(string)) // "199.99" — string form of the exact decimal
+}
+```
+
+If the `Int`/`Exp` gymnastics bother you, override `numeric` to `json.Number` or `string` — the override hits params, filters, and scans at once.
+
+### jsonb — `meta`
+
+Raw bytes by default: marshal in, unmarshal out:
+
+```go
+raw, err := json.Marshal(map[string]any{"plan": "pro", "seats": 12})
+if err != nil {
+    return err
+}
+_, err = db.UpdateDocument(ctx, pool, doc.ID, db.DocumentSet{Meta: pgb.Set(raw)})
+```
+
+```go
+if len(doc.Meta) > 0 {
+    var m map[string]any
+    if err := json.Unmarshal(doc.Meta, &m); err != nil {
+        return err
+    }
+    fmt.Println(m["plan"])
+}
+```
+
+An override (`pgb:type=map[string]any`) makes pgx's json codec scan straight into the typed value and deletes the manual round-trip.
+
+### Array — `tags`
+
+Go slices bind natively; pgx encodes them as arrays (empty slices get explicit casts, never `''`):
+
+```go
+_, err := db.UpdateDocument(ctx, pool, doc.ID, db.DocumentSet{
+    Tags: pgb.Set([]string{"staff", "beta"}),
+})
+```
+
+```go
+for _, t := range doc.Tags { // SQL NULL arrives as a nil slice
+    fmt.Println(t)
+}
+```
+
+### Nullable timestamptz — `updated_at`
+
+`Valid` is the NULL flag in `pgtype` mode:
+
+```go
+db.UpdateDocument(ctx, pool, doc.ID, db.DocumentSet{
+    UpdatedAt: pgb.Set(pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}),
+})
+```
+
+```go
+db.UpdateDocument(ctx, pool, doc.ID, db.DocumentSet{
+    UpdatedAt: pgb.Null[pgtype.Timestamptz](), // SET updated_at = NULL
+})
+```
+
+```go
+if doc.UpdatedAt.Valid {
+    fmt.Println(doc.UpdatedAt.Time.UTC().Format(time.RFC3339))
+}
+```
+
+### uuid — `id`
+
+A plain `uuid.UUID` value — construct, scan, and print without glue:
+
+```go
+_, err := db.InsertDocument(ctx, pool, db.InsertDocumentParams{
+    Price: pgtype.Numeric{Int: big.NewInt(4999), Exp: -2, Valid: true}, // 49.99
+    // ID is omitted: gen_random_uuid() is a default, and include_defaults is false
+})
+```
+
+```go
+doc, err := db.GetDocument(ctx, pool, id) // id uuid.UUID
+fmt.Println(doc.ID, doc.ID.String())
+```
+
+### vector — `embedding`
+
+Mapped through the `pgb:type=` directive (or the config `db_type: vector` override):
+
+```go
+db.UpdateDocument(ctx, pool, doc.ID, db.DocumentSet{
+    Embedding: pgb.Set(pgvector.New([]float32{0.11, 0.25, 0.04})),
+})
+```
+
+```go
+if err := doc.Embedding.Validate(384); err != nil { // optional check against the column dim
+    return err
+}
+floats := doc.Embedding.Slice() // []float32 — feed hybrid search or your own math
+```
+
+### The same schema under `pointers`
+
+Only nullable columns change; non-nullable columns keep their family mapping in both modes:
+
+| column | null? | `pgtype` (default) | `pointers` |
+|---|---|---|---|
+| `id` (uuid) | impossible | `uuid.UUID` | `uuid.UUID` |
+| `price` (numeric, NOT NULL) | impossible | `pgtype.Numeric` | `pgtype.Numeric` |
+| `note` (text) | NULL → `Valid: false` | `pgtype.Text` | `*string` |
+| `meta` (jsonb) | NULL → `nil` | `[]byte` | `*[]byte` |
+| `tags` (text[]) | NULL → `nil` | `[]string` | `*[]string` |
+| `updated_at` (timestamptz) | `Valid: false` | `pgtype.Timestamptz` | `*pgtype.Timestamptz` |
+| `embedding` (vector) | impossible here | `pgvector.Vector` | `pgvector.Vector` |
+
+Read-side checks become nil checks — and nullable text loses its `pgtype.Text` wrapper (plain `*string` instead):
+
+```go
+if doc.Note != nil {
+    fmt.Println(*doc.Note)
+}
+```
+
+Three-state writes are unaffected by the mode — `pgb.Set(v)` / `pgb.Null[T]()` are generic over whichever type the column carries.
+
 ## Three-state writes
 
 `UPDATE` sets need *value*, *NULL*, and *skip*. One generic covers it:

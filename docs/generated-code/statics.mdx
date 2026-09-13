@@ -7,22 +7,22 @@ icon: "bolt"
 Stage 2 generates the static layer — the reason repetitive SQL never gets hand-written. Every function: explicit column lists, bound parameters, `pgb.ErrNotFound` sentinel wrapping `pgx.ErrNoRows`, tx-compatible via `pgb.DBTX`.
 
 ```go
-func GetUser(ctx context.Context, db pgb.DBTX, id int64) (db.User, error)             // pgb.ErrNotFound
-func ListUsers(ctx context.Context, db pgb.DBTX, f UserFilter, o ...pgb.ListOpt) ([]db.User, error)
-func CountUsers(ctx context.Context, db pgb.DBTX, f UserFilter) (int64, error)
+func GetUser(ctx context.Context, exec pgb.DBTX, id int64) (db.User, error)             // pgb.ErrNotFound
+func ListUsers(ctx context.Context, exec pgb.DBTX, f UserFilter, o ...pgb.ListOpt) ([]db.User, error)
+func CountUsers(ctx context.Context, exec pgb.DBTX, f UserFilter) (int64, error)
 
-func InsertUser(ctx context.Context, db pgb.DBTX, p InsertUserParams) (db.User, error)
-func InsertUsers(ctx context.Context, db pgb.DBTX, ps []InsertUserParams) ([]db.User, error)
-func UpdateUser(ctx context.Context, db pgb.DBTX, id int64, s UserSet) (db.User, error)
-func UpdateUsers(ctx context.Context, db pgb.DBTX, where []core.Expr, s UserSet) (int64, error)
-func UpsertUser(ctx context.Context, db pgb.DBTX, p InsertUserParams, o UpsertOpts) (db.User, error)
-func DeleteUser(ctx context.Context, db pgb.DBTX, id int64) error
-func DeleteUsers(ctx context.Context, db pgb.DBTX, where []core.Expr) (int64, error)
+func InsertUser(ctx context.Context, exec pgb.DBTX, p InsertUserParams) (db.User, error)
+func InsertUsers(ctx context.Context, exec pgb.DBTX, ps []InsertUserParams) ([]db.User, error)
+func UpdateUser(ctx context.Context, exec pgb.DBTX, id int64, s UserSet) (db.User, error)
+func UpdateUsers(ctx context.Context, exec pgb.DBTX, where []core.Expr, s UserSet) (int64, error)
+func UpsertUser(ctx context.Context, exec pgb.DBTX, p InsertUserParams, o UpsertOpts) (db.User, error)
+func DeleteUser(ctx context.Context, exec pgb.DBTX, id int64) error
+func DeleteUsers(ctx context.Context, exec pgb.DBTX, where []core.Expr) (int64, error)
 ```
 
 ## Filters
 
-`UserFilter` fields are typed and optional — `nil` / zero means "don't filter":
+`UserFilter` fields are typed and optional — `nil` / zero means "don't filter" (the `pgb.Opt` helper takes a value and returns the pointer):
 
 ```go
 type UserFilter struct {
@@ -39,55 +39,340 @@ type UserFilter struct {
 This is exactly the layer where hand-written sqlc deteriorates into `(@x IS NULL OR col = @x)` — a [planner anti-pattern](https://github.com/sqlc-dev/sqlc/discussions/364). Generated filters compose the WHERE clause structurally instead, so Postgres always sees a clean, sargable predicate.
 </Warning>
 
-## Inserts
+## The CRUD flow
 
-- `InsertUser` emits `INSERT ... RETURNING <explicit columns>` and returns the row.
-- Columns with defaults are omitted from the column list; PG18 virtual generated columns are always omitted (both INSERT and UPDATE).
-- `InsertUsers` handles arbitrary batch sizes while still returning rows:
+### Insert
 
-```sql
-INSERT INTO users (email, name)
-SELECT * FROM unnest($1::text[], $2::text[])
-RETURNING id, email, name, created_at
+```go
+u, err := db.InsertUser(ctx, pool, db.InsertUserParams{
+    Email: "ada@corp.io",
+    Name:  "Ada Lovelace",
+    Bio:   pgtype.Text{String: "First programmer", Valid: true},
+    Tags:  []string{"staff", "beta"},
+})
+if err != nil {
+    return err
+}
+fmt.Println(u.ID, u.CreatedAt.Time)   // RETURNING filled both in
 ```
 
-A `pgx.CopyFrom` variant is available opt-in for pure bulk loads (no `RETURNING` — Postgres has no `COPY ... RETURNING`).
+```sql
+INSERT INTO public.users (email, name, bio, tags)
+VALUES ($1, $2, $3, $4)
+RETURNING id, email, name, bio, metadata, tags, created_at, last_login_at
+```
+
+Columns with defaults (`id`, `created_at`) are omitted from the column list; PG18 virtual generated columns are always omitted (both INSERT and UPDATE). Nullable columns with no default (`bio`, `metadata`, `tags`) stay in the list — their zero values bind as NULL.
+
+### Get
+
+```go
+u, err := db.GetUser(ctx, pool, u.ID)
+if errors.Is(err, pgb.ErrNotFound) {
+    // no such user — render a 404
+    return err
+}
+```
+
+```sql
+SELECT id, email, name, bio, metadata, tags, created_at, last_login_at
+FROM public.users
+WHERE id = $1
+```
+
+### Update
+
+```go
+u, err = db.UpdateUser(ctx, pool, u.ID, db.UserSet{
+    Email: pgb.Set("ada@newcorp.io"),
+    Bio:   pgb.Null[string](),   // cleared — see three-state sets below
+})
+if err != nil {
+    return err
+}
+```
+
+```sql
+UPDATE public.users
+SET email = $1, bio = NULL
+WHERE id = $2
+RETURNING id, email, name, bio, metadata, tags, created_at, last_login_at
+```
+
+### List
+
+```go
+users, err := db.ListUsers(ctx, pool, db.UserFilter{
+    EmailLike:    pgb.Opt("%@corp.io"),
+    CreatedAfter: pgb.Opt(since),
+}, pgb.Limit(20), pgb.Offset(40))
+if err != nil {
+    return err
+}
+```
+
+```sql
+SELECT id, email, name, bio, metadata, tags, created_at, last_login_at
+FROM public.users
+WHERE email LIKE $1 AND created_at > $2
+LIMIT $3 OFFSET $4
+```
+
+### Delete
+
+```go
+err = db.DeleteUser(ctx, pool, u.ID)
+```
+
+```sql
+DELETE FROM public.users
+WHERE id = $1
+```
+
+## Batch inserts — InsertUsers
+
+`InsertUsers` handles arbitrary batch sizes in one round trip while still returning rows, via `unnest`:
+
+```go
+inserted, err := db.InsertUsers(ctx, pool, []db.InsertUserParams{
+    {Email: "grace@corp.io", Name: "Grace Hopper", Tags: []string{"staff"}},
+    {Email: "alan@corp.io", Name: "Alan Turing", Tags: []string{"beta"}},
+    {Email: "edsger@corp.io", Name: "Edsger Dijkstra", Tags: []string{"beta", "speaker"}},
+})
+if err != nil {
+    return err
+}
+fmt.Println(len(inserted), inserted[0].ID)   // all rows, ids included
+```
+
+```sql
+INSERT INTO public.users (email, name, bio, metadata, tags)
+SELECT * FROM unnest($1::text[], $2::text[], $3::text[], $4::jsonb[], $5::text[])
+RETURNING id, email, name, bio, metadata, tags, created_at, last_login_at
+```
+
+Each column becomes an array parameter; pgx encodes the Go slices natively, and `unnest` lines them back up into rows.
+
+## Bulk copy — CopyFromUsers
+
+For pure bulk loads (imports, fixtures, ETL), an opt-in `pgx.CopyFrom` variant uses the COPY protocol — the fastest ingest path into Postgres:
+
+```go
+n, err := db.CopyFromUsers(ctx, pool, pgx.CopyFromRows([][]any{
+    {"ada@corp.io", "Ada Lovelace", []string{"staff"}},
+    {"grace@corp.io", "Grace Hopper", []string{"staff"}},
+    {"alan@corp.io", "Alan Turing", []string{"beta"}},
+}))
+if err != nil {
+    return err
+}
+fmt.Println("copied", n)
+```
+
+```sql
+COPY public.users (email, name, tags) FROM STDIN
+```
+
+There is no `RETURNING` variant because Postgres has no `COPY ... RETURNING` — you get the row count, not the rows. Use `InsertUsers` when you need the inserted entities back.
 
 ## Updates — three-state sets
 
 ```go
 type UserSet struct {
-    Email core.Set[string]     // pgb.Set("x") · pgb.Null[string]() · zero = skip
-    Bio   core.Set[string]
+    Email       core.Set[string]
+    Name        core.Set[string]
+    Bio         core.Set[string]
+    Metadata    core.Set[[]byte]
+    Tags        core.Set[[]string]
+    LastLoginAt core.Set[pgtype.Timestamptz]
 }
+```
 
-dbgen.UpdateUser(ctx, db, id, dbgen.UserSet{
-    Email: pgb.Set("new@corp.io"),
-    Bio:   pgb.Null[string](),
+Each field has exactly three states:
+
+```go
+db.UpdateUser(ctx, pool, id, db.UserSet{
+    Email: pgb.Set("new@corp.io"),     // write a value
+    Bio:   pgb.Null[string](),         // write NULL
+    // LastLoginAt: zero core.Set     // skip this column entirely
 })
+```
+
+```sql
+UPDATE public.users
+SET email = $1, bio = NULL
+WHERE id = $2
+RETURNING id, email, name, bio, metadata, tags, created_at, last_login_at
+```
+
+`UpdateUsers` applies a set to every row matching composed predicates and returns the affected count:
+
+```go
+n, err := db.UpdateUsers(ctx, pool, []core.Expr{
+    db.Users.Tags().Contains([]string{"legacy"}),
+}, db.UserSet{
+    Tags: pgb.Null[[]string](),
+})
+```
+
+```sql
+UPDATE public.users
+SET tags = NULL
+WHERE tags @> $1::text[]
 ```
 
 ## Upserts
 
 ```go
-dbgen.UpsertUser(ctx, db, p, dbgen.UpsertOpts{
-    Target:  []string{"email"},          // ON CONFLICT (email)
-    Action:  dbgen.DoUpdate(dbgen.UserSet{Bio: pgb.Set("...")}),
-    // OnSelect: true                      // target 19 → ON CONFLICT DO SELECT RETURNING
+u, err := db.UpsertUser(ctx, pool, db.InsertUserParams{
+    Email: "ada@corp.io",
+    Name:  "Ada Lovelace",
+    Tags:  []string{"staff"},
+}, db.UpsertOpts{
+    Target: []string{"email"},                       // ON CONFLICT (email)
+    Action: db.DoUpdate(db.UserSet{
+        Name: pgb.Set("Ada King, Countess of Lovelace"),
+    }),
 })
 ```
 
-`OnSelect` is gated behind `target: "19"` in config; the `DO SELECT` syntax must be re-verified at PG19 GA (currently beta).
+```sql
+INSERT INTO public.users (email, name, tags)
+VALUES ($1, $2, $3)
+ON CONFLICT (email) DO UPDATE
+SET name = EXCLUDED.name
+WHERE users.name IS DISTINCT FROM EXCLUDED.name
+RETURNING id, email, name, bio, metadata, tags, created_at, last_login_at
+```
+
+The generated `WHERE` on the `DO UPDATE` skips no-op writes — the row keeps its physical placement and nothing fires when the values didn't change. `db.DoNothing{}` is the other action, emitting `ON CONFLICT (email) DO NOTHING`.
+
+`UpsertOpts.OnSelect: true` switches to `ON CONFLICT ... DO SELECT`, which returns the conflicting row instead of updating it:
+
+```go
+db.UpsertOpts{Target: []string{"email"}, OnSelect: true}
+```
+
+```sql
+INSERT INTO public.users (email, name)
+VALUES ($1, $2)
+ON CONFLICT (email) DO SELECT
+RETURNING id, email, name, bio, metadata, tags, created_at, last_login_at
+```
+
+<Warning>
+`OnSelect` is gated behind `target: "19"` in config and refuses to generate otherwise. The `DO SELECT` syntax must be re-verified at PG19 GA (currently beta) — do not enable it against a PG18 server.
+</Warning>
 
 ## Transactions
 
-Every function takes `pgb.DBTX`, which `*pgxpool.Pool`, `*pgx.Conn`, and `pgx.Tx` all satisfy:
+Every static function takes `pgb.DBTX`, which `*pgxpool.Pool`, `*pgx.Conn`, and `pgx.Tx` all satisfy — so a transaction is just passing `tx` instead of `pool`.
+
+With `pgx.BeginFunc`, returning an error rolls back automatically; a clean return commits both writes:
 
 ```go
-_ = pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
-    _, err := dbgen.InsertUser(ctx, tx, p)   // joins the tx
-    return err
+err := pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
+    u, err := db.InsertUser(ctx, tx, db.InsertUserParams{
+        Email: "grace@corp.io",
+        Name:  "Grace Hopper",
+        Tags:  []string{"staff"},
+    })
+    if err != nil {
+        return err   // rollback — the user insert is undone
+    }
+    _, err = db.InsertOrder(ctx, tx, db.InsertOrderParams{
+        TenantID: 7,
+        UserID:   u.ID,
+        Status:   "paid",
+        Total:    pgtype.Numeric{Int: big.NewInt(12999), Exp: -2, Valid: true}, // 129.99
+    })
+    if err != nil {
+        return err   // rollback — nothing was written
+    }
+    return nil       // commit both writes
 })
 ```
 
-or the helper: `pgb.WithTx(ctx, pool, func(tx pgb.DBTX) ([]db.User, error) { ... })`.
+```sql
+BEGIN;
+INSERT INTO public.users (email, name, tags)
+VALUES ($1, $2, $3)
+RETURNING id, email, name, bio, metadata, tags, created_at, last_login_at;
+INSERT INTO public.orders (tenant_id, user_id, status, total)
+VALUES ($1, $2, $3, $4)
+RETURNING id, tenant_id, user_id, status, total, placed_at;
+COMMIT;
+-- any error before COMMIT → ROLLBACK, both writes undone
+```
+
+Or the generic helper `pgb.WithTx`, which hands the closure any `pgb.DBTX` (builders included) and returns your value:
+
+```go
+o, err := pgb.WithTx(ctx, pool, func(tx pgb.DBTX) (db.Order, error) {
+    updated, err := db.Orders.Update().
+        Set(db.OrderSet{Status: pgb.Set("shipped")}).
+        Where(db.Orders.ID().Eq(orderID)).
+        Returning().
+        All(ctx, tx)
+    if err != nil {
+        return db.Order{}, err
+    }
+    if len(updated) == 0 {
+        return db.Order{}, pgb.ErrNotFound
+    }
+    _, err = db.UpdateUser(ctx, tx, updated[0].UserID, db.UserSet{
+        LastLoginAt: pgb.Set(pgtype.Timestamptz{Time: time.Now(), Valid: true}),
+    })
+    if err != nil {
+        return db.Order{}, err
+    }
+    return updated[0], nil   // err == nil → committed; err != nil → rolled back
+})
+```
+
+The emitted SQL is byte-identical whether the executor is a pool, a conn, or a tx — only the destination changes.
+
+## Error handling
+
+| error | raised by | check with |
+|---|---|---|
+| `pgb.ErrNotFound` | single-row lookups: `GetUser`, `UpdateUser`, `UpsertUser` (after `DO NOTHING`), `One` | `errors.Is` |
+| `pgb.ErrNoWhere` | `UpdateUsers` / `DeleteUsers` with an empty `where` slice; builders without `Where` | `errors.Is` |
+| unique violation `23505` | Postgres constraint violations on any write | `errors.As` + `*pgconn.PgError` |
+
+`pgb.ErrNotFound` wraps `pgx.ErrNoRows`, so `errors.Is(err, pgx.ErrNoRows)` matches too:
+
+```go
+u, err := db.GetUser(ctx, pool, 4242)
+if errors.Is(err, pgb.ErrNotFound) {
+    // render a 404
+}
+```
+
+`ErrNoWhere` fires before any SQL is sent — a full-table mutation must opt in:
+
+```go
+_, err := db.DeleteUsers(ctx, pool, nil)
+if errors.Is(err, pgb.ErrNoWhere) {
+    // refused: pass at least one predicate, or use a deliberate
+    // full-table path if truncation is really intended
+}
+```
+
+Constraint violations surface as pgx errors wrapping a `*pgconn.PgError` — check the five-character SQLSTATE code:
+
+```go
+_, err := db.InsertUser(ctx, pool, db.InsertUserParams{
+    Email: "ada@corp.io",
+    Name:  "Ada Lovelace",
+})
+var pgErr *pgconn.PgError
+if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+    // unique_violation — email taken
+    fmt.Println(pgErr.ConstraintName)   // e.g. users_email_key
+}
+```
+
+<Note>
+pgb wraps driver errors with `%w`, so `errors.Is` / `errors.As` always traverse to the original `pgx` / `pgconn` error. No sentinel is hidden behind a custom error type.
+</Note>

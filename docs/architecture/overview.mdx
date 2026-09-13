@@ -26,7 +26,13 @@ schema.sql (+ queries.sql)                       sqlc.yaml (options = pgb config
 └──────────────┬───────────────────────────────────────────────────┘
                │ GenerateResponse { File{name, contents} }
                ▼
-        db/ (models + query wrappers)      dbgen/ (builders + statics)
+db/  — ONE generated package (config package: db), flat files:
+  models.gen.go            structs, params, filters, sets, scan funcs
+  users.gen.go             db.Users descriptor + predicates + builder
+                           + statics (Get/List/Insert/Update/.../Delete)
+  products.gen.go          same surface for products
+  products_search.gen.go   SearchProducts (+ Page/Hybrid) — only for
+                           tables with a USING paradedb index
                │ imports (runtime only)
                ▼
         core/ — handwritten runtime: expression tree, SQL emitter,
@@ -40,6 +46,12 @@ schema.sql (+ queries.sql)                       sqlc.yaml (options = pgb config
 The plugin protocol hands pgb the same catalog and resolved queries that sqlc-gen-go receives, so pgb forks sqlc-gen-go (MIT) for models and query emission. The alternative — stock `gen: go:` plus a second builder plugin — means two independent type mappings; the moment their override sets diverge, generated code disagrees with models and you get runtime mis-scans or confusing compile errors.
 
 With a single fork there is exactly **one type map**, and it is still checked twice: pass A generates scan code that *assigns into* the model structs, so any internal inconsistency breaks `go build` rather than misbehaving.
+
+### One package, not two
+
+Everything pgb emits lands in one Go package named by `package:` (default `db`): models, query wrappers, descriptors, builders, and statics. There is no separate "models" package for the builder layer to import. That is what makes the single type map hold **end to end** — the same `db.User` struct is the target of `InsertUser` params, the return of `GetUser`, the row type of the `db.Users.Select()` builder, and the carrier of every scan function. One override in sqlc.yaml applies to the model field, the filter field, and the scan target simultaneously, because they are literally the same generated type.
+
+Splitting the output into two packages would turn every one of those cross-references into an import — and the moment the override sets or nullability modes drifted between them, generated code would disagree with models at runtime instead of at compile time. (The early two-package design — a `dbgen` models package beside a builder package — is retired for exactly this reason.) Cross-package consistency is also why the fork-parity test below diffs a single output tree: there is one place to look, and one place to drift.
 
 ### The plugin gets no SQL AST — so pgb re-parses the schema
 

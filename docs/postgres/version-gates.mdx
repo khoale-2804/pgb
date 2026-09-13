@@ -20,6 +20,65 @@ icon: "layer-group"
 | SQL/PGQ property graphs | 19 | non-goal — `Raw()` escape hatch |
 | `WAIT FOR` | 19 | out of scope |
 
+## Two gates in emitted SQL
+
+### Generated columns excluded from writes (PG18, default gate)
+
+PG18 makes *virtual* the default generated-column kind. Postgres rejects any write to a generated column, so the emitter drops it from every INSERT column list, every VALUES row, every UPDATE `SET`, and every upsert `DO UPDATE` — while keeping it in filters, RETURNING lists, and scans:
+
+```sql
+CREATE TABLE invoices (
+    id         bigserial PRIMARY KEY,
+    cents      int8        NOT NULL,
+    total      numeric GENERATED ALWAYS AS (cents::numeric / 100) VIRTUAL,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+```
+
+```sql
+INSERT INTO public.invoices (cents)
+VALUES ($1)
+RETURNING id, cents, total, created_at
+```
+
+`total` is absent from the column list but present in RETURNING — the round trip hands the computed value straight back. The same exclusion in an UPDATE:
+
+```sql
+UPDATE public.invoices
+SET cents = $1
+WHERE id = $2
+RETURNING id, cents, total, created_at
+```
+
+Unlike default-bearing columns (`include_defaults: true` can put them back), there is no opt-out for generated columns — writing to them is a server error in every Postgres version that has them.
+
+### `ON CONFLICT DO SELECT` (PG19 gate)
+
+`UpsertOpts.OnSelect` emits `INSERT ... ON CONFLICT ... DO SELECT RETURNING`, which returns the conflicting row instead of updating it. The gate requires `target: "19"`:
+
+```yaml
+options:
+  target: "19"
+```
+
+```go
+u, err := db.UpsertUser(ctx, pool, db.InsertUserParams{
+    Email: "ada@corp.io",
+    Name:  "Ada Lovelace",
+}, db.UpsertOpts{Target: []string{"email"}, OnSelect: true})
+```
+
+```sql
+INSERT INTO public.users (email, name)
+VALUES ($1, $2)
+ON CONFLICT (email) DO SELECT
+RETURNING id, email, name, bio, metadata, tags, created_at, last_login_at
+```
+
+<Warning>
+PG19 is beta (beta 3: 2026-08-13, GA expected late Sept/Oct 2026), and no codegen parser embeds PG19 grammar yet — this syntax was validated against the beta server, not by the parser. pgb re-verifies the emitted `DO SELECT` form at PG19 GA before lifting the beta caveat; if upstream changed the syntax, the fix is a regenerated build away because the gate is in the emitter, not in your call sites. Search emission stays on 15–18 regardless, until ParadeDB ships PG19 binaries.
+</Warning>
+
 ## Parser reality
 
 The generator parses your schema with libpg_query 18 (`sqlc-dev/oliphant`; libpg_query 18.0.0 landed 2026-05-21). **No parser embeds PG19 grammar yet** — libpg_query has no 19 branch, and PG19 is beta (beta 3: 2026-08-13, GA expected ~Sept/Oct 2026).

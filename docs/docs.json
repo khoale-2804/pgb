@@ -12,10 +12,6 @@
     "default": "system",
     "strict": false
   },
-  "banner": {
-    "content": "Docs expansion: ParadeDB architecture, aggregations, tokenizers, and the [support matrix](/reference/support-matrix) — pgb now documents pg_search 0.25.9+ / 0.26-rc.",
-    "dismissible": true
-  },
   "navigation": {
     "tabs": [
       {
@@ -70,16 +66,6 @@
         ]
       },
       {
-        "tab": "Postgres",
-        "icon": "database",
-        "groups": [
-          {
-            "group": "Versions",
-            "pages": ["postgres/version-gates"]
-          }
-        ]
-      },
-      {
         "tab": "Reference",
         "icon": "gears",
         "groups": [
@@ -88,8 +74,8 @@
             "pages": ["reference/config", "reference/directives", "reference/type-mapping"]
           },
           {
-            "group": "Platform",
-            "pages": ["reference/support-matrix"]
+            "group": "Versions",
+            "pages": ["postgres/version-gates", "reference/support-matrix"]
           },
           {
             "group": "Runtime core",

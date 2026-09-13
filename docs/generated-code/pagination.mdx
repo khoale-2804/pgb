@@ -7,26 +7,159 @@ icon: "arrow-right-long"
 Offset pagination degrades linearly and drifts under concurrent writes. pgb generates **keyset** pagination from your table's unique sortable key (`emit.keyset: true`), returning an opaque cursor:
 
 ```go
-rows, next, more, err := dbgen.Users.Select().
-    OrderBy(dbgen.Users.ID().Asc()).
-    Page(ctx, db, pgb.CursorOf(prev), 50)
+rows, next, more, err := db.Users.Select().
+    OrderBy(db.Users.ID().Asc()).
+    Page(ctx, pool, pgb.CursorOf(prev), 50)
 ```
 
 - The emitted WHERE is `(k > $last)` — index-driven, stable under inserts.
 - `next` is a base64-encoded, versioned cursor over the sort key; `more` is computed by fetching `limit + 1` rows.
 - Cursors are tied to the column set that produced them; mixing sort keys returns `pgb.ErrCursorMismatch`.
 
-## Composite keys
+## End to end — first page, then next
 
-Tables whose unique key is `(tenant_id, id)` produce two-column cursors: `WHERE (tenant_id, id) > ($1, $2)`.
+`Page` takes the previous page's token (empty string on the first request) and returns the token for the following page:
 
-## Search results
+```go
+func listUsers(ctx context.Context, pool *pgxpool.Pool, prev string) ([]db.User, string, bool, error) {
+    return db.Users.Select().
+        OrderBy(db.Users.ID().Asc()).
+        Page(ctx, pool, pgb.CursorOf(prev), 50)
+}
+
+// first request — prev == "", no keyset predicate is emitted
+users, next, more, err := listUsers(ctx, pool, "")
+if err != nil {
+    return err
+}
+// serve users; hand next to the client when more == true
+
+// next request — pass the token back
+page2, next2, more2, err := listUsers(ctx, pool, next)
+```
+
+First page SQL (the limit argument is `limit + 1`; the extra row only sets `more` and is dropped):
+
+```sql
+SELECT id, email, name, bio, metadata, tags, created_at, last_login_at
+FROM public.users
+ORDER BY id ASC
+LIMIT $1
+```
+
+Next page SQL — the cursor's last `id` becomes the keyset predicate:
+
+```sql
+SELECT id, email, name, bio, metadata, tags, created_at, last_login_at
+FROM public.users
+WHERE id > $1
+ORDER BY id ASC
+LIMIT $2
+```
+
+Descending order flips the comparison: `OrderBy(db.Users.ID().Desc()).Page(...)` emits `WHERE id < $1`.
+
+A drain loop over every page is just the same call with `prev = next`:
+
+```go
+func allBetaUsers(ctx context.Context, pool *pgxpool.Pool) ([]db.User, error) {
+    var out []db.User
+    prev := ""
+    for {
+        users, next, more, err := db.Users.Select().
+            Where(db.Users.Tags().Contains([]string{"beta"})).
+            OrderBy(db.Users.ID().Asc()).
+            Page(ctx, pool, pgb.CursorOf(prev), 500)
+        if err != nil {
+            return nil, err
+        }
+        out = append(out, users...)
+        if !more {
+            return out, nil
+        }
+        prev = next
+    }
+}
+```
+
+<Note>
+The token is versioned and self-describing — roughly `base64("v1|users|id|asc|5027")`. It is opaque to clients; treat it as a string and pass it back. A codegen change that alters the cursor format bumps the version, and old tokens fail closed with `pgb.ErrCursorMismatch` rather than silently resuming from the wrong row.
+</Note>
+
+## Composite keys — (tenant_id, id)
+
+Tables whose unique key is `(tenant_id, id)` — the orders table on the [builders page](/generated-code/builders) — produce two-column cursors. Order by the full key and the predicate becomes a row-value comparison, which the `(tenant_id, id)` unique index serves directly:
+
+```go
+orders, next, more, err := db.Orders.Select().
+    Where(db.Orders.TenantID().Eq(tenantID)).
+    OrderBy(db.Orders.TenantID().Asc(), db.Orders.ID().Asc()).
+    Page(ctx, pool, pgb.CursorOf(prev), 100)
+```
+
+```sql
+SELECT id, tenant_id, user_id, status, total, placed_at
+FROM public.orders
+WHERE tenant_id = $1
+  AND (tenant_id, id) > ($2, $3)
+ORDER BY tenant_id ASC, id ASC
+LIMIT $4
+```
+
+The cursor carries both column values from the last row of the previous page.
+
+## Search results — the (score, id) cursor
 
 Score-ordered search has unstable keys (ties), so the search functions paginate on the **(score, id) composite** — which ParadeDB requires anyway: the tiebreak column must be indexed for Top-K execution.
 
 ```go
-hits, next, more, err := dbgen.SearchProductsPage(ctx, db, "running shoes",
-    pgb.CursorOf(prev), 20)
+func searchPage(ctx context.Context, pool *pgxpool.Pool, q, prev string) ([]db.ProductHit, string, bool, error) {
+    return db.SearchProductsPage(ctx, pool, q, pgb.CursorOf(prev), 20)
+}
+
+// first page
+hits, next, more, err := searchPage(ctx, pool, "running shoes", "")
+// next page
+page2, next2, more2, err := searchPage(ctx, pool, "running shoes", next)
 ```
 
-The SQL orders by `pdb.score(id) DESC, id ASC` and continues from the previous page's `(score, id)` pair.
+The SQL orders by `pdb.score(id) DESC, id ASC` and continues from the previous page's `(score, id)` pair. Because the two sort directions differ (score descending, id ascending), a row-value comparison is not valid Postgres — the emitter expands it:
+
+```sql
+SELECT id, name, description, price, pdb.score(id) AS score
+FROM public.products
+WHERE description ||| $1
+  AND (
+        pdb.score(id) < $2
+     OR (pdb.score(id) = $2 AND id > $3)
+      )
+ORDER BY pdb.score(id) DESC, id ASC
+LIMIT $4
+```
+
+## ErrCursorMismatch
+
+`pgb.ErrCursorMismatch` fires when a token is used against a sort key that did not produce it — different column, different direction, a token from another table, or a schema/codegen change that invalidated the cursor format:
+
+```go
+users, next, more, err := db.Users.Select().
+    OrderBy(db.Users.Email().Asc()).   // token was built for id ASC
+    Page(ctx, pool, pgb.CursorOf(prev), 50)
+if errors.Is(err, pgb.ErrCursorMismatch) {
+    // the client mixed sort keys — restart from the first page
+    users, next, more, err = db.Users.Select().
+        OrderBy(db.Users.Email().Asc()).
+        Page(ctx, pool, pgb.CursorOf(""), 50)
+}
+```
+
+| trigger | example |
+|---|---|
+| different sort column | token for `id` used with `ORDER BY email` |
+| different direction | token for `id ASC` used with `ORDER BY id DESC` |
+| different table | token from `users` passed to an `orders` page call |
+| stale format | token issued before a cursor-format version bump |
+
+<Note>
+Failing closed is deliberate: a mismatched keyset predicate could silently skip or repeat rows. Restarting from page one is always correct — callers only need the `errors.Is` branch above.
+</Note>

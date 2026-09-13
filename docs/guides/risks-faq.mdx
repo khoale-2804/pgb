@@ -42,4 +42,13 @@ icon: "triangle-exclamation"
   <Accordion title="License implications of ParadeDB?">
     pg_search is AGPL-3.0 for the community edition. Using it in your stack (self-hosted) does not infect your application; redistribution of the extension itself is what AGPL governs.
   </Accordion>
+  <Accordion title="Why is the generated package named db?">
+    sqlc muscle memory: years of sqlc tutorials and configs already use `out: db`, so the default matches what your fingers type. Models, query wrappers, descriptors, builders, and statics all live in that one package, set once via `package: db` — it is an ordinary config value, so `package: store` renames the package everywhere. (The early default `dbgen` is retired.)
+  </Accordion>
+  <Accordion title="Can I rename it to paradedb or pdb?">
+    Technically yes — `package:` accepts any valid Go identifier. Both are poor choices, though: `pdb` collides with debugger muscle memory (it reads as a debugger prompt in stack traces and shell history), and `paradedb` is the name the [plugin system](/future/plugins) scopes to the official `pgb-paradedb` extension — using it for the generated package would make plugin docs and generated symbols ambiguous. Pick a domain noun: `db`, `store`, `queries`.
+  </Accordion>
+  <Accordion title="What does pgb cost me at build time?">
+    One process spawn per `sqlc generate`: sqlc launches the `sqlc-gen-pgb` binary, pipes one protobuf request in, reads the files out, and exits. No daemon, no watch mode, and no codegen at `go build` time — the generated code is checked into the repo and compiles like anything you wrote. Generation cost is dominated by sqlc's own parse/analyze; pgb's three passes are in-memory and add milliseconds on realistic schemas.
+  </Accordion>
 </AccordionGroup>

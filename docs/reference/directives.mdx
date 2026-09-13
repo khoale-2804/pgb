@@ -23,6 +23,50 @@ COMMENT ON COLUMN users.metadata   IS 'pgb:type=map[string]any';
 | `pgb:no_patch` | column | excluded from generated Update sets |
 | `pgb:type=<go type>` | column | Go type override (import path or bare type) |
 
+## A worked example
+
+A small `articles` schema with one directive per kind, plus a skipped table:
+
+```sql
+CREATE TABLE articles (
+    id          bigserial PRIMARY KEY,
+    title       text        NOT NULL,
+    body        text        NOT NULL,
+    secret_note text,                       -- never filtered, never patched
+    reviewer    text,
+    embedding   vector(384)
+);
+
+CREATE TABLE audit_log (
+    id        bigserial PRIMARY KEY,
+    what      text NOT NULL,
+    at        timestamptz NOT NULL DEFAULT now()
+);
+
+COMMENT ON COLUMN articles.reviewer    IS 'internal QA notes — plain comment, not a directive';
+COMMENT ON TABLE  audit_log            IS 'pgb:skip';
+COMMENT ON COLUMN articles.secret_note IS 'pgb:no_filter; pgb:no_patch';
+COMMENT ON COLUMN articles.embedding   IS 'pgb:type=github.com/pgvector/pgvector-go.Vector';
+```
+
+The generated surface, column by column:
+
+| column | directive | predicate surface | patch surface (`db.ArticleSet`) | model type |
+|---|---|---|---|---|
+| `id` | — | `ID().Eq / Ne / In / IsNull …` | `core.Set[int64]` | `int64` |
+| `title` | — | text predicates: `Eq`, `Like`, `ILike` … | `core.Set[string]` | `string` |
+| `body` | — | text + bm25 predicates (`Match` &c. via the paradedb index) | `core.Set[string]` | `string` |
+| `secret_note` | `no_filter; no_patch` | **none** — no predicate methods | **no field** — column can only change via `core.Raw` or handwritten SQL | `pgtype.Text` |
+| `reviewer` | — (plain comment) | text predicates | `core.Set[string]` | `pgtype.Text` |
+| `embedding` | `type=…pgvector-go.Vector` | vector predicates against the overridden type | `core.Set[pgvector.Vector]` | `pgvector.Vector` |
+| `audit_log` (whole table) | `skip` | — | — | — no model, no descriptors, no statics |
+
+Read the two halves of that table as guarantees: `no_filter` removes the read surface (nothing can query on `secret_note`), `no_patch` removes the write surface (no generated `UPDATE` can set it), and `skip` removes both plus the model. The `reviewer` comment shows the flip side — text that does not start with `pgb:` is documentation and changes nothing.
+
+<Note>
+Precedence against config: if the [`overrides` list](/reference/config) also targets `articles.embedding`, the directive wins — it is closer to the schema. Everything coarse-grained (dialect target, emit toggles, ParadeDB version) still belongs in sqlc.yaml, not in directives.
+</Note>
+
 ## Notes
 
 - A comment that does not start with `pgb:` is treated as documentation, not a directive — real table/column comments are safe to mix in.

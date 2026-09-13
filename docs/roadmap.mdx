@@ -8,9 +8,9 @@ icon: "map"
 
 | M | scope | exit criteria |
 |---|---|---|
-| **M0** | fork sqlc-gen-go into `gen/pass_models.go`; plugin skeleton wired into sqlc.yaml | real schema → models/query-wrappers identical to upstream |
-| **M1** | SchemaIR + oliphant DDL pass + core emitter + stage 1 descriptors/builders | golden tests + round-trip tests green |
-| **M2** | stage 2 statics + scan funcs + docker harness (PG18) | CRUD e2e against a real Postgres |
+| **M0** | fork sqlc-gen-go into `gen/pass_models.go`; plugin skeleton wired into sqlc.yaml | real schema → models/query-wrappers identical to upstream, emitted into the single package `db` |
+| **M1** | SchemaIR + oliphant DDL pass + core emitter + stage 1 descriptors/builders in `db/` | golden tests + round-trip tests green |
+| **M2** | stage 2 statics + scan funcs (package `db`) + docker harness (PG18) | CRUD e2e against a real Postgres |
 | **M3** | pg_search layer: index DDL extraction, predicates, scoring/snippets, aggregations/tokenizers docs, `SearchXxx` | e2e vs ParadeDB image; all "verify" shapes confirmed against 0.26-rc docs |
 | **M4** | PG19 gates (`ON CONFLICT DO SELECT`), keyset pagination, hybrid RRF, batch insert | matrix green on PG18 + PG19-beta |
 | **M5** | MERGE builder (opt-in), temporal upserts, directives polish, docs parity | tag v0.1 |

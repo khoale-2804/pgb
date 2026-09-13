@@ -3,25 +3,98 @@ title: "pgb — two-stage Postgres codegen"
 description: "Typed builders and static query functions generated from your schema. PostgreSQL 18 & 19, full ParadeDB pg_search support."
 ---
 
-**pgb** is a [sqlc](https://sqlc.dev) process plugin that turns your Postgres schema into four layers of Go — so repetitive SQL never gets hand-written again:
+**pgb** is a two-stage [sqlc](https://sqlc.dev) process plugin that turns your Postgres schema into one Go package — `db/` — so the repetitive SQL layer never gets hand-written again. You keep your schema as plain SQL and keep sqlc for analysis and handwritten queries; pgb adds the layer sqlc deliberately doesn't provide, all under a single shared type map:
 
-1. **Models** — typed structs, generated with sqlc-gen-go-compatible behavior and a single shared type map.
-2. **Stage 1: builders** — per-table column descriptors with typed predicates, including every ParadeDB pg_search operator on bm25-indexed columns.
+1. **Models** — typed structs, generated with sqlc-gen-go-compatible behavior.
+2. **Stage 1: builders** — per-table column descriptors with typed predicates, including every ParadeDB pg_search operator on `paradedb`-indexed columns.
 3. **Stage 2: static functions** — `Get / List / Count / Insert / InsertBatch / Update / Upsert / Delete / Search / HybridSearch` per table, ready to call.
 4. **Query wrappers** — typed Go functions for the handwritten queries sqlc already resolved.
 
+The whole flow, end to end — no SQL strings in application code:
+
+```go
+package main
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log"
+	"os"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	pgb "github.com/your-org/pgb/core" // handwritten runtime — small, versioned, readable
+	"github.com/your-org/shop/db"     // generated — one package, DO NOT EDIT
+)
+
+func main() {
+	ctx := context.Background()
+
+	// any pgx executor satisfies pgb.DBTX: pool, conn, or tx
+	pool, err := pgxpool.New(ctx, os.Getenv("DATABASE_URL"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer pool.Close()
+
+	// insert — typed params, the full row comes back
+	// INSERT INTO users (email, name) VALUES ($1, $2)
+	// RETURNING id, email, name, bio, created_at
+	ada, err := db.InsertUser(ctx, pool, db.InsertUserParams{
+		Email: "ada@example.com", Name: "Ada Lovelace",
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// dynamic list — filters compose structurally; no (@x IS NULL OR col = @x)
+	users, err := db.ListUsers(ctx, pool, db.UserFilter{
+		EmailLike:    pgb.Opt("%@example.com"),
+		CreatedAfter: pgb.Opt(time.Now().Add(-30 * 24 * time.Hour)),
+	}, pgb.Limit(20))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// search — generated from the USING paradedb index in your schema
+	// WHERE description === $1::pdb.fuzzy(1) AND category ||| $2::pdb.boost(2)
+	// ORDER BY pdb.score(id) DESC, id ASC   -- Top-K pushdown
+	hits, err := db.SearchProducts(ctx, pool, "runing shoes", db.SearchOpts{
+		Fuzzy:         1, // tolerates the typo
+		BoostCategory: 2.0,
+		Snippet:       "description", // pdb.snippet(description, start_tag => '<em>')
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// single-row lookup with a typed sentinel
+	_, err = db.GetUser(ctx, pool, ada.ID)
+	switch {
+	case errors.Is(err, pgb.ErrNotFound): // wraps pgx.ErrNoRows
+		fmt.Println("user is gone")
+	case err != nil:
+		log.Fatal(err)
+	default:
+		fmt.Printf("%d users, %d hits, user exists\n", len(users), len(hits))
+	}
+}
+```
+
 <CardGroup cols={2}>
   <Card title="Quickstart" icon="rocket" href="/welcome/quickstart">
-    Install the plugin, wire one yaml block, run `sqlc generate`.
+    Schema, sqlc.yaml, and a runnable main.go — generate your first package in five minutes.
+  </Card>
+  <Card title="Generated code" icon="code" href="/generated-code/builders">
+    What lands in `db/` — models, descriptors, builders, statics — and what you can call.
   </Card>
   <Card title="ParadeDB pg_search" icon="magnifying-glass" href="/paradedb/overview">
     Full support for the v2 operator API — stable 0.25.9, 0.26-rc tracked — predicates, scoring, snippets, hybrid RRF.
   </Card>
-  <Card title="Generated code" icon="code" href="/generated-code/builders">
-    What lands in `dbgen/` and what you can call.
-  </Card>
-  <Card title="Why this design" icon="book-open" href="/architecture/overview">
-    One plugin, one type map, a SchemaIR contract, and a churn barrier for pg_search.
+  <Card title="Support matrix" icon="table-list" href="/reference/support-matrix">
+    PostgreSQL 18 full / 19 gated, pg_search 0.25.9+ / 0.26-rc, Go 1.24+, pgx v5.
   </Card>
 </CardGroup>
 
@@ -29,25 +102,26 @@ description: "Typed builders and static query functions generated from your sche
 
 Pure sqlc is static: every query is hand-written SQL. Dynamic filtering devolves into planner-hostile workarounds like `(@x IS NULL OR col = @x)` (a known [anti-pattern](https://github.com/sqlc-dev/sqlc/discussions/364)), and anything ParadeDB-flavored needs raw SQL escape hatches.
 
-pgb keeps sqlc where it is strong — parsing your schema, analyzing your handwritten queries — and generates the layer sqlc deliberately doesn't provide: a **runtime query builder**, typed to your actual columns, plus **static functions** for the CRUD shapes every table repeats.
-
-```go
-// static layer — zero hand-written SQL
-users, err := dbgen.ListUsers(ctx, db, dbgen.UserFilter{
-    EmailLike:    pgb.Opt("%@corp.io"),
-    CreatedAfter: pgb.Opt(since),
-}, pgb.Limit(20))
-
-// search — generated from the USING paradedb index definition
-hits, err := dbgen.SearchProducts(ctx, db, "running shoes",
-    dbgen.SearchOpts{Fuzzy: 1, BoostCategory: 2.0, Snippet: "description"})
-```
+pgb keeps sqlc where it is strong — parsing your schema, analyzing your handwritten queries — and generates the runtime query builder, typed to your actual columns, plus static functions for the CRUD shapes every table repeats. Why one plugin and one package: [architecture overview](/architecture/overview).
 
 ## Targets
 
-| | |
+| component | support |
 |---|---|
-| Postgres | 18 (full), 19 (gated features, beta) |
-| ParadeDB | 0.25.9+ / 0.26-rc — v2 operator API (`\|\|\|`, `&&&`, `###`, `===`, `@@@`, `##`, `pdb.*`) |
+| PostgreSQL | 18 (full) · 19 (gated — beta-only syntax flag-gated until GA, see [version gates](/postgres/version-gates)) |
+| ParadeDB pg_search | 0.25.9+ / 0.26-rc — v2 operator API (`\|\|\|`, `&&&`, `###`, `===`, `@@@`, `##`, `pdb.*`); current stable v0.25.9 (2026-09-11) |
 | Go | 1.24+ · pgx/v5 · generics |
-| Generator | sqlc process plugin (protobuf over stdin/stdout) |
+| Generator | sqlc process plugin protocol (protobuf over stdin/stdout) — replaces `gen: go:` |
+
+## What gets generated
+
+```text
+db/
+├── models.gen.go           # User, Product · InsertUserParams, UserFilter, UserSet · scan funcs
+├── users.gen.go            # db.Users descriptor, typed predicates, builder, statics
+├── products.gen.go         # same for products
+└── products_search.gen.go  # SearchProducts / SearchProductsPage / SearchProductsHybrid
+                            # — only for tables with a USING paradedb index
+```
+
+One package (config `package: db`), flat files, `// Code generated ... DO NOT EDIT.` headers — on top of a small handwritten `core/` runtime the generated code imports. See the [quickstart](/welcome/quickstart) for the full walkthrough.

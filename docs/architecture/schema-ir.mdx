@@ -58,6 +58,41 @@ type SearchField struct {
 }
 ```
 
+## Worked example: one table through the pipeline
+
+A three-column table plus one directive:
+
+```sql
+CREATE TABLE tags (
+    id    bigserial PRIMARY KEY,
+    name  text NOT NULL,
+    color text NOT NULL DEFAULT 'gray'
+);
+COMMENT ON COLUMN tags.color IS 'pgb:no_filter';
+```
+
+The IR pgb builds from it (catalog gives types and nullability; oliphant recovers the default expression; the `COMMENT ON` directive rides along):
+
+```go
+ir.Table{
+    Schema:     "public",
+    Name:       "tags",
+    PrimaryKey: []string{"id"},
+    Columns: []ir.Column{
+        {Name: "id",    PGType: "int8", NotNull: true, HasDefault: true, DefaultExpr: "nextval('tags_id_seq'::regclass)"},
+        {Name: "name",  PGType: "text", NotNull: true},
+        {Name: "color", PGType: "text", NotNull: true, HasDefault: true, DefaultExpr: "'gray'", Comment: "pgb:no_filter"},
+    },
+    // Search: nil — no USING paradedb index on this table
+}
+```
+
+What codegen emits from that IR:
+
+- **`db/models.gen.go`** — `type Tag struct { ID int64; Name string; Color string }`, plus `TagFilter` (only `id` and `name` — the `pgb:no_filter` directive hides `color` from predicates) and a `TagSet` covering all three columns for updates.
+- **`db/tags.gen.go`** — the `db.Tags` descriptor with `ID()` / `Name()` / `Color()` column methods, the `TagSelect` builder, and statics `GetTag` / `ListTags` / `CountTags` / `InsertTag` / `UpdateTag` / `DeleteTag`; `color` is omitted from the INSERT column list because `HasDefault` is set.
+- **No `tags_search.gen.go`** — `Search` is nil, so the search layer is skipped entirely for this table; no search predicates, no `SearchTags`, no `ProductHit`-style results.
+
 ## Where each fact comes from
 
 | fact | source | why |

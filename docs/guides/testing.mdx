@@ -14,15 +14,65 @@ Table-driven: expression tree in, SQL + args out, byte-exact. Coverage includes 
 
 A canonical `testdata/schema.sql` (including `USING paradedb` DDL, enums, domains, generated columns) is run through the full pipeline; output is snapshotted.
 
-```bash
-go test ./... -update       # regenerate snapshots, review diffs like a PR
+```go
+// golden_test.go — harness shape; the real one lives beside the generator
+var update = flag.Bool("update", false, "rewrite golden files from current output")
+
+func TestGolden(t *testing.T) {
+    got, err := generateAll(t, "testdata/schema.sql", "testdata/queries.sql")
+    if err != nil {
+        t.Fatal(err)
+    }
+
+    if *update {
+        if err := writeGolden(t, "testdata/golden", got); err != nil {
+            t.Fatal(err)
+        }
+        return
+    }
+
+    want, err := readGolden(t, "testdata/golden")
+    if err != nil {
+        t.Fatal(err)
+    }
+    for file, wantSrc := range want {
+        if got[file] != wantSrc {
+            t.Errorf("%s drifted from the golden file — run with -update and review the diff", file)
+        }
+    }
+}
 ```
 
-Golden diffs are the code review surface for generator changes — every generated-line change is visible.
+The `-update` flow, end to end:
+
+```bash
+# 1. change the generator (template, emitter, mapping) or the test schema
+# 2. regenerate the snapshot
+go test ./internal/gen -run TestGolden -update
+# 3. review what moved — every generated line is in the diff
+git diff --stat testdata/golden/
+git diff testdata/golden/db/models.gen.go
+# 4. CI runs without -update and fails on any unreviewed drift
+go test ./internal/gen -run TestGolden
+```
+
+Reviewing the diff *is* the code review for generator changes: because the emitter is deterministic (same tree → byte-identical SQL, see [core API](/reference/core-api)), a golden diff shows exactly which generated lines a change moves and nothing else. No unreviewed drift can reach users — CI is red until the snapshot and the intent match.
 
 ## 3. Round-trip property tests
 
 The emitter's SQL is fed back through oliphant and must re-parse to the same statement shape. The generator ships with the PG18 parser in-process, so it can check its own grammar on every fuzz case — malformed emission is caught generically, not per-bug.
+
+```text
+for each fuzz case (schema fragment + expression tree):
+    sql  := emitter.Emit(tree)          # byte-deterministic output
+    stmt := oliphant.Parse(sql)         # PG18 grammar, in-process — no server
+    assert parse succeeds
+    assert statement shape matches the tree
+        same tables, same clause order,
+        same parameter count as the tree's collected args
+```
+
+The parameter-count assertion is what guards `Raw` compositing and empty-slice casts: if emitted placeholders and collected args ever disagreed, pgx would send the wrong values at runtime — the property test catches the disagreement at fuzz time instead.
 
 ## 4. Integration matrix (docker compose)
 
@@ -33,7 +83,30 @@ Every generated function executed against real servers:
 | full | `paradedb/paradedb` (0.25.9+/0.26) on **PG18** | CRUD, builders, search, scoring, hybrid RRF |
 | plain | `postgres:19-beta` | CRUD, builders, upsert gates — search lanes skipped until ParadeDB ships PG19 builds |
 
-ParadeDB emits version-agnostic SQL on the non-search paths, so the PG19 lane needs no code changes when its search lane activates.
+Both lanes run side by side in one compose file — separate ports, one `docker compose up`:
+
+```yaml
+services:
+  paradedb:                          # full lane — search + hybrid on PG18
+    image: paradedb/paradedb:0.25.9  # or an 0.26-rc tag; bundles pgvector (required since 0.25.0)
+    environment:
+      POSTGRES_USER: pgb
+      POSTGRES_PASSWORD: pgb
+      POSTGRES_DB: pgb
+    ports:
+      - "5432:5432"
+
+  pg19:                              # plain lane — non-search gates on 19 beta
+    image: postgres:19-beta
+    environment:
+      POSTGRES_USER: pgb
+      POSTGRES_PASSWORD: pgb
+      POSTGRES_DB: pgb
+    ports:
+      - "5433:5432"
+```
+
+The test runner points the full lane at `localhost:5432` and the plain lane at `localhost:5433`, keyed off each lane's image. ParadeDB emits version-agnostic SQL on the non-search paths, so the PG19 lane needs no code changes when its search lane activates.
 
 ## 5. Fork parity
 

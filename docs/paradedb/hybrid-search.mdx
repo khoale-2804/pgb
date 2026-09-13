@@ -1,71 +1,149 @@
 ---
 title: "Hybrid search"
-description: "Generated RRF fusion of BM25 text relevance and pgvector similarity — the documented ParadeDB pattern, as one function call."
+description: "Generated RRF fusion of BM25 text relevance and pgvector similarity — schema, config, one function call, and the complete fusion SQL."
 icon: "shuffle"
 ---
 
-ParadeDB has no single "hybrid" function; the documented pattern is **Reciprocal Rank Fusion** over two lanes. pgb generates it for every table that has both a `USING paradedb` index and a vector column (detected via the `pgvector.Vector` type override):
+ParadeDB has no single "hybrid" function; the documented pattern is **Reciprocal Rank Fusion** over two lanes. pgb generates it for every table that has both a `USING paradedb` index and a vector column (detected via the `pgvector.Vector` type override). One function call fuses BM25 relevance and cosine similarity into one ranking.
 
-```go
-hits, err := dbgen.SearchProductsHybrid(ctx, db, "running shoes", queryVec, dbgen.HybridOpts{
-    TextWeight:  0.7,
-    VecWeight:   0.3,
-    K:           60,    // RRF constant
-    PerLane:     20,    // per-lane LIMIT
-    Limit:       10,
-})
-```
+## 1. Schema
 
-## Emitted SQL
+The quickstart products table with an embedding column. pgvector has been a **required dependency** of pg_search since 0.25.0, and only the `vector` type is indexable — not `halfvec`, `sparsevec`, or `bit`:
 
 ```sql
-WITH text AS (
-    SELECT id, RANK() OVER (ORDER BY pdb.score(id) DESC, id) AS rank
+CREATE EXTENSION IF NOT EXISTS vector;
+
+CREATE TABLE products (
+    id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    seller_id   bigint NOT NULL REFERENCES users (id),
+    title       text NOT NULL,
+    description text NOT NULL,
+    category    text NOT NULL,
+    rating      integer NOT NULL DEFAULT 0,
+    price_cents bigint NOT NULL,
+    in_stock    boolean NOT NULL DEFAULT true,
+    metadata    jsonb NOT NULL DEFAULT '{}',
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    embedding   vector(768) NOT NULL
+);
+
+-- one index, both lanes: text fields and the vector opclass live in the
+-- same USING paradedb index — there is no separate pgvector index
+CREATE INDEX products_search ON products USING paradedb
+  (id,
+   title,
+   description::pdb.icu,
+   category::pdb.literal,
+   in_stock,
+   embedding vector_cosine_ops)
+  WITH (key_field='id');
+```
+
+The distance opclass is baked into the index definition — switching `vector_cosine_ops` to `vector_ip_ops` is a rebuild, not an `ALTER` (see [index DDL](/paradedb/index-ddl)).
+
+## 2. Required config overrides
+
+Two `sqlc.yaml` options make the codegen detect the vector lane — the `vector` type override types the model and the query parameter, and `vector_dim` types the `$2::vector` cast:
+
+```yaml
+options:
+  emit:
+    hybrid: true           # SearchXxxHybrid when a vector column exists
+  vector_dim:
+    products: 768
+  overrides:
+    - db_type: vector
+      go_type: github.com/pgvector/pgvector-go.Vector
+```
+
+## 3. The call
+
+```go
+import "github.com/pgvector/pgvector-go"
+
+qvec := pgvector.NewVector(queryEmbedding) // []float32(768) from your embedding model
+
+hits, err := db.SearchProductsHybrid(ctx, pool, "running shoes", qvec, db.HybridOpts{
+    TextWeight: 0.7, // BM25 lane's share of the fused score
+    VecWeight:  0.3, // vector lane's share
+    K:          60,  // RRF constant
+    PerLane:    20,  // each lane's LIMIT before fusion
+    Limit:      10,  // final result count
+})
+if err != nil {
+    return err
+}
+for _, h := range hits {
+    // h.Score is the fused RRF score; h.Product is the full row
+    fmt.Printf("%.4f  %s\n", h.Score, h.Product.Title)
+}
+```
+
+`hits` is `[]db.ProductHit` — the same result struct as [scoring](/paradedb/scoring), with `Score` holding the fused score instead of the raw BM25 score.
+
+## 4. Emitted SQL
+
+The weights, `K`, and per-lane limit are emitted as literals — they are config values from `HybridOpts`, not user data. The query text and the embedding are bound:
+
+```sql
+WITH text_lane AS (
+    SELECT id, RANK() OVER (ORDER BY pdb.score(id) DESC, id ASC) AS rank
     FROM products
     WHERE description ||| $1
+    ORDER BY pdb.score(id) DESC, id ASC
     LIMIT 20
-  ), vec AS (
+), vec_lane AS (
     SELECT id, RANK() OVER (ORDER BY embedding <=> $2::vector) AS rank
     FROM products
     WHERE id @@@ pdb.all()
+    ORDER BY embedding <=> $2::vector
     LIMIT 20
-  )
-SELECT p.*,
-       0.7/(60+text.rank) + 0.3/(60+vec.rank) AS rrf_score
-FROM products p
-JOIN text      ON text.id = p.id
-FULL JOIN vec  ON vec.id  = p.id
-ORDER BY rrf_score DESC, p.id
+), fused AS (
+    SELECT COALESCE(text_lane.id, vec_lane.id) AS id,
+           COALESCE(0.7 / (60 + text_lane.rank), 0.0)
+         + COALESCE(0.3 / (60 + vec_lane.rank), 0.0)  AS rrf_score
+    FROM text_lane
+    FULL OUTER JOIN vec_lane ON vec_lane.id = text_lane.id
+)
+SELECT p.id, p.seller_id, p.title, p.description, p.category, p.rating,
+       p.price_cents, p.in_stock, p.metadata, p.created_at,
+       fused.rrf_score AS score
+FROM fused
+JOIN products p ON p.id = fused.id
+ORDER BY fused.rrf_score DESC, p.id ASC
 LIMIT $3
+-- $1 = "running shoes" · $2 = the query embedding · $3 = 10
 ```
 
 Details that matter:
 
+- **Ranks, not scores.** Each lane produces a `RANK()` ordering; the fused score `weight / (K + rank)` is scale-free, so BM25 magnitudes never fight cosine distances. The `FULL OUTER JOIN` keeps rows found by only one lane — their missing contribution `COALESCE`s to `0.0`.
+- The text lane orders by `pdb.score(id) DESC, id ASC` — the indexed tiebreak that ParadeDB's Top-K execution requires.
 - The vector lane carries `WHERE id @@@ pdb.all()` — that forces ParadeDB execution and enables its Top-K routing for the lane.
-- `<=>` is cosine distance via pgvector, which has been a **required dependency** of pg_search since 0.25.0.
-- 0.26-rc's vector pushdown for RRF queries and vector tiebreak ordering apply to this shape automatically — no pgb change needed.
+- `<=>` is cosine distance via pgvector, matching the `vector_cosine_ops` opclass in the index.
+
+## Tuning
+
+| knob | guidance |
+|---|---|
+| `PerLane` | at least `Limit`, typically 2–4x. Both lanes must be deep enough that fusion has candidates to merge — with `PerLane == Limit` the fusion adds nothing over a single lane. |
+| `K` | the RRF paper's 60 is the sane default. Lower `K` makes the top few ranks dominate; higher `K` flattens the curve toward breadth-first ordering. |
+| `TextWeight` / `VecWeight` | browse-heavy catalogs favor text (`0.7`/`0.3`); visual or "find similar" flows favor vectors (`0.3`/`0.7`); balanced discovery starts at `0.5`/`0.5`. |
+
+Raising `PerLane` is cheap — the extra rows only widen the fusion pool, and each lane's `LIMIT` rides Top-K pushdown.
 
 <Note>
-The vector index itself is SPANN-style (not HNSW) and Beta — its format may change between pg_search releases and require a `REINDEX`. The `embedding vector_cosine_ops` opclass is declared *inside* the `USING paradedb (...)` index, not in a separate pgvector index; pgvector is a required dependency of pg_search since 0.25.0.
+The vector index itself is SPANN-style (not HNSW) and **Beta** — its format may change between pg_search releases and require a `REINDEX`. The `embedding vector_cosine_ops` opclass is declared *inside* the `USING paradedb (...)` index, not in a separate pgvector index; pgvector is a required dependency of pg_search since 0.25.0.
 </Note>
 
-## Requirements
+## 0.26-rc improvements
 
-1. The `vector` type override in sqlc.yaml:
+pg_search 0.26.0-rc.1 (prerelease — the current stable is 0.25.9) improves this exact shape, and pgb emits the richer SQL automatically behind the [version gate](/paradedb/overview) with no call-site change:
 
-```yaml
-overrides:
-  - db_type: vector
-    go_type: github.com/pgvector/pgvector-go.Vector
-```
+1. **Vector tiebreak ordering** — the vector lane can carry an indexed tiebreak (`ORDER BY embedding <=> $2::vector, id ASC`), which qualifies the lane for `SegmentedTopKExec` pruning the same way the text lane's `(score, id)` pair does.
+2. **Vector pushdown for RRF queries** — the nearest-neighbor work of the vector lane pushes down into the custom scan instead of executing as a plain Postgres ordering.
 
-2. `vector_dim` config when generating the `$2::vector` cast parameter typing:
-
-```yaml
-options:
-  vector_dim:
-    products: 768
-```
+On a 0.25.9 server pgb emits the shape above; on 0.26-rc it emits the tiebroken, pushed-down variant. Either way the fused result is the same — the difference is how much work Postgres does to produce it.
 
 ## Non-goals
 

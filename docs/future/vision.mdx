@@ -23,8 +23,8 @@ pgb/*.pgb (multiple schema files)
 SchemaIR  ────────────────────────────────────────┐
      │                                            │
      ▼                                            ▼
-db/ + dbgen/ (models, builders,          .pgb/schema.bin (encoded IR:
-statics, ORM client)                      IR + pgb version + content hash)
+db/ (models, builders,          .pgb/schema.bin (encoded IR:
+statics, ORM client)                IR + pgb version + content hash)
                                                       │
                                               pgb migrate (reads artifact)
                                                       │
@@ -64,6 +64,7 @@ Design points:
 - **ParadeDB annotations are first-class** — `@search(...)` fields become the `USING paradedb` index columns, `@@paradedb(keyField:)` sets the key field, JSON paths and aliases are declared where you read them. No other ORM schema language can express a search index; that stays pgb's wedge. Attributes are **plugin-owned**: they are claimed by the official `pgb-paradedb` extension via the [plugin system](/future/plugins), and an unknown attribute errors naming the plugin that would claim it.
 - Every construct has an exact SQL DDL projection — the DSL is **lossless against Postgres 18/19 features** (generated columns, temporal constraints, ranges), not a lossy abstraction.
 - Base types mirror the [type-mapping table](/reference/type-mapping); `@pg(type:)` overrides map to Go.
+- **Output shape unchanged**: the DSL compiles to the same SchemaIR and emits into the same single `db` package (`package: db`) — one type map end to end, whether the source was SQL or DSL.
 - The SQL-first path stays untouched: `schema.sql` + sqlc continues to work. Both doors produce the same SchemaIR.
 
 ## P2 — encoded artifact + `pgb migrate`

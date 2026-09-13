@@ -69,6 +69,43 @@ The knobs pgb users most often touch:
 | `background_layer_sizes` / `layer_sizes` | 100KB–10GB layers | the boundaries background merges stop at |
 | `work_mem` | 15MB minimum enforced | floor for index maintenance, raised at runtime if set lower |
 
+### Writes: a concrete session
+
+The write path end to end. Compaction checks for merge opportunities on every `INSERT`/`UPDATE`/`COPY`/`VACUUM`, but the merges themselves run in the background — statements never wait on them.
+
+```sql
+SET work_mem = '64MB';
+
+-- statement 1: 400 rows append to the mutable segment
+INSERT INTO products (id, title, description, rating)
+SELECT g, 'Item ' || g, 'a searchable description for item ' || g, 4.0
+FROM generate_series(1, 400) g;
+
+-- statement 2: 500 more rows — still the same mutable segment (900 rows buffered)
+INSERT INTO products (id, title, description, rating)
+SELECT g, 'Item ' || g, 'a searchable description for item ' || g, 4.5
+FROM generate_series(401, 900) g;
+
+-- statement 3: rows 901-1000 freeze the mutable segment into an immutable one;
+-- rows 1001-1400 open the next mutable segment
+INSERT INTO products (id, title, description, rating)
+SELECT g, 'Item ' || g, 'a searchable description for item ' || g, 3.8
+FROM generate_series(901, 1400) g;
+```
+
+Each statement commits and becomes searchable immediately — there is no refresh to wait for. Frozen segments then consolidate layer by layer in the background (100KB, 1MB, 10MB, 100MB, 1GB, 10GB).
+
+The tuning knobs, and when they are worth touching:
+
+| knob | default | touch it when |
+|---|---|---|
+| `mutable_segment_rows` | 1,000 | bulk loading: raise it (`ALTER INDEX products_search SET (mutable_segment_rows = 50000)`) so the load freezes fewer, larger segments, then restore the default. A high value trades read latency and RAM for write throughput, since the mutable structure is slower to search |
+| `background_layer_sizes` | `100KB, 1MB, 10MB, 100MB, 1GB, 10GB` | almost never — the defaults suit most tables. Trim only to bound background merge work (`ALTER INDEX ... SET (background_layer_sizes = '100MB, 1GB')`); setting `0` disables background merging |
+| `layer_sizes` | unset (foreground merging off) | keep it unset — it moves merging into the foreground and slows writes. Use it only to apply back pressure when segments are being created faster than they can merge |
+| `work_mem` | 15MB floor enforced | raise for large bulk updates (`SET work_mem = '64MB'`); values below 15MB are ignored and 15MB is used |
+
+`mutable_segment_rows` can also be set database-wide with `SET paradedb.global_mutable_segment_rows = 1000`; the global setting then overrides per-index settings (its default, `-1`, means per-index settings win).
+
 ## Custom-scan pushdown
 
 ParadeDB registers a custom scan node with the Postgres planner. It activates **only when a ParadeDB operator or `pdb.*` function appears in the query** — a plain `SELECT` against an indexed table is left to the standard planner and standard access paths.
@@ -82,7 +119,45 @@ ORDER BY score DESC
 LIMIT 10;
 ```
 
-Here the `@@@` predicate triggers the custom scan, and `ORDER BY score DESC LIMIT 10` is served by `SegmentedTopKExec`, which reads only the per-segment tops instead of scoring every row. The full pushdown surface:
+Here the `@@@` predicate triggers the custom scan, and `ORDER BY score DESC LIMIT 10` is served by `SegmentedTopKExec`, which reads only the per-segment tops instead of scoring every row. You can see this in `EXPLAIN` (abridged):
+
+```sql
+EXPLAIN
+SELECT id, description, pdb.score(id) AS score
+FROM products
+WHERE description @@@ 'running shoes'
+ORDER BY score DESC
+LIMIT 10;
+```
+
+```ini
+Limit  (cost=10.00..10.02 rows=3 width=552)
+  ->  Custom Scan (ParadeDB Base Scan) on products  (cost=10.00..10.02 rows=3 width=552)
+        Table: products
+        Index: products_search
+        Segment Count: 3
+        Exec Method: SegmentedTopKExec
+        Scores: true
+           TopK Order By: pdb.score(id) DESC
+           TopK Limit: 10
+        Tantivy Query: {"with_index":{"query":{"match":{"field":"description","value":"running shoes"}}}}
+```
+
+The contrast, same table and same index, but **no ParadeDB operator in the query**:
+
+```sql
+EXPLAIN
+SELECT id, rating FROM products WHERE rating > 4.0;
+```
+
+```ini
+                     QUERY PLAN
+-----------------------------------------------------
+ Seq Scan on products  (cost=0.00..22.50 rows=310 width=16)
+   Filter: (rating > 4.0)
+```
+
+Plain Postgres nodes — the custom scan never activates without an operator, even on an indexed table. The full pushdown surface:
 
 | query shape | what executes |
 |---|---|

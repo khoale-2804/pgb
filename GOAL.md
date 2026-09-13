@@ -130,6 +130,21 @@ there) — `export PATH=$PATH:$HOME/go/bin`.
 - Full gate green: build/vet/test/validate/validate-plugin; emitted
   package compiles.
 
+## ALREADY-DONE (2026-09-13 third shift)
+
+- Integration lane on pg_search 0.25.9 (f3ddd2e): docker-compose pinned to
+  paradedb/paradedb:0.25.9 (0.24 `latest` = `USING bm25`, incompatible);
+  testdata/integration 7 tests green (CRUD + defaults, batch, ErrNoWhere,
+  unique violation, BM25 search + score + snippet, vector roundtrip,
+  composite-PK orders); schema fixture fix — edge_ngram needs explicit
+  typmod `(title::pdb.edge_ngram(2, 10))` on 0.25.9; gen fix —
+  identity columns (CONSTR_IDENTITY) now HasDefault=true and excluded from
+  INSERT lists; docs pinned to 0.25.9 as tested floor (installation,
+  quickstart, testing, version-gates AM-rename section, support-matrix,
+  README). Sequencing gotcha: `go test ./...` wipes testdata/golden/
+  gen-plugin/ on cleanup — run make validate-plugin BEFORE the integration
+  lane.
+
 ## ALREADY-DONE (2026-09-14 first cron shift)
 
 - Backlog items 1–5 ALL COMPLETE (M3a/b/c + M1 + docs sync). Full gate green:

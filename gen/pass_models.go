@@ -51,13 +51,10 @@ func PassModels(sch ir.Schema, opts Options, dir DirectiveSet) ([]byte, error) {
 			t.Schema == "pg_catalog" || t.Schema == "information_schema" {
 			continue
 		}
-		structName := singularize(pascalIdent(t.Name))
-		if t.Schema != "" && t.Schema != sch.DefaultSchema {
-			// Same-name tables across schemas must not collide in one
-			// package: prefix the schema ("app.users" -> AppUser), matching
-			// the builders/statics naming.
-			structName = pascalIdent(t.Schema) + structName
-		}
+		// Struct name via the shared naming helper: identical to the old
+		// inline singularize+schema-prefix rule, plus the cross-schema
+		// collision suffix so model, descriptor and file names always agree.
+		_, structName, _ := goTableNames(sch, t)
 
 		seen := map[string]int{}
 		type field struct {

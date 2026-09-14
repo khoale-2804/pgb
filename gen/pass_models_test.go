@@ -323,3 +323,63 @@ func TestGoTypeForScoping(t *testing.T) {
 		t.Errorf("dbtype fallback: got %q, want dbtype", got)
 	}
 }
+
+// TestGoTableNamesCollisionDedupe pins the cross-schema naming dedupe: a
+// default-schema table named "app_users" and the schema-qualified
+// "app"."users" used to produce identical descriptors, model structs AND
+// file names (silent overwrite + duplicate identifiers). The first table in
+// catalog order keeps the base names; the collider takes the numeric
+// suffix across descriptor, model and file stem.
+func TestGoTableNamesCollisionDedupe(t *testing.T) {
+	sch := ir.Schema{
+		DefaultSchema: "public",
+		Tables: []ir.Table{
+			{Schema: "public", Name: "app_users", Columns: []ir.Column{
+				{Name: "id", PGType: "int8", NotNull: true},
+			}},
+			{Schema: "app", Name: "users", Columns: []ir.Column{
+				{Name: "id", PGType: "int8", NotNull: true},
+			}},
+			// reverse catalog order: the schema-qualified one first
+			{Schema: "app", Name: "audit_log", Columns: []ir.Column{
+				{Name: "id", PGType: "int8", NotNull: true},
+			}},
+			{Schema: "public", Name: "app_audit_log", Columns: []ir.Column{
+				{Name: "id", PGType: "int8", NotNull: true},
+			}},
+		},
+	}
+	p1, s1, f1 := goTableNames(sch, sch.Tables[0])
+	p2, s2, f2 := goTableNames(sch, sch.Tables[1])
+	p3, s3, f3 := goTableNames(sch, sch.Tables[2])
+	p4, s4, f4 := goTableNames(sch, sch.Tables[3])
+
+	if p1 != "AppUsers" || s1 != "AppUser" || f1 != "app_users" {
+		t.Errorf("first collider keeps base names: got %q/%q/%q", p1, s1, f1)
+	}
+	if p2 != "AppUsers2" || s2 != "AppUser2" || f2 != "app_users2" {
+		t.Errorf("second collider suffixed: got %q/%q/%q", p2, s2, f2)
+	}
+	if p3 != "AppAuditLogs" || s3 != "AppAuditLog" || f3 != "app_audit_log" {
+		t.Errorf("schema-qualified-first keeps base names: got %q/%q/%q", p3, s3, f3)
+	}
+	if p4 != "AppAuditLogs2" || s4 != "AppAuditLog2" || f4 != "app_audit_log2" {
+		t.Errorf("later default-schema collider suffixed: got %q/%q/%q", p4, s4, f4)
+	}
+
+	// The assignment is a pure function of the schema: a second pass returns
+	// identical names (every pass must derive the same ones).
+	p1b, s1b, f1b := goTableNames(sch, sch.Tables[0])
+	if p1b != p1 || s1b != s1 || f1b != f1 {
+		t.Errorf("naming not deterministic: %q/%q/%q vs %q/%q/%q", p1b, s1b, f1b, p1, s1, f1)
+	}
+
+	// Non-colliding tables are unaffected.
+	pure := ir.Schema{DefaultSchema: "public", Tables: []ir.Table{
+		{Schema: "public", Name: "users"},
+		{Schema: "app", Name: "orders"},
+	}}
+	if p, s, f := goTableNames(pure, pure.Tables[1]); p != "AppOrders" || s != "AppOrder" || f != "app_orders" {
+		t.Errorf("prefix rule broken: %q/%q/%q", p, s, f)
+	}
+}

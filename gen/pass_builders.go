@@ -132,7 +132,17 @@ func genSchema(name string) bool {
 // table name is not a plural (singularize is the identity — cache_blob,
 // partitions), the models pass claims the identifier for the row struct,
 // so the descriptor var pluralizes instead ("CacheBlobs").
-func goTableNames(sch ir.Schema, t ir.Table) (plural, singular, fileBase string) {
+//
+// Schema-qualified names can STILL collide with a default-schema table
+// ("app.users" vs a table literally named "app_users"), which would make
+// two files share a name (silent overwrite) and two types share an
+// identifier (compile error). Resolution is deterministic: tables earlier
+// in catalog order keep the base names, later colliders take a numeric
+// suffix (AppUsers2/app_users2) until both the identifier and the file
+// stem are free. The dedupe is a pure function of the schema, so every
+// pass derives identical names.
+// baseTableNames is the un-suffixed base naming for one table.
+func baseTableNames(sch ir.Schema, t ir.Table) (plural, singular, fileBase string) {
 	p := pascalIdent(t.Name)
 	fb := t.Name
 	if t.Schema != "" && t.Schema != sch.DefaultSchema {
@@ -144,6 +154,49 @@ func goTableNames(sch ir.Schema, t ir.Table) (plural, singular, fileBase string)
 		p += "s"
 	}
 	return p, sg, fb
+}
+
+func goTableNames(sch ir.Schema, t ir.Table) (plural, singular, fileBase string) {
+	type names struct {
+		p, s, fb string
+	}
+	final := make(map[[2]string]names, len(sch.Tables))
+	takenP := map[string]bool{}
+	takenS := map[string]bool{}
+	takenFb := map[string]bool{}
+	for i := range sch.Tables {
+		ot := sch.Tables[i]
+		if !genSchema(ot.Schema) {
+			continue
+		}
+		op, os, ofb := baseTableNames(sch, ot)
+		key := [2]string{ot.Schema, ot.Name}
+		if !takenP[strings.ToLower(op)] && !takenS[strings.ToLower(os)] &&
+			!takenFb[strings.ToLower(ofb)] {
+			final[key] = names{op, os, ofb}
+		} else {
+			// A table-qualified name collided with an earlier table's base
+			// names: take the lowest numeric suffix free in ALL three
+			// spaces (descriptor, model, file stem).
+			for k := 2; ; k++ {
+				p, sg, f := op+strconv.Itoa(k), os+strconv.Itoa(k), ofb+strconv.Itoa(k)
+				if !takenP[strings.ToLower(p)] && !takenS[strings.ToLower(sg)] &&
+					!takenFb[strings.ToLower(f)] {
+					final[key] = names{p, sg, f}
+					op, os, ofb = p, sg, f
+					break
+				}
+			}
+		}
+		takenP[strings.ToLower(op)] = true
+		takenS[strings.ToLower(os)] = true
+		takenFb[strings.ToLower(ofb)] = true
+	}
+	if n, ok := final[[2]string{t.Schema, t.Name}]; ok {
+		return n.p, n.s, n.fb
+	}
+	// t not in the schema (defensive): base names unchanged.
+	return baseTableNames(sch, t)
 }
 
 // fieldNames returns the exported Go field name per column (catalog order),
